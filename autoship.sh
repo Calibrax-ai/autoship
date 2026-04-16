@@ -104,6 +104,12 @@ phase_boot() {
     [[ -f "$PROTOTYPE_DIR/.env" ]] || die "compose references env_file but $PROTOTYPE_DIR/.env missing"
   fi
 
+  # Fresh containers for new runs; resume keeps existing stack
+  if [[ "$IS_NEW_RUN" == true ]]; then
+    log "  new run — tearing down stale containers"
+    (cd "$PROTOTYPE_DIR" && docker compose down -v 2>/dev/null) || true
+  fi
+
   (cd "$PROTOTYPE_DIR" && docker compose up -d --build --wait --wait-timeout 300) \
     | tee "$RUN_DIR/logs/boot.log"
 
@@ -184,9 +190,11 @@ cmd_ingest() {
 
   if [[ -f "$CURRENT_RUN_FILE" ]] && [[ -d "$AUTOSHIP_DIR/runs/$(cat "$CURRENT_RUN_FILE")" ]]; then
     RUN_ID="$(cat "$CURRENT_RUN_FILE")"
+    IS_NEW_RUN=false
     log "resuming: $RUN_ID"
   else
     RUN_ID="$(date -u +%Y-%m-%dT%H-%M-%S)-ingest"
+    IS_NEW_RUN=true
     log "new run: $RUN_ID"
   fi
 
