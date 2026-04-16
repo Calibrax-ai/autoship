@@ -1,6 +1,8 @@
 ---
 name: controller
 description: Orchestrates autoship ingest pipeline. Spawns sub-agents, verifies artifacts, manages state. Never stops until pipeline complete.
+model: opus
+effort: high
 tools: Read, Glob, Grep, Bash, Write
 permissionMode: bypassPermissions
 ---

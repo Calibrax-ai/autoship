@@ -1,6 +1,8 @@
 ---
 name: external
 description: External service enumeration probe for reverse-spec-extraction Phase 1. Catalogs all external dependencies from source analysis.
+model: opus
+effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 150
 permissionMode: bypassPermissions

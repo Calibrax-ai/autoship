@@ -1,6 +1,8 @@
 ---
 name: data
 description: Live database introspection probe for reverse-spec-extraction Phase 1. Describes actual data state independent of code claims.
+model: opus
+effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 150
 permissionMode: bypassPermissions
