@@ -213,6 +213,22 @@ If your output has fewer fields per entry than the example below, you are under-
 }
 ```
 
+#### Design system schema (`design.md`)
+
+Full schema is in `skills/reverse-spec-extraction/references/design-system-schema.md`. See `references/design-system-example-posthog.md` for a complete worked example showing expected depth. Nine required sections:
+
+1. **Visual Theme & Atmosphere** — narrative description of visual personality, key characteristics
+2. **Color Palette & Roles** — every color observed, grouped by role (primary, surface, semantic, gradients)
+3. **Typography Rules** — font families, full hierarchy table with computed values, principles
+4. **Component Stylings** — buttons, cards, inputs, navigation, images, all variants with exact values
+5. **Layout Principles** — spacing system, grid, whitespace philosophy, border-radius scale
+6. **Depth & Elevation** — shadow system, depth philosophy, decorative depth
+7. **Do's and Don'ts** — 6-8 specific actionable rules and anti-patterns with exact values
+8. **Responsive Behavior** — breakpoints table, touch targets, collapsing strategy
+9. **Agent Prompt Guide** — quick color reference, example component prompts, iteration checklist
+
+All values must be extracted from the running prototype via browser inspection (computed styles, DOM, network). Do not guess or assume from domain knowledge.
+
 ### Phase 2 — Reconciliation
 
 A single reconciler agent (fresh context, reads only probe outputs) produces the unified artifacts.

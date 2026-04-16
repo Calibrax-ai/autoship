@@ -151,3 +151,13 @@ autoship/
 4. `./autoship.sh status` shows a current, accurate picture during and after a run.
 
 If 1–3 pass, v0.1 is done. v0.2 adds oracle-assembly.
+
+## Track 2: controller.md Agent
+
+An alternative orchestration path where the Claude agent IS the controller — no bash wrapper. Inspired by karpathy/autoresearch's `program.md`: ~40 lines of goals and constraints, the agent reads `SKILL.md` and `autoship.sh` to derive the mechanics.
+
+**Invocation:** `claude --agent controller --add-dir <project-dir> -p "ingest <project-dir>"`
+
+**Why both tracks exist.** Track 1 (`autoship.sh`) is deterministic bash — good for CI, headless, reproducible runs. Track 2 (`controller.md`) is an adaptive agent — good for interactive use, error recovery, and future pipeline stages (oracle, build loop) where the controller needs judgment, not just sequencing. Both share the same state model (marker files, artifacts, agent definitions).
+
+**Design principle: thin controller, thick protocol.** The controller doesn't duplicate SKILL.md's artifact lists or autoship.sh's boot logic. It says "read SKILL.md for the protocol, read autoship.sh for reference, and go." This keeps one source of truth for the pipeline definition.

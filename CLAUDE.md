@@ -38,6 +38,16 @@ The ingest (`autoship.sh ingest <project-dir>`) takes 30-60 minutes (4 parallel 
 
 **Do NOT** run ingest in foreground Bash — it will be killed at 10 minutes mid-fanout.
 
+### Track 2: controller.md Agent (interactive/autonomous)
+
+The controller agent IS the orchestrator — no bash wrapper. Follows karpathy/autoresearch's program.md pattern: thin instructions, the agent figures out mechanics.
+
+```
+claude --agent controller --add-dir /path/to/project -p "ingest /path/to/project"
+```
+
+Same state model as Track 1 (marker files, artifacts, agent definitions). Both tracks coexist — use Track 1 for CI/headless, Track 2 for interactive/autonomous runs.
+
 ## Project Philosophy
 
 - **The hard part is artifact extraction, not code generation.** The product value is in turning a messy demo into a reliable spec, not in writing code. Claude Code is already strong at implementation.
