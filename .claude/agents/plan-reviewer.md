@@ -1,7 +1,7 @@
 ---
 name: plan-reviewer
 description: Skeptical fresh-context reviewer of slice plans before Stage 1 oracle dispatch. Reads spec pack + decisions.md + progress.txt, judges against four checks calibrated by docs/plan-reviewer-calibration.md, returns APPROVED or REJECTED with specific objections. The build-controller cannot proceed to oracle without this approval.
-model: claude-opus-4-7
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 60

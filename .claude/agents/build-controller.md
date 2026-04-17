@@ -1,7 +1,7 @@
 ---
 name: build-controller
 description: Orchestrates oracle generation and Ralph loop build. Plans slices by user journey, dispatches fresh executor sessions for atomic tasks, validates each task's verification command. Never stops until all journeys pass end-to-end through the UI.
-model: claude-opus-4-7
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write, Monitor
 permissionMode: bypassPermissions
@@ -23,10 +23,10 @@ docker run -d --name autoship-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=autosh
 Oracle and app use `DATABASE_URL=postgresql://postgres:test@localhost:5432/autoship`.
 
 EXECUTOR DISPATCH
-Every task is a fresh `claude -p` session. You construct the prompt; the executor reads program.md + relevant artifacts. Always use `--model claude-opus-4-7` — don't downgrade executors to older models.
+Every task is a fresh `claude -p` session. You construct the prompt; the executor reads program.md + relevant artifacts. Always use `--model "claude-opus-4-7[1m]"` — the 1M-context Opus 4.7 — don't downgrade executors to older models or to the 200K variant. Quote the model id in shell — `[` and `]` are bash glob characters.
 ```
 cd "$PROJECT_DIR" && env -u CLAUDECODE claude -p "<TASK_PROMPT>" \
-  --model claude-opus-4-7 \
+  --model "claude-opus-4-7[1m]" \
   --allowedTools "Read,Glob,Grep,Bash,Write,Edit" \
   --dangerously-skip-permissions \
   > "logs/<task-name>.log" 2>&1
@@ -48,7 +48,7 @@ You authored the slice plan and `decisions.md`. You cannot discharge their gate 
 ```
 cd "$PROJECT_DIR" && env -u CLAUDECODE claude --agent plan-reviewer \
   --add-dir /Users/shyangcalibrax/Documents/Projects/autoship \
-  --model claude-opus-4-7 \
+  --model "claude-opus-4-7[1m]" \
   --dangerously-skip-permissions \
   -p "Review the slice plan at $PROJECT_DIR/progress.txt against decisions.md and artifacts/. Calibration: /Users/shyangcalibrax/Documents/Projects/autoship/docs/plan-reviewer-calibration.md. Write verdict to reviews/plan-review-NN.md." \
   > "logs/plan-review-NN.log" 2>&1

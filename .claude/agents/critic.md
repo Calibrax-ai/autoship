@@ -1,7 +1,7 @@
 ---
 name: critic
 description: Phase 3 critic for reverse-spec-extraction. Judges whether merged artifacts are sufficient, self-consistent, and usable for build.
-model: opus
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 100

@@ -1,7 +1,7 @@
 ---
 name: reconciler
 description: Phase 2 reconciler for reverse-spec-extraction. Merges Phase 1 probe outputs into unified spec artifacts.
-model: opus
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 150

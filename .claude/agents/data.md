@@ -1,7 +1,7 @@
 ---
 name: data
 description: Live database introspection probe for reverse-spec-extraction Phase 1. Describes actual data state independent of code claims.
-model: claude-opus-4-7
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 150

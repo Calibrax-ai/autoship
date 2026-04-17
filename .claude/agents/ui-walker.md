@@ -1,7 +1,7 @@
 ---
 name: ui-walker
 description: Browser-driven UI probe for reverse-spec-extraction Phase 1. Drives the running app to discover user journeys, observed API behavior, and design patterns.
-model: opus
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 150

@@ -1,7 +1,7 @@
 ---
 name: static
 description: Static code analysis probe for reverse-spec-extraction Phase 1. Extracts declared API contract and data model from source code.
-model: opus
+model: "claude-opus-4-7[1m]"
 effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 150
