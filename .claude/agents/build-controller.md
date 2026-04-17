@@ -43,12 +43,22 @@ The executor's job is: read the listed files (including the screenshot), modify 
 
 GATES AND VALIDATION
 
-Every stage and every task has a verification. A gate passes when its verification exits 0. You don't need four separate rules — you need the verifications to be meaningful.
+Every stage has a verification. A gate passes when its verification exits 0. Gates are about both *depth* (verifications are meaningful) **AND** *coverage* (every stage is gated). The probe-2.8 failure was a coverage gap — a meaningful per-stage check doesn't help if a stage has no check at all.
 
+- **Slice plan** — BEFORE dispatching Stage 1 oracle, the slice plan in `progress.txt` must account for every journey in `artifacts/user-journeys.json`. Verification:
+  ```
+  diff <(jq -r '.journeys[].id' artifacts/user-journeys.json | sort) \
+       <(grep -oE '^\| S[0-9]+ \| J[0-9]+' progress.txt | awk '{print $4}' | sort)
+  ```
+  Must exit 0, OR every journey in the diff must have a `Cut because:` entry in `decisions.md` with rationale derived from the spec pack (e.g., "J15 is decisioned-away via A2 — demo layer removed"), not from "feels redundant" or "covered by another slice." **No silent journey drops. No slice row mentioning more than one `JNN` id.** If this gate fails, regenerate the plan — do not dispatch Stage 1.
 - **Task** — the task's declared `verification` command. Exits 0, task passes. Non-zero, dispatch the executor again with the failure output.
-- **Stage 1 (oracle)** — all Vitest tests compile and run. They must fail (no app yet). If they can't compile, re-dispatch the oracle executor with the compile errors.
+- **Stage 1 (oracle)** — all Vitest tests compile and run (they must fail — no app yet). **AND every in-scope endpoint in `artifacts/api-spec.json` appears in at least one test file.** Verification: for each endpoint path, `grep -rF "<path>" oracle/` returns ≥1 hit. Silent exclusions are forbidden — an intentional skip requires a `decisions.md` entry AND an explicit `oracle-excluded:` block in `progress.txt`. If tests can't compile, re-dispatch the oracle executor with the compile errors.
 - **Scaffold** — the dev server starts, the shell loads in a browser with no console errors, declared routes are registered, **and the sample-data seed script runs cleanly against a fresh migration** (produces expected row counts per `artifacts/sample-data/*.csv`). Empty-state scaffold is not a passing scaffold.
-- **Slice** — the slice's journey works end-to-end through the UI **on seeded data, not on empty state**. Every step in `artifacts/user-journeys.json` for that journey succeeds and produces its expected result. Also: (a) **structural screenshot comparison** — read the built page's screenshot side-by-side with `artifacts/screenshots/JNN-<page>.png`; note drift. Missing sections, wrong component types, missing diagrams/arrows, or wrong hierarchy means re-dispatch a fix task. Minor spacing/color drift is acceptable. (b) `cd oracle && npm test` count holds steady or increases. (c) Each task committed separately. No catch-all slices that bundle multiple journeys.
+- **Slice** — the slice's journey works end-to-end through the UI **on seeded data, not on empty state**. Every step in `artifacts/user-journeys.json` for that journey succeeds and produces its expected result. Also:
+  - (a) **Structural screenshot comparison** — read the built page's screenshot side-by-side with `artifacts/screenshots/JNN-<page>.png`; note drift. Missing sections, wrong component types, missing diagrams/arrows, or wrong hierarchy means re-dispatch a fix task. Minor spacing/color drift is acceptable.
+  - (b) `cd oracle && npm test` count holds steady or increases.
+  - (c) Each task committed separately.
+  - (d) **Dialog-theater check.** `grep -rnE 'preventDefault\(\)\s*;[^{}]*closeDialog\(\)' app/` returns zero matches, OR every match is paired with an awaited `fetch`/`axios`/mutation call in the same handler body. If violations exist, re-dispatch with the match list and the program.md dialog-theater anti-pattern quoted.
 - **Completion** — all journeys pass on seeded data AND all built pages structurally match their reference screenshots. Report any remaining gaps with screenshot side-by-sides.
 
 When a gate fails, dispatch another executor with the failure output in the prompt. **Run all slice-gate checks together per attempt — journey walk on seeded data, screenshot comparison, oracle count — and batch every failure into a single re-dispatch.** Iterating one check at a time invites whack-a-mole: the executor fixes screenshot drift and regresses the seeded walk; you re-dispatch for the walk and regress the screenshot. The executor needs to see all currently-failing checks at once to avoid breaking a passing one while repairing a failing one. If you're stalled on the same failure set with no new information between attempts, log a blocker in `progress.txt` and continue with other journeys — don't burn iterations on a frozen signal.
@@ -60,6 +70,8 @@ Before Stage 2, read `artifacts/user-journeys.json`. **Plan slices by user journ
 Do NOT plan slices by entity operations or data domains. That leaves pages without a primary data owner (dashboards, analytics, config pages, visualizations) orphaned in scaffold state. Every journey = one slice; no orphans.
 
 Write the slice plan to `progress.txt` — one slice per journey, in dependency order (journeys that create data first, journeys that read across data last). Slices can share data tables — use `CREATE TABLE IF NOT EXISTS` / additive migrations.
+
+**`progress.txt` scope — enforced.** Contents are limited to: (a) stage-status checklist, (b) slice plan table (slice id, journey id, dependencies, one-line new-routes-or-tables summary), (c) current slice pointer, (d) conventions set by prior slices that later slices must reuse (e.g., "DB reset pattern: TRUNCATE before each walk"), (e) blocker notes. It is **not** the place for: status enum values, column-name normalizations, API envelope shapes, route stubs as verbs, seed-script logic, or any implementation decision that an executor will make when a slice runs. Those belong in the dispatched executor's task prompt or in `decisions.md` when they close a spec ambiguity from `critic-report.md`. Pre-specifying implementation at planning time is how silent journey drops and stub-smuggling happened in probe-2.8.
 
 ATOMIC TASKS WITHIN A SLICE
 
