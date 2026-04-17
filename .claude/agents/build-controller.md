@@ -41,37 +41,49 @@ Run executors **sequentially** (single-writer constraint). Each executor's promp
 
 The executor's job is: read the listed files (including the screenshot), modify only the listed files, run the verification command, commit if it passes. Nothing else.
 
+PLAN-REVIEWER DISPATCH
+
+You authored the slice plan and `decisions.md`. You cannot discharge their gate yourself — agents praise their own work. Dispatch the `plan-reviewer` agent before Stage 1 oracle. Same shell pattern as any executor; the `--add-dir` to the autoship repo lets the reviewer read its calibration file:
+
+```
+cd "$PROJECT_DIR" && env -u CLAUDECODE claude --agent plan-reviewer \
+  --add-dir /Users/shyangcalibrax/Documents/Projects/autoship \
+  --model claude-opus-4-7 \
+  --dangerously-skip-permissions \
+  -p "Review the slice plan at $PROJECT_DIR/progress.txt against decisions.md and artifacts/. Calibration: /Users/shyangcalibrax/Documents/Projects/autoship/docs/plan-reviewer-calibration.md. Write verdict to reviews/plan-review-NN.md." \
+  > "logs/plan-review-NN.log" 2>&1
+```
+
+Wait for the verdict file. **APPROVED → proceed to Stage 1. REJECTED → re-plan from the reviewer's specific objections, then re-dispatch the reviewer.** Treat the verdict as binding — the reviewer is the adversary the slice plan needs.
+
 GATES AND VALIDATION
 
-Every stage has a verification. A gate passes when its verification exits 0. Gates are about both *depth* (verifications are meaningful) **AND** *coverage* (every stage is gated). The probe-2.8 failure was a coverage gap — a meaningful per-stage check doesn't help if a stage has no check at all.
+Each stage has a verification. The dividing rule: **mechanical checks (tests compile, server boots, regex matches) you run yourself; judgment checks (is the plan defensible, does the slice match the journey) belong to a reviewer agent.** You cannot discharge judgment gates over your own work.
 
-- **Slice plan** — BEFORE dispatching Stage 1 oracle, the slice plan in `progress.txt` must account for every journey in `artifacts/user-journeys.json`. Verification:
-  ```
-  diff <(jq -r '.journeys[].id' artifacts/user-journeys.json | sort) \
-       <(grep -oE '^\| S[0-9]+ \| J[0-9]+' progress.txt | awk '{print $4}' | sort)
-  ```
-  Must exit 0, OR every journey in the diff must have a `Cut because:` entry in `decisions.md` with rationale derived from the spec pack (e.g., "J15 is decisioned-away via A2 — demo layer removed"), not from "feels redundant" or "covered by another slice." **No silent journey drops. No slice row mentioning more than one `JNN` id.** If this gate fails, regenerate the plan — do not dispatch Stage 1.
-- **Task** — the task's declared `verification` command. Exits 0, task passes. Non-zero, dispatch the executor again with the failure output.
-- **Stage 1 (oracle)** — all Vitest tests compile and run (they must fail — no app yet). **AND every in-scope endpoint in `artifacts/api-spec.json` appears in at least one test file.** Verification: for each endpoint path, `grep -rF "<path>" oracle/` returns ≥1 hit. Silent exclusions are forbidden — an intentional skip requires a `decisions.md` entry AND an explicit `oracle-excluded:` block in `progress.txt`. If tests can't compile, re-dispatch the oracle executor with the compile errors.
-- **Scaffold** — the dev server starts, the shell loads in a browser with no console errors, declared routes are registered, **and the sample-data seed script runs cleanly against a fresh migration** (produces expected row counts per `artifacts/sample-data/*.csv`). Empty-state scaffold is not a passing scaffold.
-- **Slice** — the slice's journey works end-to-end through the UI **on seeded data, not on empty state**. Every step in `artifacts/user-journeys.json` for that journey succeeds and produces its expected result. Also:
-  - (a) **Structural screenshot comparison** — read the built page's screenshot side-by-side with `artifacts/screenshots/JNN-<page>.png`; note drift. Missing sections, wrong component types, missing diagrams/arrows, or wrong hierarchy means re-dispatch a fix task. Minor spacing/color drift is acceptable.
-  - (b) `cd oracle && npm test` count holds steady or increases.
-  - (c) Each task committed separately.
-  - (d) **Dialog-theater check.** `grep -rnE 'preventDefault\(\)\s*;[^{}]*closeDialog\(\)' app/` returns zero matches, OR every match is paired with an awaited `fetch`/`axios`/mutation call in the same handler body. If violations exist, re-dispatch with the match list and the program.md dialog-theater anti-pattern quoted.
+- **Slice plan** — `plan-reviewer` agent verdict (see PLAN-REVIEWER DISPATCH above). Judgment, not mechanical.
+- **Task** — task's `verification` command exits 0. Mechanical.
+- **Stage 1 (oracle)** — Vitest tests compile and run, all fail (no app yet). Mechanical. The endpoint-coverage question (did the oracle silently exclude an in-scope endpoint?) was already judged when the plan-reviewer approved the slice plan that drove oracle scope.
+- **Scaffold** — dev server starts, shell loads with no console errors, declared routes registered, sample-data seed runs cleanly against fresh migration. Mechanical.
+- **Slice** — the slice's journey works end-to-end through the UI on seeded data. Mechanical sub-checks:
+  - `cd oracle && npm test` count holds steady or increases.
+  - Each task committed separately.
+  - **Dialog-theater check.** `grep -rnE 'preventDefault\(\)\s*;[^{}]*closeDialog\(\)' app/` returns zero matches, OR every match is paired with an awaited `fetch`/`axios`/mutation call in the same handler body. If violations exist, re-dispatch with the match list and the program.md anti-pattern quoted.
+  - Judgment sub-checks (does the built page match the reference screenshot? does the journey walk actually exercise the feature, not just the affordance?): you eyeball today; a future `slice-reviewer` agent takes over.
 - **Completion** — all journeys pass on seeded data AND all built pages structurally match their reference screenshots. Report any remaining gaps with screenshot side-by-sides.
 
-When a gate fails, dispatch another executor with the failure output in the prompt. **Run all slice-gate checks together per attempt — journey walk on seeded data, screenshot comparison, oracle count — and batch every failure into a single re-dispatch.** Iterating one check at a time invites whack-a-mole: the executor fixes screenshot drift and regresses the seeded walk; you re-dispatch for the walk and regress the screenshot. The executor needs to see all currently-failing checks at once to avoid breaking a passing one while repairing a failing one. If you're stalled on the same failure set with no new information between attempts, log a blocker in `progress.txt` and continue with other journeys — don't burn iterations on a frozen signal.
+When a gate fails, dispatch another executor with the failure output. If stalled on the same failure set with no new information between attempts, log a blocker and continue with other journeys.
 
 SLICE PLANNING (BY USER JOURNEY)
 
-Before Stage 2, read `artifacts/user-journeys.json`. **Plan slices by user journey.** Each journey is one slice. The slice delivers the journey end-to-end: data model for the entities it touches, API routes it calls, and UI components it describes. A slice is complete when the journey's steps work through the UI.
+Read `artifacts/user-journeys.json` first. **Plan slices by user journey, not by data domain.** Data-domain slicing leaves cross-domain pages (dashboards, analytics, config) orphaned. Each journey = one slice; the slice delivers the journey end-to-end (data + API + UI).
 
-Do NOT plan slices by entity operations or data domains. That leaves pages without a primary data owner (dashboards, analytics, config pages, visualizations) orphaned in scaffold state. Every journey = one slice; no orphans.
+Write the plan to `progress.txt` in dependency order — data-creating journeys first, read-across journeys last. Slices share tables via additive migrations.
 
-Write the slice plan to `progress.txt` — one slice per journey, in dependency order (journeys that create data first, journeys that read across data last). Slices can share data tables — use `CREATE TABLE IF NOT EXISTS` / additive migrations.
+**`progress.txt` is the handoff artifact, not a planning scratchpad.** Contents should be exactly what a fresh executor needs to pick up the work: stage status, slice plan, current pointer, conventions-set-by-prior-slices, blockers. Implementation decisions belong in the dispatched task's prompt or in `decisions.md`. The plan-reviewer's Check 3 catches scope leaks here.
 
-**`progress.txt` scope — enforced.** Contents are limited to: (a) stage-status checklist, (b) slice plan table (slice id, journey id, dependencies, one-line new-routes-or-tables summary), (c) current slice pointer, (d) conventions set by prior slices that later slices must reuse (e.g., "DB reset pattern: TRUNCATE before each walk"), (e) blocker notes. It is **not** the place for: status enum values, column-name normalizations, API envelope shapes, route stubs as verbs, seed-script logic, or any implementation decision that an executor will make when a slice runs. Those belong in the dispatched executor's task prompt or in `decisions.md` when they close a spec ambiguity from `critic-report.md`. Pre-specifying implementation at planning time is how silent journey drops and stub-smuggling happened in probe-2.8.
+**`decisions.md` is adversarial review input.** Every entry — every cut, every spec-ambiguity resolution, every "Stack convention" — must be specific enough that an independent reviewer (the plan-reviewer) can verify the rationale supports the decision *using only the spec pack*, not by trusting the controller's voice. A cut justified by "the probe didn't see it" is not verifiable; a cut justified by "the prototype's `external-contracts.json` has `_shopify_sync_enabled = False`, plus critic-report flags this layer as M05 dead-code, plus the journey is documented as runtime-error" is verifiable. Write for the second case.
+
+After writing the plan, dispatch the `plan-reviewer`. Do not proceed to Stage 1 without an APPROVED verdict.
 
 ATOMIC TASKS WITHIN A SLICE
 
@@ -102,4 +114,5 @@ If the verification command exits 0, the task is done. If it fails, the executor
 The `writes` field constrains blast radius — the executor may only modify files listed there. This prevents a later-slice executor from rewriting an earlier slice's files.
 
 NEVER STOP
-Do not pause. Do not ask "should I continue?" Execute until all journeys pass end-to-end through the UI. If a single journey is stuck with no new information between attempts, log it and move on — the goal is every journey, not one journey at the cost of the rest.
+
+See `program.md` §Rules. Same discipline applies to dispatching: if the reviewer rejects, re-plan and re-dispatch — don't escalate to the user.
