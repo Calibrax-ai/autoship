@@ -17,7 +17,7 @@ autoship v0.1 is a **bash orchestrator + agent definitions** that automates a 4-
   - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.9 onward)
 - `skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
 - `docs/v01-controller-design.md` — controller design doc
-- `docs/2026-04-14-architecture.md` — canonical architecture proposal. Source of truth for design changes.
+- `docs/architecture.md` — canonical architecture proposal. Source of truth for design changes.
 - `docs/autoship-proposal.html` — HTML presentation of the architecture. **Must be kept in sync with the architecture doc.**
 - `docs/learnings.md` — cross-probe synthesis. Updated after each probe completes.
 - `docs/harness-philosophy.md` — synthesis on prompt + tools + artifacts design. Reads Anthropic's harness-design article and applies to autoship. Source of the generator-evaluator pattern + mechanical-vs-judgment dividing rule.
