@@ -203,6 +203,29 @@ Result: the controller passed every gate. **And cut J13 anyway**, with a transpa
 
 This is the deepest finding of the probe series.
 
+### Mid-2.8 validation (2026-04-17, 6 of 14 slices landed)
+
+After human-correction of J13 (reinstated with full upload-scan contract per revised A7) and resumption of the build, the execution layer is delivering faithfully. Spot-check at S06-landed / S07-running showed:
+
+- **Dialog-theater grep clean on every slice (S01–S06).** The anti-pattern gate is doing what it was designed for at the task level. Every landed handler has a real mutation or no action wired up — no `e.preventDefault(); closeDialog()` stubs.
+- **AR page (S03) renders seeded data 1:1 with reference structure.** Live browse: 37 transactions with real Malay counterparty names, waterfall math (Opening 0 → Invoiced 254,796 → Collected 35,408 → Closing 219,387), 4 status cards with accent colors, filter row with 3 dropdowns + 2 checkboxes, amber CoA warning banner with "Go to Business Context →" link, transaction table with correct 8-column schema and status pills (OVERDUE / PENDING MATCH / DISPUTED / PAID / CREDITED / PARTIALLY PAID) rendering with correct semantic colors. The reference PNG was captured on an empty tenant showing US$ 0 across all cards; the built page shows the *same structure populated with real numbers*, which is strictly stronger evidence than matching an empty reference would have been.
+- **GL page (S06) renders faithful empty state** — correct sidebar highlight, header "General Ledger" with blue accent, Export CSV + Compare buttons, FILTER row, and an empty-state card explaining "Journal entries appear here when you click Post to GL." GL is legitimately empty because the test tenant hasn't posted from AP yet.
+- **Oracle pass count monotonically rising across slices** (42 → 77 → 79 → ... → 122 at S06), with no regressions.
+
+Three 2.7 diagnoses map cleanly to execution-layer fixes that are now empirically validated:
+
+| 2.7 diagnosis | 2.8 fix | Evidence at S06-landed |
+|---|---|---|
+| Dialog theater on Upload/Match/Resolve | `grep -rnE 'preventDefault\(\)\s*;[^{}]*closeDialog\(\)' app/` must return zero in slice gate | 6 slices, grep returns zero every time |
+| Empty-PROBE blind spot | `data` probe extracts canonical dataset to `artifacts/sample-data/`; scaffold seeds it pre-journey-walk | AR page exercises pill-color logic, waterfall math, filter behavior, table rendering — all code paths untouched in probe-2.7 |
+| Screenshots never consulted | PNG path in executor's `reads` list with "screenshot wins if journey text disagrees" instruction | Built pages are 1:1 structural match to references |
+
+The three 2.7 failure modes were **execution-layer failures** with mechanical fixes: dialog theater = per-slice grep, empty-PROBE = data bootstrapping, screenshot-blindness = dispatch-prompt contract. All three land at the executor layer where they can be caught by pattern matching or fixed by changing what the executor reads. These fixes are validated.
+
+The J13 cut was a **planning-layer failure** — judgment about journey scope happening inside the controller that also discharges the gate judging its own plan. Mechanical gates can't catch it because the evidence is interpretive, not pattern-based. This is the problem `plan-reviewer` targets in 2.9 — structurally different from the three 2.7 failures.
+
+**Tentative conclusion pending 2.8 completion:** the execution-layer structural fixes work. The remaining open question is S13 (J13 upload with human-override contract) — if it ships real multipart + INSERT + AR/AP wire-up, then even the planning-layer failure was recoverable by operator intervention, and 2.9's `plan-reviewer` is the automation of that intervention. If S13 ships a 501-stub-with-toast despite the revised A7 in `decisions.md`, the self-evaluation problem reaches further than currently modeled and 2.9's design may need revisiting before launch.
+
 ## The accumulated-gates pattern, and why it loops
 
 Across 2.6 → 2.7 → 2.8 the same shape repeated:
