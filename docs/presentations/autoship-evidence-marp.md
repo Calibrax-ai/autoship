@@ -385,12 +385,12 @@ Each probe isolates one layer, finds its failure mode, and fixes it. Discipline,
 <div class="cols">
 
 <figure>
-<img src="../../../autoship-probe-2.8/artifacts/screenshots/02-accounts-receivable.png" alt="Reference AR page — empty tenant"/>
+<img src="../../../autoship-probe-2.4/artifacts/screenshots/02-accounts-receivable.png" alt="Reference AR page — empty tenant"/>
 <p class="cap">REFERENCE · prototype AR page on empty tenant (all US$ 0)</p>
 </figure>
 
 <figure>
-<img src="../../probe28-ar-live.png" alt="Autoship-built AR page — populated"/>
+<img src="../../probe24-ar-live.png" alt="Autoship-built AR page — populated"/>
 <p class="cap">BUILT · autoship output, seeded with prototype's own data</p>
 </figure>
 
@@ -428,7 +428,7 @@ Buttons opened dialogs that closed without doing anything. **Fix:** every task m
 The build never rendered a populated row. **Fix:** seed the prototype's own data before journey walks.
 
 ### Self-evaluation <span class="dim">(2.8)</span>
-When the same agent plans the work *and* judges its own plan, it passes every gate while cutting scope. **Fix:** separate author from judge <span class="dim">(probe 2.9, in flight)</span>.
+When the same agent plans the work *and* judges its own plan, it passes every gate while cutting scope. **Fix:** separate author from judge <span class="dim">(probe 2.5, in flight)</span>.
 
 </div>
 

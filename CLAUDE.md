@@ -14,7 +14,7 @@ autoship v0.1 is a **bash orchestrator + agent definitions** that automates a 4-
   - **Ingest synthesis**: reconciler, critic
   - **Ingest orchestration**: controller (Track 2)
   - **Build orchestration**: build-controller — dispatches per-slice executors, runs gates
-  - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.9 onward)
+  - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.5 onward)
 - `skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
 - `docs/v01-controller-design.md` — controller design doc
 - `docs/architecture.md` — canonical architecture proposal. Source of truth for design changes.
@@ -57,7 +57,7 @@ claude --agent controller --add-dir /path/to/project -p "ingest /path/to/project
 
 Same state model as Track 1 (marker files, artifacts, agent definitions). Both tracks coexist — use Track 1 for CI/headless, Track 2 for interactive/autonomous runs.
 
-## Running the Build (probe-2.9 onward)
+## Running the Build (probe-2.5 onward)
 
 The build-controller dispatches the per-slice executors. Per-probe directories live one level up at `/Users/shyangcalibrax/Documents/Projects/autoship-probe-<N.M>/`. Each probe carries its own `program.md`, `decisions.md`, `progress.txt`, `artifacts/`, and per-slice `app/` + `oracle/`.
 
@@ -71,6 +71,20 @@ claude --agent build-controller \
 The second `--add-dir` to the autoship repo is required so the build-controller can dispatch the `plan-reviewer` agent with access to `docs/plan-reviewer-calibration.md`.
 
 **Conflict warning:** all probes share the same Postgres container (`autoship-pg` on `:5432`), the same dev-server ports (3001, 5173), and the same `/tmp/oracle-prompt.txt`. Do not run two probes simultaneously without isolating ports + DB + Docker container name.
+
+## Probe renaming (2026-04-18)
+
+Probes were renamed from 2.5/2.6/2.7/2.8/2.9 → 2.1/2.2/2.3/2.4/2.5 for consistency. Git commit messages reference the old numbers and are not rewritten. Mapping:
+
+| Old | New | What it tested |
+|---|---|---|
+| probe-2.5 | probe-2.1 | Build-controller + stronger oracle + vertical slices |
+| probe-2.6 | probe-2.2 | Playwright journey tests added to oracle |
+| probe-2.7 | probe-2.3 | Journey-based slicing + atomic-task verification |
+| probe-2.8 | probe-2.4 | Sample-data + screenshot-as-layout-contract + forcing-function gates |
+| probe-2.9 | probe-2.5 | plan-reviewer agent (generator-evaluator pattern) — in flight |
+
+Claude Code session history for the old probe dirs lives under `~/.claude/projects/-Users-shyangcalibrax-Documents-Projects-autoship-probe-2-{5,6,7,8,9}/` — these are not renamed; they remain as historical reference.
 
 ## Project Philosophy
 

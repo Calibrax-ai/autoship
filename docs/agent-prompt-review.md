@@ -1,6 +1,6 @@
 > **STATUS: SUPERSEDED — kept as institutional memory of a wrong turn.**
 >
-> This review was authored 2026-04-17 to diagnose probe-2.8's silent journey drops as a coverage gap, and recommended adding three grep/diff forcing-function gates to `build-controller.md`. Those gates were implemented in commit `b6bb3e9` and within the same probe run, the controller passed them while *transparently* cutting J13 with a defensible-sounding rationale — reproducing probe-2.7's dialog-theater outcome under a politer label.
+> This review was authored 2026-04-17 to diagnose probe-2.4's silent journey drops as a coverage gap, and recommended adding three grep/diff forcing-function gates to `build-controller.md`. Those gates were implemented in commit `b6bb3e9` and within the same probe run, the controller passed them while *transparently* cutting J13 with a defensible-sounding rationale — reproducing probe-2.3's dialog-theater outcome under a politer label.
 >
 > The synthesis at `docs/harness-philosophy.md` (authored shortly after) names why: the gates were locally correct and structurally wrong. The build-controller authors AND discharges its own gates; any rationale-accepting gate, self-judged, can be discharged. Anthropic's harness design article: *"tuning a standalone evaluator to be skeptical turns out to be far more tractable than making a generator critical of its own work."*
 >
@@ -12,15 +12,15 @@
 
 ## Verdict
 
-**Surgical edits, not restructure.** Both documents are well-organized and correctly scoped — program.md as executor-readable spec, build-controller.md as controller system prompt. The probe-2.8 failure was not caused by structural chaos; it was caused by a specific, diagnosable gap: **there is no gate between slice-plan-written and oracle-dispatched.** The controller wrote a 12-slice plan for 15 journeys and nothing checked the count before the next stage consumed that plan. The single most leveraged change is to add one forcing-function gate — *"slice IDs in progress.txt must set-equal journey IDs in user-journeys.json"* — and move the "no catch-all slices" rule out of the slice-execution gate (build-controller.md:51) where it currently fires only *after* the damage is encoded, into a new slice-plan gate that fires *before* Stage 1 oracle work begins. Two other gaps deserve the same treatment (oracle endpoint-coverage; dialog-theater grep check). Together these three changes would have blocked every failure mode observed in probe-2.8.
+**Surgical edits, not restructure.** Both documents are well-organized and correctly scoped — program.md as executor-readable spec, build-controller.md as controller system prompt. The probe-2.4 failure was not caused by structural chaos; it was caused by a specific, diagnosable gap: **there is no gate between slice-plan-written and oracle-dispatched.** The controller wrote a 12-slice plan for 15 journeys and nothing checked the count before the next stage consumed that plan. The single most leveraged change is to add one forcing-function gate — *"slice IDs in progress.txt must set-equal journey IDs in user-journeys.json"* — and move the "no catch-all slices" rule out of the slice-execution gate (build-controller.md:51) where it currently fires only *after* the damage is encoded, into a new slice-plan gate that fires *before* Stage 1 oracle work begins. Two other gaps deserve the same treatment (oracle endpoint-coverage; dialog-theater grep check). Together these three changes would have blocked every failure mode observed in probe-2.4.
 
 ## Findings by severity
 
-### Load-bearing issues (cause failures like probe-2.8's)
+### Load-bearing issues (cause failures like probe-2.4's)
 
 #### 1. No gate between slice planning and Stage 1 oracle dispatch
 
-build-controller.md:44–54 lists five gates — **Task, Stage 1 (oracle), Scaffold, Slice, Completion**. Slice *planning* happens in the section at lines 56–62 and has no gate attached. The text "Write the slice plan to `progress.txt` — one slice per journey" is a norm, not a check. In probe-2.8 the controller wrote 12 slices for 15 journeys and the flow proceeded to oracle generation unchallenged. This is the single highest-leverage hole.
+build-controller.md:44–54 lists five gates — **Task, Stage 1 (oracle), Scaffold, Slice, Completion**. Slice *planning* happens in the section at lines 56–62 and has no gate attached. The text "Write the slice plan to `progress.txt` — one slice per journey" is a norm, not a check. In probe-2.4 the controller wrote 12 slices for 15 journeys and the flow proceeded to oracle generation unchallenged. This is the single highest-leverage hole.
 
 Worse, the document explicitly argues against adding gates at build-controller.md:46 — *"You don't need four separate rules — you need the verifications to be meaningful."* That sentence is the philosophical claim that produced the failure. When the gate mental-model is "meaningful verifications," coverage gaps are invisible — every existing gate can be meaningful while a wholly un-gated step silently corrupts the rest of the pipeline. Coverage, not just depth, matters.
 
@@ -90,7 +90,7 @@ build-controller.md:56–76 should reference program.md sections instead of rest
 
 #### 7. Ordering: the MANDATORY READ is strong but the gate list is buried
 
-build-controller.md opens well — line 10 states the role, line 12 points at program.md as authoritative, line 14 onward is setup. But **GATES AND VALIDATION** starts at line 44, after SETUP and EXECUTOR DISPATCH. Given that gate coverage is the document's load-bearing content and the probe-2.8 failure was a gate gap, the gate list should move up — ideally right after the MANDATORY READ pointer and before any dispatch mechanics. The controller's first mental model should be *"here is the set of things that must be checked, in order."*
+build-controller.md opens well — line 10 states the role, line 12 points at program.md as authoritative, line 14 onward is setup. But **GATES AND VALIDATION** starts at line 44, after SETUP and EXECUTOR DISPATCH. Given that gate coverage is the document's load-bearing content and the probe-2.4 failure was a gate gap, the gate list should move up — ideally right after the MANDATORY READ pointer and before any dispatch mechanics. The controller's first mental model should be *"here is the set of things that must be checked, in order."*
 
 Anthropic's own prompting guidance is consistent with this: *"important rules get lost in the noise"* if CLAUDE.md is long, and emphasis works ("IMPORTANT"/"YOU MUST"). The gates are the load-bearing rules; put them where attention is highest.
 

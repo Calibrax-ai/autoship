@@ -35,7 +35,7 @@ Contrast what build-controller.md has become. Procedural clauses, with the line 
 
 - **Probe 2.6 → 2.7 (dialog theater discovery).** We added the dialog-theater anti-pattern to `program.md`. That addition was correct and still thin-WHAT (*"forbidden"*, no detection recipe). Net change: zero drift — a content rule in the right file.
 - **Probe 2.7 → 2.8 (empty-state and screenshot elevation).** We added sample-data-seeding language and "screenshot as layout contract" to program.md. Also thin-WHAT. Also not drift.
-- **Post-probe-2.8 → today (`agent-prompt-review.md`).** This is where the drift lives. The review (authored 1 hour before this synthesis) diagnosed probe-2.8 as *"a coverage gap between gates"* and proposed three new forcing-function checks, all grep-based, all landing in build-controller.md. Every one of them was reasonable in isolation. Collectively they shifted the controller's system prompt from declarative to procedural.
+- **Post-probe-2.4 → today (`agent-prompt-review.md`).** This is where the drift lives. The review (authored 1 hour before this synthesis) diagnosed probe-2.4 as *"a coverage gap between gates"* and proposed three new forcing-function checks, all grep-based, all landing in build-controller.md. Every one of them was reasonable in isolation. Collectively they shifted the controller's system prompt from declarative to procedural.
 - **Honest note from the agent writing this doc.** That review — which I (as the calling agent) wrote — addressed a real hole but addressed it by widening the surface of HOW. The right criticism of my own earlier review is that it papered over a deeper structural miss: the controller has no adversary.
 
 Each drift step was defensible. The accumulated shape is not.
@@ -50,7 +50,7 @@ The article has several load-bearing claims for us. Paraphrase-free:
 
 3. **Criteria over checklists.** The frontend-design work didn't add more gates — it added four weighted criteria (design quality, originality, craft, functionality) and a separate evaluator calibrated with few-shot examples. The criteria were explicitly written to encode preferences (*"the best designs are museum quality"*) not to be grep-able. This is the opposite of what autoship has been drifting toward.
 
-4. **Sprint contracts (pre-commit negotiation).** *"Before each sprint, the generator and evaluator negotiated a sprint contract: agreeing on what 'done' looked like for that chunk of work before any code was written."* Applied to us: the build-controller should not be allowed to proceed from slice-plan to Stage 1 on its own signature. A separate reviewer should have to sign off on the plan. This is exactly the gap probe-2.8 exposed.
+4. **Sprint contracts (pre-commit negotiation).** *"Before each sprint, the generator and evaluator negotiated a sprint contract: agreeing on what 'done' looked like for that chunk of work before any code was written."* Applied to us: the build-controller should not be allowed to proceed from slice-plan to Stage 1 on its own signature. A separate reviewer should have to sign off on the plan. This is exactly the gap probe-2.4 exposed.
 
 5. **Simplify by stress-testing load-bearingness.** *"Every component in a harness encodes an assumption about what the model can't do on its own, and those assumptions are worth stress testing, both because they may be incorrect, and because they can quickly go stale as models improve."* And the practical method: *"remove one component at a time and review what impact it had."* The move from Opus 4.5 → 4.6 let the author *remove* the sprint decomposition. Several of autoship's gates may be in the same bucket — added because we didn't trust Claude, still there after Claude got better.
 
@@ -140,9 +140,9 @@ The set-equality grep becomes an internal sanity-check the controller may run op
 
 The *principle* ("handoff artifact, not scratchpad") is load-bearing. The eleven-line enumeration is the failure mode it's trying to name; once the principle is stated, the list is noise.
 
-**Deletion 1 — `build-controller.md:46-47` ("Gates are about both *depth* (verifications are meaningful) **AND** *coverage* (every stage is gated). The probe-2.8 failure was a coverage gap — a meaningful per-stage check doesn't help if a stage has no check at all.").**
+**Deletion 1 — `build-controller.md:46-47` ("Gates are about both *depth* (verifications are meaningful) **AND** *coverage* (every stage is gated). The probe-2.4 failure was a coverage gap — a meaningful per-stage check doesn't help if a stage has no check at all.").**
 
-Delete. This is probe-2.8 retrospective reasoning leaking into the forward prompt. The reviewer will catch uncovered stages by construction (if the slice plan is approved and the oracle is approved and the slice is approved, there is no stage to be un-gated). The two-sentence theory-of-our-past-failures is noise in the present run. Future retrospectives belong in `docs/`, not in the system prompt.
+Delete. This is probe-2.4 retrospective reasoning leaking into the forward prompt. The reviewer will catch uncovered stages by construction (if the slice plan is approved and the oracle is approved and the slice is approved, there is no stage to be un-gated). The two-sentence theory-of-our-past-failures is noise in the present run. Future retrospectives belong in `docs/`, not in the system prompt.
 
 **Deletion 2 — `build-controller.md:104-105` ("NEVER STOP" block).**
 

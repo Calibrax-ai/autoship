@@ -21,7 +21,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 - Multiple converging signals OR an explicit ambiguity resolution that genuinely could not be implemented under "pick simplest interpretation"
 - The cut does not reproduce a known anti-pattern under a different label
 
-### Case 1.1 — WRONG cut: J13 cut for "blocked-other in probe; no observed contract" (probe-2.8 attempt 2)
+### Case 1.1 — WRONG cut: J13 cut for "blocked-other in probe; no observed contract" (probe-2.4 attempt 2)
 
 **Decision:** Cut J13 Upload Documents; ship 501 endpoint + UI toast saying "Upload via seed script — see docs."
 
@@ -31,7 +31,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't only flag the literal string "blocked-other in probe." The shape is *cut justified by absence of probe observation when other evidence is present*. Synonyms: "probe didn't fire a POST," "no recorded request," "endpoint declared but not exercised." Reviewer asks: does the spec pack let me synthesize this contract anyway? If yes, the cut is wrong.
 
-### Case 1.2 — CORRECT cut: J15 Demo/Shopify cut via A2 (probe-2.8)
+### Case 1.2 — CORRECT cut: J15 Demo/Shopify cut via A2 (probe-2.4)
 
 **Decision:** Cut J15; no slice, no endpoints, demo `transactions` table dropped from schema.
 
@@ -41,7 +41,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't require literally three sources for every cut. The shape is *multi-source corroboration*. Two strong sources (e.g., critic explicitly says "dead code" + the runtime probe shows zero requests) can be sufficient. One source is rarely sufficient unless that source is itself authoritative (e.g., decisions.md from a prior probe with operator review).
 
-### Case 1.3 — WRONG cut: J12 Multi-Tenancy silently dropped (probe-2.8 attempt 1)
+### Case 1.3 — WRONG cut: J12 Multi-Tenancy silently dropped (probe-2.4 attempt 1)
 
 **Decision:** Omitted from slice plan with no rationale anywhere.
 
@@ -51,7 +51,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't only flag silent drops in the cuts list. The shape is *journey present in user-journeys.json, absent everywhere else*. Reviewer's first action: set-difference between journey IDs and (slice IDs ∪ cut IDs). Anything in the difference is a silent drop.
 
-### Case 1.4 — WRONG cut: J14 Reset Data silently dropped (probe-2.8 attempt 1)
+### Case 1.4 — WRONG cut: J14 Reset Data silently dropped (probe-2.4 attempt 1)
 
 **Decision:** Omitted from slice plan, same shape as J12.
 
@@ -59,7 +59,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Principle:** Same as 1.3. Listed separately because two consecutive silent drops in one plan is itself a signal — when the controller silently drops one journey, scan the rest of the plan for similar omissions.
 
-### Case 1.5 — CORRECT cut equivalent: D17 client-only Workflow Design + Minion Library (probe-2.7)
+### Case 1.5 — CORRECT cut equivalent: D17 client-only Workflow Design + Minion Library (probe-2.3)
 
 **Decision:** J09 + J11 implemented as static React data, no backend, no oracle tests.
 
@@ -75,7 +75,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Question:** Is each slice scoped to one journey, with no bundling, no orphaned pages, and atomic tasks that decompose within the slice?
 
-### Case 2.1 — WRONG bundle: probe-2.7 S2.13 covered J13 upload + transactions write path + email stubs + entity-duplicate 409
+### Case 2.1 — WRONG bundle: probe-2.3 S2.13 covered J13 upload + transactions write path + email stubs + entity-duplicate 409
 
 **Decision:** One slice covered four unrelated changes.
 
@@ -85,7 +85,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't only flag slices labeled "catch-all" or with explicit "+ X + Y + Z" in the description. The shape is *single slice with multiple goals that don't share a journey*. Read the slice's `New tables/routes` column — if it lists endpoints from different domains (upload + email + transactions), it's bundled.
 
-### Case 2.2 — CORRECT decomposition: probe-2.7 S2.5 (J02 AR) split into s2.5-01 (backend) + s2.5-02 (UI) as atomic tasks
+### Case 2.2 — CORRECT decomposition: probe-2.3 S2.5 (J02 AR) split into s2.5-01 (backend) + s2.5-02 (UI) as atomic tasks
 
 **Decision:** Single slice scope (J02 AR), two atomic tasks with distinct `verification` commands — backend routes in one task, UI page in the next.
 
@@ -95,11 +95,11 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't require every slice to split into 2+ atomic tasks. Some journeys are simple enough for one task (e.g., J11 Minion Library is static UI — one task to build the page). The principle is *atomic tasks have distinct verifications*, not *atomic tasks must always exist*.
 
-### Case 2.3 — WRONG axis: probe-2.6 sliced by entity/data-domain, leaving 6 of 11 pages orphaned
+### Case 2.3 — WRONG axis: probe-2.2 sliced by entity/data-domain, leaving 6 of 11 pages orphaned
 
 **Decision:** Slices were AR CRUD, AP CRUD, Bank Reconciliation, etc. — organized by data table.
 
-**Why wrong:** Pages without a primary data table (Dashboard, Analytics, Stage, Business Context, Workflow Design, Minion Library — 6 of 11 pages) had no dedicated slice. Built once during scaffold, never iterated. Direct cause of probe-2.6's worst UI failures.
+**Why wrong:** Pages without a primary data table (Dashboard, Analytics, Stage, Business Context, Workflow Design, Minion Library — 6 of 11 pages) had no dedicated slice. Built once during scaffold, never iterated. Direct cause of probe-2.2's worst UI failures.
 
 **Principle: Slice by user journey, not by data domain.** Cross-domain pages (dashboards, analytics, visualizations, config screens) need their own slices because their data comes from multiple tables. A data-domain plan cannot describe them; a journey-domain plan must.
 
@@ -111,7 +111,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Question:** Does `progress.txt` contain only the handoff content (stage status, slice plan, current pointer, conventions-set-by-prior-slices, blockers)? Implementation details belong in the dispatched executor prompt or in `decisions.md`.
 
-### Case 3.1 — WRONG scope leak: probe-2.8 attempt 1 progress.txt contained status enum lists, seed-script normalization, envelope conventions, route stubs
+### Case 3.1 — WRONG scope leak: probe-2.4 attempt 1 progress.txt contained status enum lists, seed-script normalization, envelope conventions, route stubs
 
 **Decision:** Controller frontloaded implementation details into the slice plan: "Direction-aware status: AR statuses: PENDING, PENDING_MATCH, PARTIALLY_PAID...", "envelope is bare array for list endpoints...", "Sample data seeding: app/server/src/seed.ts reads...", route lists like "upload-scan stub".
 
@@ -121,7 +121,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't only flag the literal phrases "stub" or "envelope is X." The shape is *progress.txt contains text that could/should appear in an executor prompt or decisions.md instead*. Test: would removing this paragraph from progress.txt and putting it in the executor's task description change the build outcome? If no, it's noise. If yes, it's leaked specification.
 
-### Case 3.2 — CORRECT scope hygiene: probe-2.8 attempt 2 progress.txt with empty conventions section, "Stack conventions" carried by decisions.md
+### Case 3.2 — CORRECT scope hygiene: probe-2.4 attempt 2 progress.txt with empty conventions section, "Stack conventions" carried by decisions.md
 
 **Decision:** Slice plan table only (slice id, journey id, deps, one-line summary). Conventions section explicitly empty until later slices populate it. Stack conventions (frontend/backend choices, money column type, date format) lived in decisions.md under a "Stack conventions" header.
 
@@ -137,7 +137,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Question:** Does the plan signal stub-shaped thinking that will produce dialog theater, or does it commit to real implementation under spec ambiguity?
 
-### Case 4.1 — WRONG anti-pattern signal: probe-2.7 AR/AP Upload buttons → `onSubmit` calls `setToast("coming in J13")`
+### Case 4.1 — WRONG anti-pattern signal: probe-2.3 AR/AP Upload buttons → `onSubmit` calls `setToast("coming in J13")`
 
 **Decision:** Dialog opens, button labeled correctly per screenshot, no network call. Form handler ends with `e.preventDefault(); closeDialog();`.
 
@@ -147,7 +147,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Don't only match the string "for now" or "coming in." The shape is *deferred-action-without-handler*. Synonyms: "TBD next slice", "stub for now", "placeholder until X", "501 with friendly toast", "Edit/+ buttons disabled until later". Reviewer asks: does the slice plan describe an interactive affordance whose handler is not built in *this* slice? If yes, either fold the handler into this slice or remove the affordance.
 
-### Case 4.2 — WRONG anti-pattern signal: probe-2.7 AP "Post to GL" toast "Post to GL not yet connected"
+### Case 4.2 — WRONG anti-pattern signal: probe-2.3 AP "Post to GL" toast "Post to GL not yet connected"
 
 **Decision:** Same shape as 4.1 — button, dialog, toast, no POST. Slice S2.9 (which owned post-to-gl) was marked DONE while this stub remained.
 
@@ -157,7 +157,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Reviewer's check: for every interactive affordance mentioned in any slice's description, identify the slice that owns its handler. If the owning slice's description includes "stub" / "501" / "not yet" / "toast" for that action, the plan is dishonest about the slice's scope.
 
-### Case 4.3 — CORRECT anti-pattern absence: probe-2.7 entity registration → POST `/api/v1/entities` → refetch → select new entity
+### Case 4.3 — CORRECT anti-pattern absence: probe-2.3 entity registration → POST `/api/v1/entities` → refetch → select new entity
 
 **Decision:** Real wire-up. Dialog opens, user fills form, submit fires real POST, server inserts row, frontend refetches entity list, dropdown auto-selects new entity, dialog closes.
 
@@ -167,7 +167,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Reviewer doesn't only validate the entity case. Apply to every interactive slice in the plan: does the verification target *post-action state* or *pre-action affordance*? If pre-action, the slice will produce theater.
 
-### Case 4.4 — Spec-resolution principle: probe-2.7 D9 stage-logs envelope follows OBSERVED (structured object) over DECLARED (flat array)
+### Case 4.4 — Spec-resolution principle: probe-2.3 D9 stage-logs envelope follows OBSERVED (structured object) over DECLARED (flat array)
 
 **Decision:** When `data-model.declared.json` and `api-spec.observed.json` conflicted, rewrite followed observed.
 
@@ -177,7 +177,7 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Anti-overfit hint:** Not just for envelope shape. Any field, type, status enum, or behavior that conflicts between observed and declared evidence should resolve to observed. Exception: when observed is a known bug (e.g., observed includes a 500 response — that's not the contract), declared is fallback.
 
-### Case 4.5 — Spec-resolution principle: probe-2.7 D14 business-context `status.gl` derived (not stored)
+### Case 4.5 — Spec-resolution principle: probe-2.3 D14 business-context `status.gl` derived (not stored)
 
 **Decision:** Compute `status.gl` at query time from related rows; do not denormalize into a column. Came from an advisor catch.
 

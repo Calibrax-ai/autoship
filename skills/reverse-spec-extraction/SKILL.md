@@ -89,7 +89,7 @@ Dispatch four probes in parallel. Each probe has one evidence source, one output
 | Probe | Primary evidence | Output file |
 |---|---|---|
 | **ui-walker** | Agent-browser driving the live UI (with deterministic tool access to DOM, network, and screenshots underneath) | `artifacts/user-journeys.json`, `artifacts/api-spec.observed.json`, `artifacts/design.md`, optional evidence in `artifacts/screenshots/` |
-| **static** | Route definitions, handler signatures, ORM models, import graph | `artifacts/api-spec.declared.json`, `artifacts/data-model.declared.json` |
+| **static** | Route definitions, handler signatures, ORM models, import graph, UI event handlers | `artifacts/api-spec.declared.json`, `artifacts/data-model.declared.json`, `artifacts/ui-handlers.declared.json` |
 | **data** | Live DB schema introspection + sample rows + alternative stores (SQLite, CSV) | `artifacts/data-model.actual.json`, `artifacts/sample-data/` (verbatim canonical input files — CSVs, PDFs, JSON fixtures the build uses to seed a populated tenant) |
 | **external** | Imports, env vars, outbound HTTP, SDK initializations | `artifacts/external-contracts.json` |
 
@@ -281,10 +281,10 @@ State your per-output decision in the summary. When in doubt, `regenerate`.
 | Role | Owned outputs | Allowed evidence | Forbidden |
 |---|---|---|---|
 | **ui-walker** | `user-journeys.json`, `api-spec.observed.json`, `design.md`, best-effort evidence in `screenshots/` | Live prototype via browser + intercepted network | Source code, other probes' outputs, prose docs |
-| **static** | `api-spec.declared.json`, `data-model.declared.json` | Prototype source code | Live prototype, DB, other probes' outputs |
+| **static** | `api-spec.declared.json`, `data-model.declared.json`, `ui-handlers.declared.json` | Prototype source code | Live prototype, DB, other probes' outputs |
 | **data** | `data-model.actual.json`, `sample-data/` | Live DB + flat files (SQLite, CSV) | Source code, other probes' outputs |
 | **external** | `external-contracts.json` | Source imports, env vars, deps manifest, `.env` key list | Live prototype, other probes' outputs |
-| **reconciler** | `api-spec.json`, `data-model.json`, `prd.md`, `reconciliation-report.md` | Phase 1 probe outputs only | Prototype, live systems |
+| **reconciler** | `api-spec.json`, `data-model.json`, `prd.md`, `reconciliation-report.md`, `journey-interactions.json` | Phase 1 probe outputs only | Prototype, live systems |
 | **critic** | `critic-report.md` | Merged Phase 2 artifacts only | Phase 1 probe outputs, prototype, live systems |
 
 Output schemas are defined in the Phase 1/2/3 descriptions above — the contract here covers ownership and rerun behavior, not schema detail.
