@@ -86,6 +86,8 @@ Also check spec-ambiguity resolutions in `decisions.md`:
 
 For any cut justified by spec ambiguity (case 1.1 shape), apply the picking-simplest-interpretation test: if the spec pack contains the inputs and the outputs of the action, the contract is derivable. A cut that fails this test is dialog theater under the label of cut.
 
+**Re-ground UI-behavior claims on primary sources — do not echo the controller's paraphrase.** Whenever the plan (or controller's slice description) makes a claim about what a journey does or does not do — e.g. *"journey never clicks SETUP,"* *"affordance Y is non-interactive per journey text,"* *"no user action in this step"* — you **must** open `artifacts/user-journeys.json`, locate the cited journey, and quote the relevant step verbatim in your verdict. If any step contains behavior verbs attached to the affordance ("clickable", "opens", "selects", "triggers", "navigates", "enters", "drops", "uploads"), the plan's framing is wrong regardless of how confident it sounds. Per case 4.6, the generator-evaluator pattern only works when the evaluator re-grounds against primary sources for claims about source content; echoing the generator's summary lets paraphrase-loss survive into the build. This check fails silently if you don't actively perform it — there is no grep that catches "evaluator re-used generator's framing."
+
 ## VERDICT OUTPUT
 
 Write your verdict to `reviews/plan-review-<NN>.md` in the project dir (NN = next available 2-digit number; 01 if none exists). Format:

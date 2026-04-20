@@ -82,7 +82,7 @@ Probes were renamed from 2.5/2.6/2.7/2.8/2.9 → 2.1/2.2/2.3/2.4/2.5 for consist
 | probe-2.6 | probe-2.2 | Playwright journey tests added to oracle |
 | probe-2.7 | probe-2.3 | Journey-based slicing + atomic-task verification |
 | probe-2.8 | probe-2.4 | Sample-data + screenshot-as-layout-contract + forcing-function gates |
-| probe-2.9 | probe-2.5 | plan-reviewer agent (generator-evaluator pattern) — in flight |
+| probe-2.9 | probe-2.5 | plan-reviewer agent (generator-evaluator pattern) |
 
 Claude Code session history for the old probe dirs lives under `~/.claude/projects/-Users-shyangcalibrax-Documents-Projects-autoship-probe-2-{5,6,7,8,9}/` — these are not renamed; they remain as historical reference.
 

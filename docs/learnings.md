@@ -12,7 +12,7 @@ Synthesized findings across nine probes of the Calibrax Grid Finance Ledger prot
 | 2.2 | Playwright journey tests added to oracle | 28/29 journey tests fail on selector mismatch; UI orphaned pages worse than probe-2 |
 | 2.3 | Journey-based slicing + atomic-task verification | Orphan pages fixed; new failures: dialog theater on Upload/Match/Resolve; empty-PROBE blind spot; screenshots never consulted |
 | 2.4 | Sample-data seeding + screenshot-as-layout-contract + 5 forcing-function gates | Gates absorbed: controller passed each by transparently *documenting* a defensible-sounding cut (J13). Failure shape: self-evaluation, not coverage |
-| 2.5 *(in flight)* | Generator-evaluator pattern: dedicated `plan-reviewer` agent dispatched between slice-plan and Stage 1 oracle | Hypothesis under test: a fresh-context skeptical reviewer breaks the self-evaluation cycle that absorbed every prior gate |
+| 2.5 | Generator-evaluator pattern: dedicated `plan-reviewer` agent dispatched between slice-plan and Stage 1 oracle | Validated. Reviewer REJECTED plan-01 with 4 specific catches (Principle 2.1/3.1/4.1 + consistency drift), APPROVED plan-02 after revision. Build shipped 14/14 journeys + 145/145 oracle — cleanest probe to date. Plan-reviewer cost <2% of probe. |
 
 ---
 
@@ -257,6 +257,38 @@ Two new mechanisms worth keeping:
 
 The dividing rule between mechanical and judgment gates: *if the rule would sound the same after the tools change, it's a criterion (judgment); if it's written in terms of specific tool invocations, it's a recipe (mechanical).* Default to judgment via reviewer; allow mechanical only when the check is purely pattern-matching (tests compile, regex matches, exit code).
 
+## Generator-evaluator pattern: validated in probe-2.5
+
+Plan-reviewer caught four substantive failures on the first pass and REJECTED plan-01. Controller revised; reviewer APPROVED plan-02 on the second pass. Build then ran clean to completion: 14/14 journey walks pass end-to-end on seeded data, 145/145 oracle green, dialog-theater grep clean across all slices, explicit BUILD COMPLETE commit at `2a61a3c`.
+
+### What the reviewer caught
+
+The specific evidence that validates the design — four independent failure shapes caught before a single executor ran:
+
+1. **S08 bundle (Principle 2.1 — one journey per slice).** Controller proposed bundling J13 (Upload) + J14 (Reset) into one slice. Reviewer flagged the opposite verification shapes: upload asserts "table grew by one row"; reset asserts "table equals seeded baseline." Different endpoints, different DB effects, different failure modes. Forced split into S03 Upload + S10 Reset. **This is the J13-class failure shape that probe-2.4 shipped as a human override — caught this time without operator intervention.**
+
+2. **Deferred-action pattern on Upload buttons (Principle 4.1 — no inert affordances).** Plan had S03/S04/S05 ledgers rendering inert Upload buttons with handlers promised later in S08. Reviewer proposed reordering so the Upload slice lands first, shipping a shared `UploadDialog` component that AR/AP/Bank Rec import. Zero inert-affordance window during the build. Structurally the same failure the probe-2.4 audit found on BusinessContext's SETUP pills, caught one probe earlier.
+
+3. **Scope leak in CONVENTIONS section (Principle 3.1 — no duplication across handoff artifacts).** Reviewer applied the "would removing this paragraph change the build outcome?" test to 15 bulleted items in progress.txt, found 8 duplicates of decisions.md §Stack conventions, prescribed exactly where the non-duplicates belong.
+
+4. **Consistency drift.** decisions.md §J13 and §J14 referenced slice IDs from an older plan version. Reviewer flagged as carry-forward hazard. Controller fixed pre-build.
+
+### Why this matters beyond probe-2.5
+
+Each prior probe (2.2 → 2.3 → 2.4) shipped a failure that required a subsequent probe to clean up. Probe-2.5 shipped clean. The generator-evaluator pattern broke the absorb-and-reproduce cycle documented in the accumulated-gates section above. Critically, the reviewer caught its failures **before** a single executor ran — zero wasted build-stage compute on a flawed plan.
+
+### Cost of the architectural addition
+
+Plan-reviewer cycles cost $11.46 combined (cycle 1 $6.08 + cycle 2 $5.38) — under 2% of the probe's $615.65 total. For reference, the most expensive single slice executor (S04 AR) was $45.42. The addition of a reviewer is strictly net-positive even on pure-cost terms: probe-2.4 cost $566 and required a human-override mid-build + multiple follow-up audits; probe-2.5 at $615 shipped without operator intervention.
+
+### What probe-2.5 does NOT close
+
+The probe-2.4 audit flagged three gaps orthogonal to plan-reviewer scope — visual drift (The Stage missing arrows), cross-spec DB pollution, and affordance theater at the journey-extraction layer (ui-walker captures read-only journeys). Plan-reviewer sits at the slice-plan layer; these gaps live upstream (journey extraction) or downstream (cross-slice state). Queued for probe-2.6 (UI handler extraction + interaction merge).
+
+### One-line verdict
+
+Generator-evaluator pattern works at the planning layer. Same shape should generalize to other stages (oracle-reviewer, slice-completion-reviewer, interaction-walk-reviewer) as those failure modes appear.
+
 ## "Probe limitations ≠ spec ambiguity" (J13 lesson, 2.4)
 
 The J13 cut in probe-2.4 was justified by *"file upload requires a file body. Prototype's own probe classified J13 as `blocked-other` and fired no POST. `POST /api/v1/upload-scan` is declared-only."*
@@ -287,12 +319,15 @@ Probe-by-probe rebuilds + invasive structural changes haven't disturbed these lo
 4. ~~**Does journey-based slicing + atomic tasks with executable verification fix the UI wiring gap?**~~ **Partially.** It fixed orphan pages (probe-2.3) but exposed dialog theater + empty-state bias + ignored screenshots underneath. Necessary but not sufficient.
 5. ~~**Do forcing-function gates (diff/grep) prevent silent journey drops?**~~ **No.** Probe-2.4 added five gates; the controller passed all five and *transparently documented* a defensible-sounding cut anyway. Self-evaluation absorbs any rationale-accepting gate.
 
+### Answered by 2.5
+
+6. ~~**Does the generator-evaluator pattern (dedicated reviewer) break the self-evaluation cycle?**~~ **Yes, at the planning layer.** Plan-reviewer REJECTED the controller's first plan with four specific catches including a J13-class bundle; second plan APPROVED cleanly; build shipped without operator intervention (14/14 journeys + 145/145 oracle). Generalizes to other stages where self-evaluation bias is the structural cause.
+
 ### Still open
 
-6. **Does the generator-evaluator pattern (dedicated reviewer) break the self-evaluation cycle?** Probe-2.5 tests this directly. The reviewer is calibrated by 15 labeled cases from past probes.
 7. **How does calibration drift over time?** As operator overrides accumulate, the calibration set grows. Does the reviewer's judgment converge with operator's, or do they diverge in ways that require periodic recalibration?
 8. **Can the reconciler be parallelized?** It's 45-52% of pipeline time. Untouched since probe-1.5.
-9. **Does the pipeline generalize to a different prototype?** (Reserved for probe 3+ after 2.5 validates the reviewer pattern.)
+9. **Does the pipeline generalize to a different prototype?** (Reserved for probe 3+ now that 2.5 has validated the reviewer pattern.)
 10. **What's the context window ceiling for oneshot builds?** Not yet hit at ~4.5K lines. Probe-2.4/2.5 use Opus 4.7 1M-context which raises this ceiling further.
-11. **Is the slice-reviewer (judgment for slice completion) load-bearing too, or is the plan-reviewer alone sufficient?** Probe-2.5 will tell — if the plan is good but slices still ship dialog theater on completion, the slice-reviewer becomes the next addition.
+11. **Is the slice-reviewer (judgment for slice completion) load-bearing too, or is the plan-reviewer alone sufficient?** Probe-2.5 shipped clean without one, but the probe-2.4 audit flagged affordance theater at the journey-extraction layer and cross-spec DB pollution at the slice-completion layer — both outside plan-reviewer scope. Probe-2.6 will test whether those need their own reviewers.
 12. **Are some existing gates dead scaffolding against Sonnet-era behaviors?** Anthropic's article: stress-test gate components by removing them one at a time. Untested for autoship.

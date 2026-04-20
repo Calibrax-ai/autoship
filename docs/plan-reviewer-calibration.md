@@ -183,6 +183,20 @@ When labeling the current plan, cite the principle by name (not the case number)
 
 **Why correct:** Denormalization risk avoided. Derived values can't go stale; stored derived values can. Simpler invariant maintenance.
 
+**Principle: Default derive, not store. Store a computed value only when the plan explicitly justifies denormalization with a performance or consistency argument.**
+
+**Anti-overfit hint:** Reviewer applies to every computed column in the data model. "Status", "rollup", "balance", "count", "is-configured" — if the value is a pure function of other rows, it defaults to derived. Require an explicit decision in `decisions.md` to store it.
+
+### Case 4.6 — WRONG paraphrase-echo: probe-2.5 reviewer endorsed "SETUP is non-interactive" without re-grounding on J08 step 4
+
+**Decision:** Plan-reviewer-01 for probe-2.5 passed Check 4 for S02 J08 Business Context with the reasoning *"Plan treats SETUP labels as non-clickable per journey text which never clicks SETUP. Matches case 4.3 observed-walk pattern. Pass."* The build shipped a page where the SETUP pills and the 7 data-source cards were visually styled but wired as `<span>`s and `<div>`s with no handlers. The Edit button on Client Configuration had an explicit `// TODO S02 follow-up` comment with no onClick.
+
+**Why wrong:** Reviewer echoed the controller's paraphrase (*"per journey text which never clicks SETUP"*) instead of re-reading J08 step-by-step against `artifacts/user-journeys.json`. Step 4 literally reads *"All 7 data sources show SETUP status (unconfigured) — each is clickable."* The tail (*"each is clickable"*) dropped in the controller's paraphrase and survived into the reviewer's verdict unchecked. Prototype source at `finance_ledger.html` confirms the affordances have real handlers — `onclick="_bcSelectNode(...)"` on each card, `onclick="_toggleClientConfigPanel()"` on Edit — so the correct plan treatment was J13-style §A7: the UI is clickable, the receiver behavior is inferable from source, decisions.md picks the simplest mapping. Instead the executor shipped decorative shells.
+
+**Principle: Re-ground claims about source content on primary sources, not on the generator's summary.** The generator-evaluator pattern works only when the evaluator verifies claims *about what the source says* by reading the source. When the claim is "the spec says X," the reviewer must open the spec and read the passage. Echoing the generator's framing inherits its blindspots and collapses the adversarial benefit.
+
+**Anti-overfit hint:** Not just for interaction claims. Apply to any plan-level claim of the form *"per [source], X does/doesn't Y"* — the reviewer must quote the source verbatim in the verdict. Phrases that should trigger re-grounding: *"per journey text..."*, *"the journey never..."*, *"decisions.md resolves..."*, *"the screenshot shows..."*, *"the api-spec declares..."*. If the reviewer can't cite the exact passage that supports the framing, the plan is making a claim the reviewer hasn't verified.
+
 **Principle: Derive when derivation is cheap; store only when derivation is expensive enough to cache.** Default to derive. Defaulting to store frontloads invariant-maintenance complexity.
 
 **Anti-overfit hint:** This is a database/API design heuristic, not specific to this prototype. Reviewer should flag any plan that introduces a stored field whose value is computable from other stored fields, unless the plan explicitly justifies the denormalization (perf, race-condition tolerance, etc.).
