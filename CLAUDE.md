@@ -12,17 +12,23 @@ autoship v0.1 is a **bash orchestrator + agent definitions** that automates a 4-
 - `.claude/agents/` — agent definitions:
   - **Ingest probes** (Phase 1): ui-walker, static, data, external
   - **Ingest synthesis**: reconciler, critic
-  - **Ingest orchestration**: controller (Track 2)
-  - **Build orchestration**: build-controller — dispatches per-slice executors, runs gates
+  - **Orchestration**: controller — one top-level controller role. Currently extract-ingest-shaped; mode-aware extension earned when deliver moves to automation. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
   - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.5 onward)
+  - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Operator-dispatched manually today; will be dispatched by `controller` in deliver mode when volume justifies it.
 - `skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
+- `teach-autoship.md` — stable operating knowledge shared by the controller across modes. Read by the controller before consulting its per-run `program.md`. Contains generator-evaluator discipline, workflow-surface ownership, per-mode phase machines, stop conditions, NEVER STOP posture.
+- `docs/architecture/deliver-program-template.md` — template for per-run `program.md` the controller reads in deliver mode. Copy to run dir, fill in testbed + issue source + approval mode, dispatch.
 - `docs/v01-controller-design.md` — controller design doc
-- `docs/architecture.md` — canonical architecture proposal. Source of truth for design changes.
-- `docs/autoship-proposal.html` — HTML presentation of the architecture. **Must be kept in sync with the architecture doc.**
-- `docs/learnings.md` — cross-probe synthesis. Updated after each probe completes.
+- `docs/architecture/extract-architecture.md` — canonical architecture proposal for the `extract` track.
+- `docs/architecture/autoship-extract-proposal.html` — HTML presentation of the `extract` architecture. **Must be kept in sync with the extract architecture doc.**
+- `docs/architecture/deliver-architecture.md` — architecture proposal for the `deliver` track.
+- `docs/architecture/autoship-deliver-proposal.html` — HTML presentation of the `deliver` architecture. **Must be kept in sync with the deliver architecture doc.**
+- `docs/learnings.md` — cross-track synthesis. Updated after each probe completes.
+- `docs/extract-learnings.md` — detailed learnings for the `extract` track.
+- `docs/deliver-learnings.md` — detailed learnings for the `deliver` track.
 - `docs/harness-philosophy.md` — synthesis on prompt + tools + artifacts design. Reads Anthropic's harness-design article and applies to autoship. Source of the generator-evaluator pattern + mechanical-vs-judgment dividing rule.
 - `docs/plan-reviewer-calibration.md` — labeled few-shot cases the plan-reviewer scores against. Operator overrides become new cases; calibration grows over time.
-- `docs/agent-prompt-review.md` — superseded review (kept as institutional memory of the "add more grep gates" wrong turn). The supersede note at the top explains why; the body explains what.
+- `docs/archive/agent-prompt-review.md` — superseded review (kept as institutional memory of the "add more grep gates" wrong turn). The supersede note at the top explains why; the body explains what.
 - `skills/` — five autoship-specific skill packs that the product will ship. They are deliverables, not skills for operating on this repo.
 
 ## Running the Ingest
@@ -101,7 +107,7 @@ Claude Code session history for the old probe dirs lives under `~/.claude/projec
 - **The `Considered and Deferred` appendix is institutional memory.** When a new direction is rejected or simplified, document it there with a `Cut because:` reason. Do not remove existing entries — they prevent future instances from re-proposing cut ideas.
 - **Executor Mode Options (A–D) are a roadmap, not alternatives.** Each option solves a failure mode of the one before it (A: converge → B: critic → C: parallel → D: self-correct). Don't promote later options without a concrete reason.
 - **Options sections belong at the architectural level, not the tactical level.** Surface trade-off analysis for agent topology, decomposition strategy, executor modes. For stack picks (framework, ORM, runtime), a one-line pick list is enough — no comparison table.
-- **When editing the architecture doc, update the HTML proposal in the same pass.** They drift quickly otherwise.
+- **When editing the extract architecture doc, update the HTML proposal in the same pass.** They drift quickly otherwise.
 
 ## Key References Already Reviewed
 
