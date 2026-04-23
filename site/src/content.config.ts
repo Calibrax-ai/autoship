@@ -3,12 +3,37 @@ import { glob } from 'astro/loaders';
 import { docsLoader } from '@astrojs/starlight/loaders';
 import { docsSchema } from '@astrojs/starlight/schema';
 
+// Architecture long-form pieces that render through the custom
+// Longform layout (warm palette, sticky sidebar). Kept out of the
+// Starlight docs collection to avoid double-routing.
+const LONGFORM_ARCHITECTURE = [
+	'architecture/system-overview.md',
+	'architecture/deliver-architecture.md',
+	'architecture/extract-architecture.md',
+];
+
 export const collections = {
 	docs: defineCollection({
 		loader: docsLoader({
-			pattern: ['**/*.{md,mdx,mdoc}', '!_assets/**'],
+			pattern: [
+				'**/*.{md,mdx,mdoc}',
+				'!_assets/**',
+				...LONGFORM_ARCHITECTURE.map((p) => `!${p}`),
+			],
 		}),
 		schema: docsSchema(),
+	}),
+	architecture: defineCollection({
+		loader: glob({
+			pattern: '{system-overview,deliver-architecture,extract-architecture}.md',
+			base: '../docs/architecture',
+		}),
+		schema: z.object({
+			title: z.string(),
+			description: z.string().optional(),
+			eyebrow: z.string().default('Architecture'),
+			subtitle: z.string().optional(),
+		}),
 	}),
 	ideas: defineCollection({
 		loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/ideas' }),

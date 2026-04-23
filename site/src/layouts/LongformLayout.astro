@@ -1,0 +1,166 @@
+---
+import '../styles/global.css';
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+	title: string;
+	subtitle?: string;
+	eyebrow?: string;
+	description?: string;
+	headings: MarkdownHeading[];
+}
+
+const { title, subtitle, eyebrow = 'Architecture', description, headings } =
+	Astro.props;
+
+// Sidebar TOC from h2 + h3 headings in the rendered MD.
+const tocEntries = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<title>{title} — autoship</title>
+		{description && <meta name="description" content={description} />}
+	</head>
+	<body class="longform">
+		<div
+			class="longform-shell"
+			style="display: grid; grid-template-columns: 280px 1fr; min-height: 100vh;"
+		>
+			<aside class="longform-sidebar">
+				<div class="longform-sidebar-brand">
+					<p class="eyebrow">autoship</p>
+					<h2 class="title">{title}</h2>
+				</div>
+
+				<nav>
+					{tocEntries.map((h) => (
+						<a
+							href={`#${h.slug}`}
+							class:list={[`depth-${h.depth}`, 'toc-link']}
+							data-slug={h.slug}
+						>
+							{h.text}
+						</a>
+					))}
+				</nav>
+
+				<div class="longform-sidebar-footer">
+					<p style="margin: 0 0 6px;">
+						<a
+							href="/"
+							style="color: var(--color-lf-text-2); border-bottom: 1px solid var(--color-lf-border-strong);"
+						>autoship</a>
+						&nbsp;·&nbsp;
+						<a
+							href="/ideas/"
+							style="color: var(--color-lf-text-2); border-bottom: 1px solid var(--color-lf-border-strong);"
+						>Ideas</a>
+					</p>
+					<p style="margin: 0;">
+						<a
+							href="https://github.com/Calibrax-ai/autoship"
+							style="color: var(--color-lf-text-2); border-bottom: 1px solid var(--color-lf-border-strong);"
+						>GitHub</a>
+					</p>
+				</div>
+			</aside>
+
+			<main class="longform-main">
+				<header class="longform-hero">
+					<div class="meta">
+						<span class="longform-badge">{eyebrow}</span>
+					</div>
+					<h1>{title}</h1>
+					{subtitle && <p class="subtitle">{subtitle}</p>}
+					{description && <p class="lead">{description}</p>}
+				</header>
+
+				<article class="longform-body">
+					<slot />
+				</article>
+			</main>
+		</div>
+
+		<script>
+			import mermaid from 'mermaid';
+
+			mermaid.initialize({
+				startOnLoad: false,
+				theme: 'default',
+				securityLevel: 'loose',
+			});
+
+			async function renderMermaidDiagrams() {
+				const preBlocks = document.querySelectorAll<HTMLElement>(
+					'pre[data-language="mermaid"]'
+				);
+				for (let i = 0; i < preBlocks.length; i++) {
+					const pre = preBlocks[i];
+					if (pre.dataset.mermaidRendered === 'true') continue;
+					pre.dataset.mermaidRendered = 'true';
+
+					const code = pre.querySelector('code');
+					const lines = code
+						? Array.from(code.querySelectorAll('.ec-line')).map(
+								(l) => (l as HTMLElement).innerText
+							)
+						: [];
+					const graphDef = lines.length
+						? lines.join('\n')
+						: code?.textContent ?? '';
+
+					const id = `mermaid-${Date.now()}-${i}`;
+					try {
+						const { svg } = await mermaid.render(id, graphDef);
+						const container = document.createElement('div');
+						container.className = 'mermaid-rendered';
+						container.innerHTML = svg;
+						const frame =
+							pre.closest('figure') ??
+							pre.closest('.expressive-code') ??
+							pre;
+						frame.replaceWith(container);
+					} catch (err) {
+						console.error('Mermaid render failed:', err);
+					}
+				}
+			}
+
+			renderMermaidDiagrams();
+			document.addEventListener('astro:page-load', renderMermaidDiagrams);
+
+			// Active-section tracking via IntersectionObserver
+			const links = document.querySelectorAll<HTMLAnchorElement>(
+				'.longform-sidebar a.toc-link'
+			);
+			const slugMap = new Map<string, HTMLAnchorElement>();
+			links.forEach((a) => {
+				const slug = a.dataset.slug;
+				if (slug) slugMap.set(slug, a);
+			});
+
+			const observer = new IntersectionObserver(
+				(entries) => {
+					for (const entry of entries) {
+						if (entry.isIntersecting) {
+							const id = (entry.target as HTMLElement).id;
+							if (!id) continue;
+							links.forEach((a) => a.classList.remove('active'));
+							slugMap.get(id)?.classList.add('active');
+						}
+					}
+				},
+				{ rootMargin: '0px 0px -70% 0px', threshold: 0 }
+			);
+
+			document.querySelectorAll('.longform-body h2[id], .longform-body h3[id]').forEach((h) => {
+				observer.observe(h);
+			});
+		</script>
+	</body>
+</html>

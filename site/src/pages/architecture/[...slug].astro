@@ -1,0 +1,25 @@
+---
+import { getCollection, render } from 'astro:content';
+import LongformLayout from '../../layouts/LongformLayout.astro';
+
+export async function getStaticPaths() {
+	const entries = await getCollection('architecture');
+	return entries.map((entry) => ({
+		params: { slug: entry.id.replace(/\.md$/, '') },
+		props: { entry },
+	}));
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+---
+
+<LongformLayout
+	title={entry.data.title}
+	subtitle={entry.data.subtitle}
+	eyebrow={entry.data.eyebrow}
+	description={entry.data.description}
+	headings={headings}
+>
+	<Content />
+</LongformLayout>

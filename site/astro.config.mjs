@@ -25,9 +25,9 @@ export default defineConfig({
               {
                   label: 'Architecture',
                   items: [
-                      { label: 'System Overview', slug: 'architecture/system-overview' },
-                      { label: 'Extract', slug: 'architecture/extract-architecture' },
-                      { label: 'Deliver', slug: 'architecture/deliver-architecture' },
+                      { label: 'System Overview', link: '/architecture/system-overview/', attrs: { target: '_self' } },
+                      { label: 'Extract', link: '/architecture/extract-architecture/', attrs: { target: '_self' } },
+                      { label: 'Deliver', link: '/architecture/deliver-architecture/', attrs: { target: '_self' } },
                       { label: 'Program Template', slug: 'architecture/deliver-program-template' },
                   ],
               },
