@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # autoship v0.1 — 4-phase ingest orchestrator. Machine state: marker files.
-# See docs/v01-controller-design.md.
+# See docs/architecture/extract-architecture.md.
 
 set -euo pipefail
 

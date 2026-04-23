@@ -4,6 +4,8 @@
 
 This file is **what autoship is** — philosophy, roles, and non-negotiable discipline. The per-run `program.md` is **what this specific run should do** — testbed, scope, approval mode, stop conditions.
 
+This file is **controller-only**. Manual worker dispatch (`pre-groomer`, `brief-reviewer`) does not require it.
+
 ---
 
 ## Autoship in one paragraph
@@ -39,17 +41,19 @@ The controller holds the pipeline state. Workers see only what's pre-injected in
 
 ### 4. Disk-backed state, filesystem-derivable
 
-State lives on disk at known paths, not in a long-running session's memory. State for an issue is derivable from filesystem presence:
+State lives on disk at known paths, not in a long-running session's memory.
+
+Deliver now has canonically derivable local runtime states:
 
 - `issue.md` exists, no `brief.md` → `new`
 - `brief.md` exists, no `reviews/` → `proposed`
 - latest review verdict REJECTED → `changes-requested`
 - latest review verdict APPROVED → `ready-for-oracle`
-- Stage 1 oracle exists → `oracle-written`
-- Stage 2 build complete + tests green → `built`
-- Operator accepts → `done`
+- `stage1.md` exists, no `stage2.md` → `oracle-written`
+- `stage2.md` exists, no `pr.md` → `built`
+- `pr.md` exists → `in-review`
 
-No parallel `state.json`. The filesystem IS the state machine.
+No parallel `state.json` is required. The runtime artifacts are the state machine.
 
 ### 5. Mechanical gates, not judgment in the outer loop
 
@@ -112,22 +116,25 @@ Never promote work silently past a boundary. Every promotion is either an operat
 
 **Hard rule:** workers never write to Linear. If a worker emits a `needs-human-input` signal, the controller is responsible for posting the Linear comment and transitioning state.
 
-### Comment and state policy (defaults for 0.1 controller)
+### Comment and state policy (defaults for deliver phase 3)
 
 Default state transitions per issue:
-- `Backlog | Todo` → `In Progress` when pre-groom dispatches
-- Stays `In Progress` through groom / review / regroom / Stage 1 / Stage 2
-- → `In Review` when Stage 2 completes green
-- → `Done` when operator accepts (supervised) or after outcome verification (auto, later)
+- `Backlog | Todo` → `Grooming` when pre-groom dispatches
+- `Grooming` → `Ready` when brief-reviewer APPROVES and the brief is build-worthy
+- `Ready` → `Building` when a human promotes the issue for execution
+- `Building` → `In Review` when draft PR is opened
+- any active state → `needs-human-input` on a typed blocker
 
-Default comment posts (free-form text, no templates required for 0.1):
-- Sub-issue created (on parent)
-- Brief approved / rejected (on sub-issue)
-- Stage 1 complete (on sub-issue)
-- Stage 2 complete (on sub-issue)
-- `needs-human-input` (on sub-issue, with specific question)
+`Ready` remains the explicit outer approval boundary. A ticket in `Ready` is waiting for human promotion; it is not actively executing. Phase 3 honors that boundary rather than auto-advancing through it.
 
-Comments are ad-hoc prose for 0.1. Templates earn their place if operator reports noise or missing information after real-world use.
+Default comment posts (free-form text, no templates required for phase 3):
+- Claim / grooming started
+- Final `Ready`
+- Build started
+- Draft PR opened
+- Final `needs-human-input`
+
+Do not post comments for every intermediate regroom pass. Comments are ad-hoc prose for phase 3. Templates earn their place if operator reports noise or missing information after real-world use.
 
 ---
 
@@ -150,57 +157,67 @@ Never calls Linear.
 ### Stage 1 executor
 
 Reads: brief.md, review.
-Writes: oracle artifacts (test files, config fixes if needed).
+Writes: oracle artifacts (test files, harness/config fixes if needed) plus `stage1.md`.
 Returns to controller: `stage1-outcome`, test counts, files created/modified, any blockers.
 Never calls Linear. Never modifies production source (Refactor type: tests may go all-green against unmodified source; other types: tests go red to signal implementation gap).
 
 ### Stage 2 executor
 
 Reads: brief.md, Stage 1 artifacts (frozen), testbed source.
-Writes: production source changes.
+Writes: production source changes plus `stage2.md`.
 Returns to controller: `stage2-outcome`, test pass/fail counts, diff stat, any test mutations detected.
 Never calls Linear. Never modifies test files written by Stage 1.
 
 ---
 
-## Issue lifecycle (controller view)
+## Issue lifecycle (controller view, current deliver runtime)
 
-Every issue progresses through this machine. Controller reads filesystem state, consults program.md for policy, dispatches next worker or halts at approval boundary.
+In deliver phase 3, every issue progresses through this machine. The controller reads runtime artifacts, consults `program.md` for policy, dispatches the next worker, then parks the issue at the next explicit boundary.
 
 ```
 new ──groom──▶ proposed ──review──▶ changes-requested ──regroom──▶ proposed
                                  └──approved──▶ ready-for-oracle
-                                                    │
-                                                    ▼ (stage-1 dispatch)
-                                               stage1-writing
-                                                    │
-                                                    ▼
-                                               oracle-written
-                                                    │
-                                                    ▼ (stage-2 dispatch)
-                                               stage2-building
-                                                    │
-                                            ┌───────┴───────┐
-                                            ▼ (pass)        ▼ (fail)
-                                       built            needs-human-input
-                                            │
-                                            ▼ (operator accept)
-                                          done
+                                                        │
+                                                        ▼
+                                                      Ready
+                                                        │
+                                     (human promotion to outer Building state)
+                                                        │
+                                                        ▼
+                                                   stage1-writing
+                                                        │
+                                                        ▼
+                                                   oracle-written
+                                                        │
+                                                        ▼
+                                                   stage2-building
+                                                        │
+                                     ┌──────────────────┴──────────────────┐
+                                     ▼                                     ▼
+                               needs-human-input                        built
+                                                                            │
+                                                                            ▼
+                                                                        draft-pr
 ```
 
 ---
 
 ## Stop conditions
 
-The controller halts (with explicit typed reason) only when:
+Per-issue terminal outcomes in deliver phase 3:
 
-1. **`needs-human-input`** — worker returns this signal. Controller posts Linear comment, sets `blocked` label (if configured), exits the loop cleanly.
-2. **Unrecoverable environment error** — testbed won't boot, external tool unavailable, credentials missing.
-3. **Repeated failed retries** — brief-reviewer rejects N+ times in a row (configurable, default N=3), or Stage 2 fails against the same Stage 1 tests N+ times.
-4. **Supervised-mode gate** — operator-confirmation required before advancing past a cost/risk boundary (brief approved → Stage 1, Stage 2 green → merge).
-5. **End of eligible work** — no more issues match program.md's eligibility criteria.
+1. **`Ready`** — grooming + review succeeded and the brief is build-worthy.
+2. **`needs-human-input`** — the reviewed outcome or build execution hit a typed blocker.
+3. **`draft-pr`** — build + validation succeeded and the controller opened a draft PR.
 
-Anything else: **do not stop**. Keep dispatching until one of the above fires.
+Those are **issue terminal states**, not run terminal states.
+
+The controller halts the whole run only when:
+
+1. **Unrecoverable environment error** — testbed path invalid, tracker integration unavailable for the selected source, credentials missing, or another global failure blocks all further work.
+2. **End of eligible work** — no more issues match `program.md`'s eligibility criteria.
+
+Anything else: **do not stop**. In deliver phase 3, park per-issue blockers at `needs-human-input`, respect `Ready` as the human approval boundary, and continue to the next eligible issue.
 
 ---
 
@@ -208,7 +225,7 @@ Anything else: **do not stop**. Keep dispatching until one of the above fires.
 
 The controller runs autonomously. Do not pause. Do not ask "should I continue?" The operator may be asleep.
 
-Continue until a stop condition above fires. When a stop condition fires, the controller writes the reason, sets the right Linear state + comment, then exits cleanly with a machine-readable exit code so the operator can resume later.
+Continue until a run-level stop condition above fires. When a stop condition fires, the controller writes the reason, sets the right Linear state + comment, then exits cleanly with a machine-readable exit code so the operator can resume later.
 
 Resumption: on restart, the controller reads filesystem state of each eligible issue, resumes from where it left off. No operator hand-holding needed.
 
@@ -238,9 +255,9 @@ Slice-based: plan → oracle → build → review per slice. Workers: oracle-pla
 
 ### Deliver mode
 
-Per-issue state machine: groom → review → stage1 → stage2 → verify. State-machine-gated per issue. Multiple issues may be at different phases concurrently. Workers: pre-groomer, brief-reviewer, stage1 executor, stage2 executor.
+Current runtime: groom → review → `Ready` → human promotion to `Building` → Stage 1 → Stage 2 → validation → draft PR. Workers today: pre-groomer, brief-reviewer, stage1-executor, stage2-executor.
 
-**Current state:** the existing `.claude/agents/controller.md` is extract-ingest-shaped. Extending it to a mode-aware controller (or adding deliver-mode support) is earned when operator wants to run deliver work through the controller rather than manual dispatch. Until then, deliver work continues via manual operator dispatch of pre-groomer + brief-reviewer (the pattern validated across probes 0.1–0.5).
+**Current state:** `.claude/agents/controller.md` now supports extract-ingest and deliver-through-draft-PR. Merge, deploy, and outcome verification remain future work. Manual dispatch of `pre-groomer` + `brief-reviewer` remains the fallback path for grooming-only use.
 
 ---
 

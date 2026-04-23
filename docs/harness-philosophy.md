@@ -35,7 +35,7 @@ Contrast what build-controller.md has become. Procedural clauses, with the line 
 
 - **Probe 2.6 → 2.7 (dialog theater discovery).** We added the dialog-theater anti-pattern to `program.md`. That addition was correct and still thin-WHAT (*"forbidden"*, no detection recipe). Net change: zero drift — a content rule in the right file.
 - **Probe 2.7 → 2.8 (empty-state and screenshot elevation).** We added sample-data-seeding language and "screenshot as layout contract" to program.md. Also thin-WHAT. Also not drift.
-- **Post-probe-2.4 → today (`agent-prompt-review.md`).** This is where the drift lives. The review (authored 1 hour before this synthesis) diagnosed probe-2.4 as *"a coverage gap between gates"* and proposed three new forcing-function checks, all grep-based, all landing in build-controller.md. Every one of them was reasonable in isolation. Collectively they shifted the controller's system prompt from declarative to procedural.
+- **Post-probe-2.4 → today (`docs/archive/agent-prompt-review.md`).** This is where the drift lives. The review (authored 1 hour before this synthesis) diagnosed probe-2.4 as *"a coverage gap between gates"* and proposed three new forcing-function checks, all grep-based, all landing in build-controller.md. Every one of them was reasonable in isolation. Collectively they shifted the controller's system prompt from declarative to procedural.
 - **Honest note from the agent writing this doc.** That review — which I (as the calling agent) wrote — addressed a real hole but addressed it by widening the surface of HOW. The right criticism of my own earlier review is that it papered over a deeper structural miss: the controller has no adversary.
 
 Each drift step was defensible. The accumulated shape is not.
@@ -219,4 +219,4 @@ Predicted outcome, played out:
 
 ---
 
-*Authored under the caveat that the reviewer I am recommending would, on this document, ask hard questions about whether the earlier `agent-prompt-review.md` should itself be struck from the repo as institutional memory of a wrong turn — or kept as a documented example of how adding gates looks locally rational and structurally incorrect. I'd argue keep and annotate: the `Considered and Deferred` convention in CLAUDE.md suggests the latter.*
+*Authored under the caveat that the reviewer I am recommending would, on this document, ask hard questions about whether the earlier `docs/archive/agent-prompt-review.md` should itself be struck from the repo as institutional memory of a wrong turn — or kept as a documented example of how adding gates looks locally rational and structurally incorrect. I'd argue keep and annotate: the `Considered and Deferred` convention in CLAUDE.md suggests the latter.*

@@ -6,19 +6,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 autoship v0.1 is a **bash orchestrator + agent definitions** that automates a 4-phase ingest protocol (boot → fanout → reconcile → critic). The controller (`autoship.sh`) spawns Claude agents via `claude --agent <role> -p` and tracks state with marker files.
 
+## Start Here
+
+Use autoship in one of two modes:
+
+- **`extract` today** — operational via `autoship.sh ingest ...` or the existing `controller` agent in extract-ingest mode.
+- **`deliver` today** — operational in two shapes:
+  - **controller-backed phase 3 runtime** through draft PR: `claude --agent controller -p "deliver"` from the testbed root (reads `.autoship/program.md`)
+  - **manual fallback** via `pre-groomer` + `brief-reviewer` dispatched directly
+
+Important boundary:
+
+- **`teach-autoship.md`** and **`program.md`** are **controller-only** artifacts.
+- You do **not** need them for the manual `deliver` fallback.
+- The checked-in `.claude/agents/controller.md` is mode-aware for `extract ingest` and `deliver` through draft PR.
+
 ## Key Files
 
 - `autoship.sh` — the controller (single-file state machine, ~240 lines)
 - `.claude/agents/` — agent definitions:
   - **Ingest probes** (Phase 1): ui-walker, static, data, external
   - **Ingest synthesis**: reconciler, critic
-  - **Orchestration**: controller — one top-level controller role. Currently extract-ingest-shaped; mode-aware extension earned when deliver moves to automation. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
+  - **Orchestration**: controller — one top-level controller role. Supports extract-ingest and deliver-through-draft-PR today. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
   - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.5 onward)
-  - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Operator-dispatched manually today; will be dispatched by `controller` in deliver mode when volume justifies it.
+  - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `controller` in deliver phase-3 mode.
+  - **Deliver build**: stage1-executor, stage2-executor — frozen-oracle and implementation workers for deliver phase 3. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
 - `skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
-- `teach-autoship.md` — stable operating knowledge shared by the controller across modes. Read by the controller before consulting its per-run `program.md`. Contains generator-evaluator discipline, workflow-surface ownership, per-mode phase machines, stop conditions, NEVER STOP posture.
-- `docs/architecture/deliver-program-template.md` — template for per-run `program.md` the controller reads in deliver mode. Copy to run dir, fill in testbed + issue source + approval mode, dispatch.
-- `docs/v01-controller-design.md` — controller design doc
+- `teach-autoship.md` — controller-only stable operating knowledge shared by the controller across modes. Read by the controller before consulting its per-run `program.md`. Contains generator-evaluator discipline, workflow-surface ownership, per-mode phase machines, stop conditions, NEVER STOP posture.
+- `docs/architecture/deliver-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in deliver mode. Commit one to each testbed; manual fallback does not need it.
 - `docs/architecture/extract-architecture.md` — canonical architecture proposal for the `extract` track.
 - `docs/architecture/autoship-extract-proposal.html` — HTML presentation of the `extract` architecture. **Must be kept in sync with the extract architecture doc.**
 - `docs/architecture/deliver-architecture.md` — architecture proposal for the `deliver` track.
@@ -62,6 +77,23 @@ claude --agent controller --add-dir /path/to/project -p "ingest /path/to/project
 ```
 
 Same state model as Track 1 (marker files, artifacts, agent definitions). Both tracks coexist — use Track 1 for CI/headless, Track 2 for interactive/autonomous runs.
+
+### Deliver phase 3 runtime
+
+The controller drives deliver work from backlog to draft PR. The whole contract lives in `.autoship/program.md` at the testbed root — one checked-in file per repo.
+
+From the testbed root:
+
+```
+claude --agent controller -p "deliver"              # resume whatever's in flight
+claude --agent controller -p "deliver FRD-162"      # restrict this run to one issue
+```
+
+The controller reads `program.md`, finds eligible work, and drives each issue through groom → review → `Ready` → (human promotes to `Building`) → Stage 1 → Stage 2 → validate → commit → push → draft PR → `In Review`.
+
+Current scope is intentionally narrow: Linear-first backlog + build pickup from `Building`, local runtime mirror under `.autoship/issues/<id>/`, serial only, draft PR yes (merge no).
+
+See `docs/architecture/deliver-program-template.md` for the `program.md` shape.
 
 ## Running the Build (probe-2.5 onward)
 
