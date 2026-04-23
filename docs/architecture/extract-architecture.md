@@ -1,10 +1,26 @@
 ---
-title: "Demo → Production Candidate v1: Reverse Spec + Ralph Loop"
+title: "Extract"
 ---
 
-**Date:** 2026-04-14
-**Status:** v1 proposal (simplified from earlier exploration)
-**Scope:** Turn a vibe-coded AI demo into structured product artifacts, generated tests, and a production-candidate app via a Ralph loop
+**Status:** v1 proposal (simplified from earlier exploration) · **Last updated:** 2026-04-14
+
+## In plain English
+
+Someone built a half-working demo of an idea. It worked just enough to demo. Now you want it in production — maintainable, tested, real.
+
+Rewriting it by hand is expensive and slow. Asking an AI to *"just rewrite this"* produces code that looks right but misses what the demo was trying to do.
+
+**Extract** takes that demo and produces three things:
+
+- A readable specification of what the demo was *trying* to do (not what the code happens to do)
+- A generated test suite that pins that intent
+- A production-candidate rebuild of the app, verified against those tests
+
+A human reviews the specification before any rewriting starts. If the spec is wrong, everything downstream is wrong — so that's where the human attention goes.
+
+> **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
+>
+> **Key terms used below.** **Reversed spec** / **artifacts** — the bundle of documents extracted from the demo (requirements, API shape, data model, user journeys, design direction). **Oracle** — the generated test suite that judges whether a rewrite matches the spec. **Ralph loop** — the iterative build loop: a fresh agent session reads the spec + a progress file each iteration, implements one slice, and commits only if the tests are green. **Tracer bullet slice** — a thin end-to-end vertical (one route, one screen, one test) that proves the path works before other slices reuse its conventions.
 
 ## Problem
 
@@ -17,7 +33,7 @@ The input app usually works just enough to demonstrate value, but it is not a ma
 - no tests
 - no clear distinction between intended behavior and accidental prototype behavior
 
-The hard part is not just "rewrite the code." The hard part is turning a messy demo into a reliable set of artifacts that an implementation loop can converge against.
+The hard part is not just *"rewrite the code."* The hard part is turning a messy demo into a reliable set of *artifacts* (specifications, tests, schemas) that an implementation loop can converge against.
 
 ## Product Thesis
 
@@ -272,6 +288,40 @@ The controller is an **Agent SDK application** — a program that uses LLM calls
 **Artifact guardrail:** Claude Code sessions should not edit artifacts or tests unless the controller explicitly opens a revision step. The session writes application code and updates `progress.txt`. If the session encounters a problem that requires changing the spec or tests, it escalates — it does not silently revise the contract it's building against.
 
 **Skill assignment:** The controller assigns skills to each session based on the task. A backend implementation session gets the `backend-rewrite-loop` skill. A frontend session gets the `frontend-regeneration` skill. Skills are reusable execution playbooks — they carry workflow logic, quality gates, and task-specific guidance that improves how the session performs.
+
+## Agents in this module
+
+Extract runs nine specialized agents across two phases: **ingest** (producing the reversed spec) and **build** (producing the production candidate). The controller dispatches them; each receives a fresh context window loaded with exactly the inputs it needs.
+
+### Ingest phase
+
+Four probes run in parallel to describe the demo from different angles, then two synthesis agents merge and judge the result.
+
+| Agent | Role | Runs |
+|---|---|---|
+| **UI walker** | Drives the running demo in a browser. Discovers user journeys, observed API behavior, and design patterns that only surface under real interaction. | In parallel with the other probes |
+| **Static probe** | Extracts the declared API contract and data model from source code via static analysis. | In parallel with the other probes |
+| **Data probe** | Introspects the live database to describe actual state. Catches where the code's claims and the data's reality disagree. | In parallel with the other probes |
+| **External probe** | Catalogs external dependencies and third-party APIs from source analysis. | In parallel with the other probes |
+| **Reconciler** | Merges the four probe outputs into a unified specification (the `artifacts/` pack). Resolves conflicts explicitly. | After all four probes |
+| **Critic** | Judges whether the merged artifacts are sufficient, self-consistent, and usable for build. A fresh-context reviewer that didn't participate in ingest — no skin in the author's work. | After reconciler |
+
+### Build phase
+
+Once ingest produces an approved spec, build decomposes it into vertical slices and iterates through them.
+
+| Agent | Role | Notes |
+|---|---|---|
+| **Build-controller** | Dispatches per-slice executors, runs feedback loops (types, tests, journey tests), and owns the commit cadence. | Transitional extract-specific orchestrator; will collapse into the top-level `controller` once observed value justifies it. |
+| **Plan-reviewer** | A fresh-context skeptic dispatched between the slice plan and the first line of code. Must approve before any slice's Stage 1 runs. | Introduced in probe 2.5 as the structural fix for the self-evaluation failure that recurred across probes 2.2–2.4. |
+
+### Top-level orchestration
+
+| Agent | Role |
+|---|---|
+| **Controller** | Mode-aware top-level agent. Reads `program.md`, picks the right phase machine (extract-ingest vs deliver), and dispatches the appropriate phase-level agents. |
+
+Each agent's fresh context is the load-bearing property. A stale context window accumulates tool-call artifacts, half-remembered assumptions, and reasoning exhaust — all of which silently degrade output quality. Every handoff in extract is a context reset, not a continuation.
 
 ## Executor Mode Options
 

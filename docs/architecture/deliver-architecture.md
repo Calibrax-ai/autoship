@@ -1,14 +1,29 @@
 ---
-title: "Existing Project Delivery v0.1"
+title: "Deliver"
 ---
 
-**Date:** 2026-04-21
-**Status:** v0.1 proposal
-**Scope:** Turn autoship from a demo-to-product rewrite system into an existing-project delivery system
+**Status:** v0.1 proposal · **Last updated:** 2026-04-21
+
+## In plain English
+
+You have an existing codebase and an approved ticket — a bug to fix, a feature to add, a refactor to land. You want the change written, tested, and reviewable — without losing control of what changed or why.
+
+Asking an AI to *"just implement the ticket"* tends to produce code that looks right but drifts the scope: changes files that weren't supposed to move, adds tests that don't pin the real behavior, or silently reinterprets what the ticket was asking for.
+
+**Deliver** takes an approved ticket and produces:
+
+- A **brief** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the brief is weak, work doesn't start.
+- A **draft pull request** with the code change, the tests, and the evidence that the change actually works.
+
+A human promotes the brief to "Building" only when it's trustworthy. Everything past that point runs until the draft PR is ready for human review.
+
+> **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
+>
+> **Key terms used below.** **Brief** — the plain-English plan for the change. **Oracle** — the test suite that judges whether the code is done; the author of the code cannot edit it. **Stage 1 / Stage 2** — two separate agent sessions: Stage 1 writes the oracle, Stage 2 writes the code. **Pre-groomer / Brief-reviewer** — the two agents that write and judge the brief respectively.
 
 ## Problem
 
-`extract` and `build` solve the "unknown prototype" problem well enough to justify a separate track. They do not yet solve the "known repo, known issue, controlled change" problem.
+`extract` and `build` solve the *"unknown prototype"* problem well enough to justify a separate track. They do not yet solve the *"known repo, known issue, controlled change"* problem.
 
 For an existing project, the challenge is different:
 
@@ -27,44 +42,66 @@ The goal of `deliver` is not to reverse-engineer the whole product again. The go
 
 At the broader product level, those are better treated as **concerns** than one rigid global pipeline. Enrichment can recur during grooming, regroom, and later verification. Decomposition can happen during grooming or before a work item enters `deliver`. `deliver` itself remains a **small explicit local workflow**.
 
-Operator experience should stay pragmatic. A tracker like Linear is the likely **outer workflow surface** for humans: status, comments, lineage, priority, and linked issues. Repo-local artifacts remain the **inner execution contract** for agents: they version with code, freeze review inputs, and keep the machine-facing brief, oracle, and evidence stable.
+Operator experience should stay pragmatic. A tracker like Linear is the likely **outer workflow surface** for humans: status, comments, lineage, priority, and linked issues. Repo-local artifacts remain the **inner execution contract** for agents — they version with code, freeze review inputs, and keep the machine-facing brief, test suite, and evidence stable.
 
-### End-to-end pipeline
+### What deliver owns
+
+Deliver zooms into the operational middle of the [system end-to-end flow](/architecture/system-overview/#end-to-end-flow): from an approved issue to a reviewed draft pull request. The shape is two generator-evaluator pairs with a human approval boundary between them.
 
 ```mermaid
 flowchart LR
-    Issue([Issue<br/>intake]) --> PG[Pre-<br/>groom]
-    PG --> Brief[(brief.md)]
-    Brief --> BR{Brief<br/>Review}
-    BR -->|REJECT| RG[Regroom]
-    RG --> Brief
-    BR -->|APPROVE| OP[Oracle<br/>Plan]
-    OP --> OR{Oracle<br/>Review}
-    OR -->|REJECT| OP
-    OR -->|APPROVE| BLD[Build]
-    BLD --> UIW[UI Walker<br/>+ Verify]
-    UIW -->|FAIL| BLD
-    UIW -->|PASS| PBR{Post-Build<br/>Review Council}
-    PBR -->|REJECT| BLD
-    PBR -->|APPROVE| MRG[Merge]
-    MRG --> DPL[Deploy]
-    DPL --> MON{Monitor}
-    MON -->|regression| ROLL[Rollback]
-    ROLL --> Issue
-    MON -->|healthy| CLS([Close +<br/>Learn])
+    Issue["Approved issue"]
 
-    style PG fill:#2563eb,color:#fff
-    style Brief fill:#2563eb,color:#fff
-    style BR fill:#2563eb,color:#fff
-    style RG fill:#2563eb,color:#fff
+    subgraph GROOM ["Groom · generator-evaluator"]
+      direction TB
+      PG["Pre-groomer<br/>writes the brief"]
+      BR["Brief-reviewer<br/>separate AI,<br/>judges the brief"]
+      PG --> BR
+    end
+
+    HA["Human approves<br/>Ready → Building"]
+
+    subgraph BUILD ["Build · oracle frozen"]
+      direction TB
+      S1["Stage 1<br/>writes the tests<br/>(the oracle)"]
+      S2["Stage 2<br/>writes the code<br/>— cannot edit tests"]
+      S1 --> S2
+    end
+
+    V["Verify<br/>tests + mechanical<br/>checks pass"]
+    PR["Draft pull request"]
+
+    Issue --> GROOM
+    GROOM --> HA
+    HA --> BUILD
+    BUILD --> V
+    V --> PR
+
+    classDef live fill:#eef5f1,stroke:#0d6e61,color:#0a574d
+    classDef human fill:#eef2f8,stroke:#2c5488,color:#2c5488
+    classDef ext fill:#f2f0e9,stroke:#8a8983,color:#575652
+
+    class PG,BR,S1,S2,V live
+    class HA human
+    class Issue,PR ext
+
+    style GROOM fill:#f4faf7,stroke:#0d6e61,stroke-width:1px,color:#0a574d
+    style BUILD fill:#f4faf7,stroke:#0d6e61,stroke-width:1px,color:#0a574d
 ```
 
-**Probe-0.1 scope** covers only the highlighted stages (pre-groom → brief → brief-review → regroom). Everything downstream is future probe work. Proving grooming first is the minimum path to validating the generator-evaluator pattern at this layer.
+The same structural discipline shows up at both stages:
+
+- **Grooming** — one AI writes the brief, a *separate* AI judges it. The author never grades its own homework.
+- **Building** — Stage 1 writes the tests (the oracle). Stage 2 writes the code, and it is **forbidden** from modifying the tests. The oracle-freeze plays the role of the separate reviewer; test mutation becomes a visible signal that something's wrong.
+
+When review rejects, work loops back: Brief-reviewer REJECT sends the pre-groomer back to rewrite the brief; a Verify failure sends Stage 2 back to fix the code. Merge, deploy, and outcome verification sit **outside** deliver's scope — they belong to the system-level flow and (when they land) the `validate` module.
+
+**Current probe scope.** Probe 0.1 proved the grooming half (Pre-groomer + Brief-reviewer). Probes 0.2–0.5 extended through the building half (Stage 1 + Stage 2 + Verify) and across Bug, Feature, Refactor, and UI-build shapes. Draft-PR handoff is operational today.
 
 ### Load-bearing architectural choices
 
 - **Evidence-first artifacts** — truth comes from code, data, and observed behavior, not from issue text
-- **Oracle quality as the ceiling** — the executor optimizes for whatever the oracle measures
+- **Oracle quality as the ceiling** — the *oracle* is the test suite that judges whether a change is done. The executor optimizes for whatever the oracle measures, so weak tests produce "code that passes tests but doesn't work."
 - **Generator-evaluator separation at every handoff** — the author never discharges the gates judging its own work
 - **Fresh session per unit** — context accumulation silently degrades output quality
 - **Disk-backed execution state** — state lives on disk, not in a long-running session
@@ -182,10 +219,6 @@ For v0.1, one pre-groomer + one brief-reviewer handle all four types. Type is a 
 
 Specializing into four separate grooming pipelines is deferred until observed quality justifies it. Structure before evidence is formalism, same discipline applied to `calibration/` and supervisor modules.
 
-### Classification
-
-The pre-groomer classifies the issue as its first action and records `type:` in the brief frontmatter. External tracker labels (GitHub, Linear) are input signal, not authoritative — the pre-groomer can correct them. Misclassification is a brief-reviewer REJECT condition.
-
 ### Out of scope for `deliver`
 
 Explicitly not handled by this module:
@@ -281,7 +314,7 @@ The first probe must be able to fail mechanically, not only subjectively. Mechan
 
 ### 6. Repo-Local Canonical State With Optional Tracker Sync
 
-External trackers (GitHub, Linear) provide the outer workflow surface. They do not hold execution state.
+External trackers provide the outer workflow surface. They do not hold execution state.
 
 Trackers own:
 
@@ -385,41 +418,49 @@ The dispatch prompt for each unit inlines all the context that unit needs:
 
 The agent is told explicitly what it has been given and what it has not. This avoids burning the first ten tool calls re-orienting to context the dispatcher already has, and prevents the agent from fishing outside the intended scope.
 
+## Agents in this module
+
+Five specialized agents participate in a deliver run. The controller dispatches them in order; each receives a fresh context window with exactly the artifacts it needs.
+
+| Agent | Role | Owns | Judged by |
+|---|---|---|---|
+| **Controller** (deliver mode) | Orchestrator. Reads `program.md`, claims an eligible issue, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
+| **Pre-groomer** | Writes the **brief** — the plain-English plan — from the raw issue. | `brief.md` in the run directory. Populates every base field in the schema. | Brief-reviewer (separate agent). Never grades its own output. |
+| **Brief-reviewer** | Judges whether the brief is well-formed, grounded in the codebase, and well-scoped. Returns `APPROVED` or `REJECTED` with specific objections. | `reviews/review-NN.md` — append-only, one file per pass. | The operator, indirectly, through the calibration set grown from observed overrides. |
+| **Stage 1 executor** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. | Stage 2 (tests pass once code is written, or don't) and the human reviewer on the PR. |
+| **Stage 2 executor** | Writes the code change; runs the oracle until it passes; commits and opens the draft pull request. | Application source code only. **Forbidden** from editing tests, the brief, or any Stage 1 artifact. | The oracle — Stage 2 cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
+
+The shape is serial and disciplined: outputs of one agent become read-only inputs of the next. Nothing loops back except through an explicit reviewer verdict (brief-reviewer rejects → regroom) or a mechanical test failure (oracle fails → Stage 2 rewrites the code).
+
 ## Agent Contract
 
 Every agent invocation in `deliver` binds four explicit contracts. Each answers a distinct question and carries its own design decisions.
 
 ### The four layers
 
-```
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│   IDENTITY   │  │    SKILL     │  │    PROMPT    │  │   CONTEXT    │
-│   (agent)    │  │ (capability) │  │    (task)    │  │    (data)    │
-├──────────────┤  ├──────────────┤  ├──────────────┤  ├──────────────┤
-│ Who is this  │  │ How to do X? │  │ What to do   │  │ What data is │
-│ agent?       │  │              │  │ now?         │  │ visible?     │
-│              │  │              │  │              │  │              │
-│ • Role       │  │ • Procedure  │  │ • Identity   │  │ • Pre-inject │
-│ • Posture    │  │ • Inputs /   │  │   reference  │  │ • Tool-      │
-│ • System     │  │   Outputs    │  │ • Skills     │  │   accessible │
-│   prompt     │  │ • Required   │  │   declared   │  │ • Explicitly │
-│ • Default    │  │   tools      │  │ • Task spec  │  │   denied     │
-│   tools      │  │ • Reusable   │  │ • Completion │  │ • Fresh vs   │
-│ • Model /    │  │   across     │  │   criteria   │  │   carried    │
-│   effort     │  │   agents?    │  │              │  │              │
-└──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
-       │                 │                 │                 │
-       └────────┬────────┴────────┬────────┴────────┬────────┘
-                ▼                 ▼                 ▼
-       ┌──────────────────────────────────────────────┐
-       │   Bound at dispatch time                     │
-       │   → fresh agent session runs                 │
-       │   → writes artifacts to disk                 │
-       │   → returns structured verdict / summary     │
-       └──────────────────────────────────────────────┘
+Four contracts converge into a single dispatched agent session:
+
+```mermaid
+flowchart TB
+    I["<b>Identity</b><br/>(agent)<br/><br/>Who is this agent?"]
+    S["<b>Skill</b><br/>(capability)<br/><br/>How to do X?"]
+    P["<b>Prompt</b><br/>(task)<br/><br/>What to do now?"]
+    C["<b>Context</b><br/>(data)<br/><br/>What data is visible?"]
+
+    D["<b>Bound at dispatch time</b><br/>— fresh agent session runs<br/>— writes artifacts to disk<br/>— returns structured verdict or summary"]
+
+    I --> D
+    S --> D
+    P --> D
+    C --> D
+
+    classDef contract fill:#eef5f1,stroke:#0d6e61,color:#0a574d
+    classDef dispatch fill:#eef2f8,stroke:#2c5488,color:#2c5488
+    class I,S,P,C contract
+    class D dispatch
 ```
 
-**Table view of the same:**
+Each layer's design decisions in one place:
 
 | Layer | Answers | Design decisions |
 |---|---|---|
@@ -500,7 +541,7 @@ Closed issues feed back into durable project memory:
 
 ### 5. Tracker Adapters
 
-GitHub or Linear integration arrives after the repo-local execution model is stable.
+Tracker integration arrives after the repo-local execution model is stable.
 
 Adapters handle:
 
@@ -555,11 +596,11 @@ This split prevents stable framework knowledge from turning into a junk drawer f
 
 These files are **controller-only**. Manual worker dispatch remains a fallback path; it does not require them.
 
-When `deliver` is connected to Linear or another tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`pre-groomer`, `brief-reviewer`, later oracle/build/review workers) should:
+When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`pre-groomer`, `brief-reviewer`, later oracle/build/review workers) should:
 
 - write their own artifacts
 - return a structured result to the controller
-- never call Linear MCP directly for official state changes
+- never call the tracker's API/MCP directly for official state changes
 
 That structured result acts like a callback signal to the controller:
 
@@ -572,7 +613,7 @@ That structured result acts like a callback signal to the controller:
 The controller then:
 
 - posts the human-facing summary comment
-- changes Linear status if policy allows
+- changes tracker status if policy allows
 - dispatches the next worker or stops
 
 ### Human / agent handoffs in `deliver`
@@ -580,10 +621,10 @@ The controller then:
 The core handoff boundaries should stay explicit:
 
 1. **Human -> agent**
-   An issue is created or selected in the outer workflow surface (likely Linear) and becomes eligible for grooming.
+   An issue is created or selected in the outer workflow surface (a tracker) and becomes eligible for grooming.
 
 2. **Agent -> human or reviewer-agent**
-   After grooming, the agent writes the brief and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When a tracker like Linear is present, `ready-for-oracle` typically maps to an outer `Ready` state.
+   After grooming, the agent writes the brief and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When a tracker is present, `ready-for-oracle` typically maps to an outer `Ready` state.
 
 3. **Approval boundary**
    In supervised mode, a human promotes work from `Ready` to `Building`.

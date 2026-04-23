@@ -1,20 +1,42 @@
 ---
-title: "Learnings from Autoship Probes"
+title: "What we've learned"
 ---
 
-Cross-track synthesis for autoship's two tracks:
+## The short version
 
-- [`extract-learnings.md`](/Users/shyangcalibrax/Documents/Projects/autoship/docs/extract-learnings.md) — reverse-spec, oracle, build, and reviewer learnings from the prototype-reconstruction line
-- [`deliver-learnings.md`](/Users/shyangcalibrax/Documents/Projects/autoship/docs/deliver-learnings.md) — grooming, brief review, and issue-driven delivery learnings from the existing-project line
+After ten probes across two tracks, three findings have held up repeatedly:
 
-Use this file for findings that generalize across tracks. Keep per-track chronology and detailed probe notes in the track-specific files.
+1. **The plan is the ceiling.** If the plan is weak, the code will be too — the agent will produce "tests pass" without "product works." Almost all the leverage lives in producing a trustworthy plan *before* code is written.
+2. **The author doesn't grade its own homework.** When the same agent writes a plan and checks it, new checks get absorbed — the agent learns the shape of the gate while reproducing the same failure under a cleaner label. The fix is structural: a separate reviewer.
+3. **Mechanical checks for mechanical things. Judgment for everything else.** Regex is right for exact-pattern rules. Anything that needs interpretation ("is this well-scoped?", "is this the right abstraction?") goes to a reviewer with no skin in the author's work.
 
-| Track | Current probes | Main question | Current answer |
+The rest of this page unpacks where those findings came from, which probes stressed them, and which open questions remain.
+
+## Where to look next
+
+- [Extract learnings](/extract-learnings/) — findings from the prototype-reconstruction track (reverse spec, oracle, build, reviewer)
+- [Deliver learnings](/deliver-learnings/) — findings from the existing-project track (grooming, brief review, issue-driven delivery)
+
+This page carries findings that generalize **across** tracks. Per-track detail and probe-by-probe chronology live in the two files above.
+
+## What a "probe" is
+
+A probe is a single end-to-end experiment we run against the system — one real input, one real output, recorded honestly, whether it shipped or not. Probes are numbered `track.number` (`extract` uses `0`–`2.5`; `deliver` uses `0.1`–`0.5`). Numbers restart per track; they don't reflect importance, just chronology. When a finding below says "probe 2.5 validated X," it means "the fifth probe of the extract track surfaced X as a load-bearing finding."
+
+Probes are not benchmarks. They're where we go looking for failure modes, so the honest notes matter more than the scorecard.
+
+## Status at a glance
+
+| Track | Probes | Main question | Current answer |
 |---|---|---|---|
-| `extract` | 0 -> 2.5 | Can autoship reconstruct intent from a prototype and build against it reliably? | Yes, but only when the oracle is strong and a separate reviewer judges plans before build. |
-| `deliver` | 0.1 → 0.5 | Can autoship turn a real issue into a trustworthy brief that downstream stages can build against? | Yes across Bug + Feature + Refactor + UI build layers. UI build validated end-to-end on FRD-162 (design-system primitives) — 12/12 Playwright tests green first-run, zero test mutations, impeccable detect clean. Cross-repo generalization, outcome verification, and recurring invented-status-value findings still open. |
+| `extract` | 0 → 2.5 | Can autoship reconstruct intent from a prototype and build against it reliably? | Yes, but only when the oracle is strong and a separate reviewer judges plans before build. |
+| `deliver` | 0.1 → 0.5 | Can autoship turn a real issue into a trustworthy brief and a reviewed change? | Yes across Bug, Feature, Refactor, and UI-build shapes. UI build validated end-to-end on FRD-162 — all 12 Playwright tests green on first run, zero test mutations. Cross-repo generalization and outcome verification still open. |
 
 ---
+
+> **The rest of this page is engineering detail.** Leadership readers can stop here.
+>
+> **Key terms used below.** **Artifacts** — the bundle of outputs from grooming or extraction (brief, spec, tests, evidence). **Oracle** — the generated test suite that judges whether code matches the spec. **Brief** — the plain-English plan for a single change. **Stage 1 / Stage 2** — two separate agent sessions: Stage 1 writes the oracle (the tests), Stage 2 writes the code and cannot edit the oracle.
 
 ## The pipeline works when artifacts are strong
 

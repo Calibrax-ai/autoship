@@ -2,9 +2,22 @@
 title: "Extract Learnings"
 ---
 
-Detailed learnings for the `extract` track: reverse-spec extraction, oracle construction, build orchestration, and plan review against prototype-derived artifacts.
+## In short
 
-For cross-track synthesis, see [`learnings.md`](/Users/shyangcalibrax/Documents/Projects/autoship/docs/learnings.md).
+Six probes from `probe 0` through `probe 2.5`. The headline: **a working extract pipeline that turns a half-built demo into a production-candidate app.** The hard part was never writing code — it was producing a trustworthy specification the code could be written against.
+
+Two findings did the heavy lifting:
+
+1. **The tests are the ceiling.** Weak tests produced code that passed tests but was behaviorally empty. Stronger tests revealed previously-hidden failures at every layer — missing frontend, dead write paths, selector drift. Whatever the tests don't measure, the agent treats as optional.
+2. **A separate reviewer at the planning layer.** When the same agent wrote and graded the plan, new checks got absorbed — the agent satisfied the letter of the gate while reproducing the same failure under a cleaner label. The fix was a dedicated reviewer (`plan-reviewer`) between slice planning and the build, introduced in probe 2.5.
+
+The rest of this page is the probe-by-probe chronology.
+
+> **This page is engineering detail.** For plain-English cross-track synthesis, see [What we've learned](/learnings/).
+
+---
+
+Detailed learnings for the `extract` track: reverse-spec extraction, oracle construction, build orchestration, and plan review against prototype-derived artifacts.
 
 | Probe | What it tested | Key outcome |
 |---|---|---|

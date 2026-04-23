@@ -2,9 +2,25 @@
 title: "Deliver Learnings"
 ---
 
-Detailed learnings for the `deliver` track: issue grooming, brief review, regroom loops, and the first trustworthy-brief -> oracle -> build validation.
+## In short
 
-For cross-track synthesis, see [`learnings.md`](/Users/shyangcalibrax/Documents/Projects/autoship/docs/learnings.md).
+Five probes, `probe 0.1` through `probe 0.5`. The headline: **deliver's grooming-and-build pattern is proven across four change shapes** — Bug, Feature, Refactor, and UI build. A human-approved brief turns into a reviewed code change through a draft pull request without losing control of scope or evidence.
+
+Three findings shaped the track:
+
+1. **Generator-evaluator generalizes.** The "author writes, separate reviewer judges" pattern that worked at extract's planning layer worked again at deliver's grooming layer (probe 0.1), and again at the building layer where Stage 1 writes the tests and Stage 2 writes the code without being allowed to edit them (probes 0.2–0.5).
+2. **Build validation holds across all four shapes.** Bug (FRD-157, 6/6 tests green), Feature (FRD-122, 20/20), Refactor (REF-001, 12/12 with zero test mutations), and UI build (FRD-162, 12/12 first-run). No test-gaming, no scope creep, no rewrites.
+3. **Invented status values are a recurring signal.** Multiple probes surfaced agents emitting values that weren't in the enumeration (e.g., `drafted` instead of one of `drafted-with-gaps` / `need-info` / `ready`). A candidate for systemic frontmatter-value validation rather than per-probe triage.
+
+Open: cross-repo generalization, outcome verification, autonomous draft-to-merge.
+
+The rest of this page is the probe-by-probe chronology.
+
+> **This page is engineering detail.** For plain-English cross-track synthesis, see [What we've learned](/learnings/).
+
+---
+
+Detailed learnings for the `deliver` track: issue grooming, brief review, regroom loops, and the first trustworthy-brief -> oracle -> build validation.
 
 | Probe | What it tested | Key outcome |
 |---|---|---|

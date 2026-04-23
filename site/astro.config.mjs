@@ -13,6 +13,14 @@ export default defineConfig({
               'Turns messy software work into bounded, reviewable, executable units.',
           customCss: ['./src/styles/starlight-overrides.css'],
           defaultLocale: 'root',
+          expressiveCode: {
+              themes: ['github-dark'],
+              styleOverrides: {
+                  borderRadius: '10px',
+                  borderWidth: '0',
+                  codeBackground: '#232220',
+              },
+          },
           components: {
               Head: './src/components/Head.astro',
           },
