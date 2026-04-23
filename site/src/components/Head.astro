@@ -1,0 +1,76 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro';
+---
+
+<Default><slot /></Default>
+
+<script>
+	import mermaid from 'mermaid';
+
+	mermaid.initialize({
+		startOnLoad: false,
+		theme: 'default',
+		securityLevel: 'loose',
+	});
+
+	async function renderMermaidDiagrams() {
+		// Starlight / expressive-code marks mermaid blocks as:
+		//   <pre data-language="mermaid"><code>…</code></pre>
+		// wrapped in <figure> / <div class="expressive-code">.
+		const preBlocks = document.querySelectorAll(
+			'pre[data-language="mermaid"]'
+		);
+		for (let i = 0; i < preBlocks.length; i++) {
+			const pre = preBlocks[i] as HTMLElement;
+			if (pre.dataset.mermaidRendered === 'true') continue;
+			pre.dataset.mermaidRendered = 'true';
+
+			const code = pre.querySelector('code');
+			// Join line-by-line text so indentation + newlines survive.
+			const lines = code
+				? Array.from(code.querySelectorAll('.ec-line')).map(
+						(l) => (l as HTMLElement).innerText
+					)
+				: [];
+			const graphDef = lines.length
+				? lines.join('\n')
+				: code?.textContent ?? '';
+
+			const id = `mermaid-${Date.now()}-${i}`;
+			try {
+				const { svg } = await mermaid.render(id, graphDef);
+				const container = document.createElement('div');
+				container.className = 'mermaid-rendered';
+				container.innerHTML = svg;
+				// Replace the whole expressive-code frame, not just the <pre>.
+				const frame =
+					pre.closest('figure') ??
+					pre.closest('.expressive-code') ??
+					pre;
+				frame.replaceWith(container);
+			} catch (err) {
+				console.error('Mermaid render failed:', err);
+			}
+		}
+	}
+
+	// Initial load + after client-side navigation
+	renderMermaidDiagrams();
+	document.addEventListener('astro:page-load', renderMermaidDiagrams);
+</script>
+
+<style is:global>
+	.mermaid-rendered {
+		display: flex;
+		justify-content: center;
+		margin: 1.5rem 0;
+		padding: 1rem;
+		background: var(--sl-color-bg-inline-code);
+		border-radius: 0.5rem;
+		overflow-x: auto;
+	}
+	.mermaid-rendered svg {
+		max-width: 100%;
+		height: auto;
+	}
+</style>

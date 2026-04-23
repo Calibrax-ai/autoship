@@ -9,6 +9,9 @@ export default defineConfig({
 			title: 'autoship',
 			description:
 				'Turns messy software work into bounded, reviewable, executable units.',
+			components: {
+				Head: './src/components/Head.astro',
+			},
 			social: [
 				{
 					icon: 'github',
