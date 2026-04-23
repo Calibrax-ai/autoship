@@ -3,7 +3,7 @@ title: autoship
 description: Turns messy software work into bounded, reviewable, executable units.
 template: splash
 hero:
-  tagline: Generator-evaluator discipline. Fresh context per unit. Disk-backed state. One controller, two modes.
+  tagline: Generator-evaluator discipline. Fresh context per unit. Disk-backed state. Four modules around one controller.
   actions:
     - text: System overview
       link: /architecture/system-overview/
@@ -19,12 +19,19 @@ hero:
 
 Autoship turns messy software work — demo reconstruction, bounded change requests, UI redesigns — into bounded, reviewable, executable units. The hard problem is not writing code. The hard problem is producing a trustworthy contract the downstream executor can optimize against.
 
-## Two modes, one controller
+## Four modules, one controller
+
+**Operational today:**
 
 - **`extract`** — understand an unknown prototype, produce trustworthy artifacts + build
 - **`deliver`** — take a known issue, move it to validated change (through draft PR)
 
-Both modes share the same operational discipline: generator-evaluator at every handoff, fresh context per worker, state on disk. Different internal phase machines, one top-level controller.
+**Next:**
+
+- **`discover`** *(coming soon)* — messy signals → trustworthy intent. Read real sources (tickets, threads, usage, incidents); produce grounded intent with every field citing its evidence.
+- **`validate`** *(coming soon)* — shipped change → outcome truth. Close the loop by measuring whether a delivery actually moved the signal it claimed to.
+
+All four share the same operational discipline: generator-evaluator at every handoff, fresh context per worker, state on disk. Different internal phase machines, one top-level controller.
 
 ## Start here
 

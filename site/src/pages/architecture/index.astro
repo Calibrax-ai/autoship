@@ -3,18 +3,57 @@ import '../../styles/global.css';
 import { getCollection } from 'astro:content';
 import TopBar from '../../components/TopBar.astro';
 
+type ArchEntry = {
+	slug: string | null; // null → coming soon, no link
+	title: string;
+	eyebrow: string;
+	description?: string;
+	status: 'live' | 'coming-soon';
+};
+
 const pieces = await getCollection('architecture');
-// Desired order: system overview, extract, deliver
-const order = [
+
+// Live entries, in narrative order
+const LIVE_ORDER = [
 	'system-overview',
 	'extract-architecture',
 	'deliver-architecture',
 ];
-pieces.sort((a, b) => {
-	const ai = order.indexOf(a.id.replace(/\.md$/, ''));
-	const bi = order.indexOf(b.id.replace(/\.md$/, ''));
-	return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+const live: ArchEntry[] = LIVE_ORDER.flatMap((slug) => {
+	const entry = pieces.find((p) => p.id.replace(/\.md$/, '') === slug);
+	if (!entry) return [];
+	return [
+		{
+			slug,
+			title: entry.data.title,
+			eyebrow: entry.data.eyebrow,
+			description: entry.data.description,
+			status: 'live' as const,
+		},
+	];
 });
+
+// Placeholders — modules not yet built
+const comingSoon: ArchEntry[] = [
+	{
+		slug: null,
+		title: 'discover',
+		eyebrow: 'Module',
+		description:
+			'Signals → trustworthy intent. Reads real sources — tickets, threads, usage, incidents — and produces grounded intent statements. No fabrication: every intent field must cite its source.',
+		status: 'coming-soon',
+	},
+	{
+		slug: null,
+		title: 'validate',
+		eyebrow: 'Module',
+		description:
+			'Shipped change → outcome truth. Closes the loop by measuring whether a delivery actually moved the signal it claimed to. Required before discover → deliver can run autonomously.',
+		status: 'coming-soon',
+	},
+];
+
+const all = [...live, ...comingSoon];
 ---
 
 <!doctype html>
@@ -26,7 +65,7 @@ pieces.sort((a, b) => {
 		<title>Architecture — autoship</title>
 		<meta
 			name="description"
-			content="System overview, extract, and deliver: autoship's canonical architecture documents."
+			content="System overview, extract, deliver, and what's next: autoship's canonical architecture documents."
 		/>
 	</head>
 	<body class="bg-[color:var(--color-lf-bg)] text-[color:var(--color-lf-text-2)] font-sans">
@@ -41,31 +80,48 @@ pieces.sort((a, b) => {
 					How autoship is built.
 				</h1>
 				<p class="mt-6 text-xl leading-[1.4] tracking-[-0.005em] text-[color:var(--color-lf-text-2)] max-w-[36rem]">
-					Canonical architecture docs for each module, and the top-level concern map that sits above them.
+					Four modules around one controller: <code class="text-[color:var(--color-lf-accent-strong)] bg-[color:var(--color-lf-accent-soft)] px-1.5 py-0.5 rounded">discover</code>, <code class="text-[color:var(--color-lf-accent-strong)] bg-[color:var(--color-lf-accent-soft)] px-1.5 py-0.5 rounded">extract</code>, <code class="text-[color:var(--color-lf-accent-strong)] bg-[color:var(--color-lf-accent-soft)] px-1.5 py-0.5 rounded">deliver</code>, <code class="text-[color:var(--color-lf-accent-strong)] bg-[color:var(--color-lf-accent-soft)] px-1.5 py-0.5 rounded">validate</code>. Two are operational today; two are next.
 				</p>
 			</header>
 
 			<ul class="flex flex-col divide-y divide-[color:var(--color-lf-border)]">
-				{pieces.map((entry) => (
-					<li class="py-8">
-						<a
-							href={`/architecture/${entry.id.replace(/\.md$/, '')}/`}
-							class="group block"
-						>
-							<div class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-[color:var(--color-lf-text-3)] mb-3">
-								<span>{entry.data.eyebrow}</span>
-							</div>
-							<h2 class="text-2xl md:text-3xl font-medium tracking-[-0.015em] leading-[1.15] text-[color:var(--color-lf-text)] group-hover:text-[color:var(--color-lf-accent-strong)] transition-colors">
-								{entry.data.title}
-							</h2>
-							{entry.data.description && (
-								<p class="mt-3 text-lg leading-[1.5] text-[color:var(--color-lf-text-2)] max-w-[34rem]">
-									{entry.data.description}
-								</p>
-							)}
-						</a>
-					</li>
-				))}
+				{all.map((entry) => {
+					const isLive = entry.status === 'live' && entry.slug;
+					const Wrapper = isLive ? 'a' : 'div';
+					const wrapperProps = isLive
+						? { href: `/architecture/${entry.slug}/`, class: 'group block' }
+						: { class: 'block opacity-70' };
+					return (
+						<li class="py-8">
+							<Wrapper {...wrapperProps}>
+								<div class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-[color:var(--color-lf-text-3)] mb-3">
+									<span>{entry.eyebrow}</span>
+									{!isLive && (
+										<>
+											<span class="w-1 h-1 rounded-full bg-[color:var(--color-lf-border)]"></span>
+											<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-[color:var(--color-lf-surface-sunken)] text-[color:var(--color-lf-text-3)] text-[10.5px] tracking-[0.08em] normal-case">
+												Coming soon
+											</span>
+										</>
+									)}
+								</div>
+								<h2
+									class:list={[
+										'text-2xl md:text-3xl font-medium tracking-[-0.015em] leading-[1.15] text-[color:var(--color-lf-text)]',
+										isLive && 'group-hover:text-[color:var(--color-lf-accent-strong)] transition-colors',
+									]}
+								>
+									{entry.title}
+								</h2>
+								{entry.description && (
+									<p class="mt-3 text-lg leading-[1.5] text-[color:var(--color-lf-text-2)] max-w-[34rem]">
+										{entry.description}
+									</p>
+								)}
+							</Wrapper>
+						</li>
+					);
+				})}
 			</ul>
 		</main>
 
