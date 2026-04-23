@@ -1,4 +1,6 @@
-# Deliver Learnings
+---
+title: "Deliver Learnings"
+---
 
 Detailed learnings for the `deliver` track: issue grooming, brief review, regroom loops, and the first trustworthy-brief -> oracle -> build validation.
 

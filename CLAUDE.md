@@ -34,10 +34,9 @@ Important boundary:
 - `skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
 - `teach-autoship.md` — controller-only stable operating knowledge shared by the controller across modes. Read by the controller before consulting its per-run `program.md`. Contains generator-evaluator discipline, workflow-surface ownership, per-mode phase machines, stop conditions, NEVER STOP posture.
 - `docs/architecture/deliver-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in deliver mode. Commit one to each testbed; manual fallback does not need it.
-- `docs/architecture/extract-architecture.md` — canonical architecture proposal for the `extract` track.
-- `docs/architecture/autoship-extract-proposal.html` — HTML presentation of the `extract` architecture. **Must be kept in sync with the extract architecture doc.**
-- `docs/architecture/deliver-architecture.md` — architecture proposal for the `deliver` track.
-- `docs/architecture/autoship-deliver-proposal.html` — HTML presentation of the `deliver` architecture. **Must be kept in sync with the deliver architecture doc.**
+- `docs/architecture/extract-architecture.md` — canonical architecture for the `extract` track.
+- `docs/architecture/deliver-architecture.md` — canonical architecture for the `deliver` track.
+- `docs/architecture/system-overview.md` — top-level concern map above the `extract` / `deliver` modules.
 - `docs/learnings.md` — cross-track synthesis. Updated after each probe completes.
 - `docs/extract-learnings.md` — detailed learnings for the `extract` track.
 - `docs/deliver-learnings.md` — detailed learnings for the `deliver` track.
@@ -45,6 +44,8 @@ Important boundary:
 - `docs/plan-reviewer-calibration.md` — labeled few-shot cases the plan-reviewer scores against. Operator overrides become new cases; calibration grows over time.
 - `docs/archive/agent-prompt-review.md` — superseded review (kept as institutional memory of the "add more grep gates" wrong turn). The supersede note at the top explains why; the body explains what.
 - `skills/` — five autoship-specific skill packs that the product will ship. They are deliverables, not skills for operating on this repo.
+- `site/` — Starlight (Astro) documentation site. Content is sourced from `docs/` via symlink `site/src/content/docs -> ../../../docs`. Canonical MDs stay at `docs/…`. Build: `cd site && bun install && bun run build`. No hand-crafted HTML — everything renders from MD.
+- `probe-artifacts/deliver-probes/` — historical probe artifacts (briefs, reviews, issues from probes 0.1–0.5). Institutional memory; not part of the published docs site.
 
 ## Running the Ingest
 

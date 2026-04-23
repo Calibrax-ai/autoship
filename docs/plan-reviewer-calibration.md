@@ -1,4 +1,6 @@
-# Plan-Reviewer Calibration
+---
+title: "Plan-Reviewer Calibration"
+---
 
 This file is the plan-reviewer's reference for what good vs. wrong slice-plan judgment looks like. Each example pairs a real decision from a past probe with a label, the reasoning behind it, the **principle** the example illustrates, and an **anti-overfit hint** so the reviewer abstracts from the case to the pattern.
 

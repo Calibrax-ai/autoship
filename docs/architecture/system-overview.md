@@ -1,4 +1,6 @@
-# Autoship System Overview
+---
+title: "Autoship System Overview"
+---
 
 **Date:** 2026-04-22
 **Status:** draft

@@ -1,4 +1,6 @@
-# Existing Project Delivery v0.1
+---
+title: "Existing Project Delivery v0.1"
+---
 
 **Date:** 2026-04-21
 **Status:** v0.1 proposal

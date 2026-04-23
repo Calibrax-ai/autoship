@@ -1,4 +1,6 @@
-# Learnings from Autoship Probes
+---
+title: "Learnings from Autoship Probes"
+---
 
 Cross-track synthesis for autoship's two tracks:
 

@@ -1,4 +1,6 @@
-# Controller Context Optimization — measured from probe-2.4
+---
+title: "Controller Context Optimization — measured from probe-2.4"
+---
 
 **Scope.** Profile the build-controller session that drove probe-2.4 (14 slices + retroactive hardening) and propose surgical edits to `.claude/agents/build-controller.md` that reduce per-slice context spend in probe-2.5+.
 

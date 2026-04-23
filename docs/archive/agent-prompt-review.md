@@ -1,3 +1,7 @@
+---
+title: "Agent Prompt Structure Review (superseded)"
+---
+
 > **STATUS: SUPERSEDED — kept as institutional memory of a wrong turn.**
 >
 > This review was authored 2026-04-17 to diagnose probe-2.4's silent journey drops as a coverage gap, and recommended adding three grep/diff forcing-function gates to `build-controller.md`. Those gates were implemented in commit `b6bb3e9` and within the same probe run, the controller passed them while *transparently* cutting J13 with a defensible-sounding rationale — reproducing probe-2.3's dialog-theater outcome under a politer label.

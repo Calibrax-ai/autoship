@@ -1,4 +1,6 @@
-# Autoship Probe Summary — cost and wall-clock
+---
+title: "Autoship Probe Summary — cost and wall-clock"
+---
 
 This table summarizes the Claude API cost and wall-clock time per probe across the autoship research program (probes 0 through 2.5, run 2026-04-10 through 2026-04-20). Probes 2.5→2.9 were renumbered to 2.1→2.5 on 2026-04-18; this doc uses the new numbering throughout (old numbers retained inside parenthetical asides where the mapping matters).
 

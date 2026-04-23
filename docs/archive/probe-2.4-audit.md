@@ -1,4 +1,6 @@
-# Probe-2.8 Quality Audit
+---
+title: "Probe-2.8 Quality Audit"
+---
 
 **Auditor:** Claude Opus 4.7 (1M context) · **Date:** 2026-04-17
 **Probe path:** `/Users/shyangcalibrax/Documents/Projects/autoship-probe-2.4/`

@@ -1,4 +1,6 @@
-# Autoship Harness Philosophy — Synthesis
+---
+title: "Autoship Harness Philosophy — Synthesis"
+---
 
 ## TL;DR
 

@@ -1,4 +1,6 @@
-# program.md — deliver run contract
+---
+title: "program.md — deliver run contract"
+---
 
 **Purpose:** the run contract the controller reads on every deliver invocation. Declares: which Linear project to work against, which issues are eligible, how to validate a build, and where to ship the draft PR.
 

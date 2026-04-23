@@ -1,4 +1,6 @@
-# Extract Learnings
+---
+title: "Extract Learnings"
+---
 
 Detailed learnings for the `extract` track: reverse-spec extraction, oracle construction, build orchestration, and plan review against prototype-derived artifacts.
 

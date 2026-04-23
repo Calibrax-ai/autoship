@@ -1,4 +1,6 @@
-# Archived Docs
+---
+title: "Archived Docs"
+---
 
 These files are kept for institutional memory, not as current source-of-truth docs.
 

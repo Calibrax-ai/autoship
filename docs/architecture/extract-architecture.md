@@ -1,4 +1,6 @@
-# Demo → Production Candidate v1: Reverse Spec + Ralph Loop
+---
+title: "Demo → Production Candidate v1: Reverse Spec + Ralph Loop"
+---
 
 **Date:** 2026-04-14
 **Status:** v1 proposal (simplified from earlier exploration)
