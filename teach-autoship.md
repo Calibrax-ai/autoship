@@ -116,7 +116,7 @@ Never promote work silently past a boundary. Every promotion is either an operat
 
 **Hard rule:** workers never write to Linear. If a worker emits a `needs-human-input` signal, the controller is responsible for posting the Linear comment and transitioning state.
 
-### Comment and state policy (defaults for deliver phase 3)
+### Comment and state policy (defaults for deliver)
 
 Default state transitions per issue:
 - `Backlog | Todo` → `Grooming` when pre-groom dispatches
@@ -125,16 +125,16 @@ Default state transitions per issue:
 - `Building` → `In Review` when draft PR is opened
 - any active state → `needs-human-input` on a typed blocker
 
-`Ready` remains the explicit outer approval boundary. A ticket in `Ready` is waiting for human promotion; it is not actively executing. Phase 3 honors that boundary rather than auto-advancing through it.
+`Ready` remains the explicit outer approval boundary. A ticket in `Ready` is waiting for human promotion; it is not actively executing. The controller honors that boundary rather than auto-advancing through it.
 
-Default comment posts (free-form text, no templates required for phase 3):
+Default comment posts (free-form text, no templates required):
 - Claim / grooming started
 - Final `Ready`
 - Build started
 - Draft PR opened
 - Final `needs-human-input`
 
-Do not post comments for every intermediate regroom pass. Comments are ad-hoc prose for phase 3. Templates earn their place if operator reports noise or missing information after real-world use.
+Do not post comments for every intermediate regroom pass. Comments are ad-hoc prose today. Templates earn their place if operator reports noise or missing information after real-world use.
 
 ---
 
@@ -172,7 +172,7 @@ Never calls Linear. Never modifies test files written by Stage 1.
 
 ## Issue lifecycle (controller view, current deliver runtime)
 
-In deliver phase 3, every issue progresses through this machine. The controller reads runtime artifacts, consults `program.md` for policy, dispatches the next worker, then parks the issue at the next explicit boundary.
+In deliver mode, every issue progresses through this machine. The controller reads runtime artifacts, consults `program.md` for policy, dispatches the next worker, then parks the issue at the next explicit boundary.
 
 ```
 new ──groom──▶ proposed ──review──▶ changes-requested ──regroom──▶ proposed
@@ -204,7 +204,7 @@ new ──groom──▶ proposed ──review──▶ changes-requested ──
 
 ## Stop conditions
 
-Per-issue terminal outcomes in deliver phase 3:
+Per-issue terminal outcomes in deliver:
 
 1. **`Ready`** — grooming + review succeeded and the brief is build-worthy.
 2. **`needs-human-input`** — the reviewed outcome or build execution hit a typed blocker.
@@ -217,7 +217,7 @@ The controller halts the whole run only when:
 1. **Unrecoverable environment error** — testbed path invalid, tracker integration unavailable for the selected source, credentials missing, or another global failure blocks all further work.
 2. **End of eligible work** — no more issues match `program.md`'s eligibility criteria.
 
-Anything else: **do not stop**. In deliver phase 3, park per-issue blockers at `needs-human-input`, respect `Ready` as the human approval boundary, and continue to the next eligible issue.
+Anything else: **do not stop**. In deliver mode, park per-issue blockers at `needs-human-input`, respect `Ready` as the human approval boundary, and continue to the next eligible issue.
 
 ---
 

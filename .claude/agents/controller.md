@@ -67,7 +67,7 @@ Boot report: $BOOT_REPORT_PATH" \
 
 Use background execution for long-running sub-agents. Artifact verification gates completion, not exit codes.
 
-## Mode B — Deliver runtime (phase 3)
+## Mode B — Deliver runtime
 
 Deliver runtime drives an issue from backlog to draft PR, preserving the human approval boundary between `Ready` and `Building`.
 

@@ -12,7 +12,7 @@ Use autoship in one of two modes:
 
 - **`extract` today** — operational via `autoship.sh ingest ...` or the existing `controller` agent in extract-ingest mode.
 - **`deliver` today** — operational in two shapes:
-  - **controller-backed phase 3 runtime** through draft PR: `claude --agent controller -p "deliver"` from the testbed root (reads `.autoship/program.md`)
+  - **controller-backed runtime** through draft PR: `claude --agent controller -p "deliver"` from the testbed root (reads `.autoship/program.md`)
   - **manual fallback** via `pre-groomer` + `brief-reviewer` dispatched directly
 
 Important boundary:
@@ -29,8 +29,8 @@ Important boundary:
   - **Ingest synthesis**: reconciler, critic
   - **Orchestration**: controller — one top-level controller role. Supports extract-ingest and deliver-through-draft-PR today. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
   - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.5 onward)
-  - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `controller` in deliver phase-3 mode.
-  - **Deliver build**: stage1-executor, stage2-executor — frozen-oracle and implementation workers for deliver phase 3. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
+  - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `controller` in deliver mode.
+  - **Deliver build**: stage1-executor, stage2-executor — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
 - `skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
 - `teach-autoship.md` — controller-only stable operating knowledge shared by the controller across modes. Read by the controller before consulting its per-run `program.md`. Contains generator-evaluator discipline, workflow-surface ownership, per-mode phase machines, stop conditions, NEVER STOP posture.
 - `docs/architecture/deliver-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in deliver mode. Commit one to each testbed; manual fallback does not need it.
@@ -78,7 +78,7 @@ claude --agent controller --add-dir /path/to/project -p "ingest /path/to/project
 
 Same state model as Track 1 (marker files, artifacts, agent definitions). Both tracks coexist — use Track 1 for CI/headless, Track 2 for interactive/autonomous runs.
 
-### Deliver phase 3 runtime
+### Deliver runtime
 
 The controller drives deliver work from backlog to draft PR. The whole contract lives in `.autoship/program.md` at the testbed root — one checked-in file per repo.
 

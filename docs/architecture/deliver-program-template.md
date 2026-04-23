@@ -1,4 +1,4 @@
-# program.md — deliver phase-3 run contract
+# program.md — deliver run contract
 
 **Purpose:** the run contract the controller reads on every deliver invocation. Declares: which Linear project to work against, which issues are eligible, how to validate a build, and where to ship the draft PR.
 
@@ -10,7 +10,6 @@ Stable knowledge (how autoship works in general) lives in `teach-autoship.md`. T
 
 ```yaml
 mode: deliver
-phase: 3
 
 # Where issues come from.
 issue_source: linear | single | folder
@@ -22,7 +21,7 @@ linear:
   grooming_states: [Backlog, Todo]     # states eligible for grooming
   build_states: [Building]              # states eligible for build
   eligible_labels: []                   # optional filter
-  max_concurrent: 1                     # phase 3 is serial; keep at 1
+  max_concurrent: 1                     # deliver is serial today; keep at 1
 
 # Grooming control
 max_regroom_cycles: 3
@@ -38,7 +37,7 @@ validation:
     - "bun test"
     - "bun run typecheck"
 
-# Draft PR policy (phase 3 ends at draft)
+# Draft PR policy — deliver ends at draft. Merging happens in your normal code-review workflow.
 pr:
   remote: origin
   draft: true
@@ -82,7 +81,6 @@ folder:
 
 ```yaml
 mode: deliver
-phase: 3
 
 issue_source: linear
 linear:
@@ -123,7 +121,7 @@ state_map:
 
 ## Notes
 
-- **Phase 3 ends at draft PR.** If you find yourself adding merge or deploy policy here, you're designing phase 4 in the wrong file.
-- **`mode: deliver` and `phase: 3` are fixed.** Omit them and the controller rejects the contract.
+- **Scope:** the controller drives groom → review → Stage 1 → Stage 2 → validate → commit → push → draft PR. Merging, deploying, and issue closure happen in your normal code-review workflow. Do not add merge or deploy policy here.
+- **`mode: deliver` is fixed.** Omit it and the controller rejects the contract.
 - **Per-dev overrides** can live at `.autoship/local.md` (gitignored). Not required; add only when a developer needs to override team defaults.
 - **Invocation:** from the testbed root, `claude --agent controller -p "deliver"` to resume in-flight work, or `claude --agent controller -p "deliver FRD-162"` to restrict to one issue.
