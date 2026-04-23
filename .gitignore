@@ -1,3 +1,7 @@
 .playwright-mcp/
 .autoship/
 .DS_Store
+
+# npm package build artifacts
+*.tgz
+node_modules/

@@ -1,0 +1,39 @@
+{
+  "name": "@cs-calibrax/autoship",
+  "version": "0.1.0",
+  "description": "Turn messy software work into reviewable, reliable delivery. Autoship framework agents for Claude Code.",
+  "keywords": [
+    "claude-code",
+    "agent",
+    "ai",
+    "delivery",
+    "autoship",
+    "automation"
+  ],
+  "homepage": "https://github.com/Calibrax-ai/autoship",
+  "bugs": "https://github.com/Calibrax-ai/autoship/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Calibrax-ai/autoship.git"
+  },
+  "license": "MIT",
+  "author": "Calibrax",
+  "type": "module",
+  "bin": {
+    "autoship": "bin/autoship.mjs"
+  },
+  "files": [
+    "bin/",
+    "cli/",
+    ".claude/agents/",
+    "skills/",
+    "teach-autoship.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

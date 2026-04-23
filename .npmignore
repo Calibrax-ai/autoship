@@ -1,0 +1,16 @@
+# Excluded from the published npm package.
+# The `files` array in package.json is the allowlist; this is an extra safety net.
+
+docs/
+site/
+probe-artifacts/
+.claude/projects/
+.claude/settings*.json
+.claude/plans/
+.claude/*.md
+autoship.sh
+CLAUDE.md
+.DS_Store
+*.log
+.env*
+node_modules/
