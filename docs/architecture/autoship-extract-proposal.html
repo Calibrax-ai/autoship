@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoship v1 — Demo → Production Candidate</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f7f3;
+    --surface: #fdfcf9;
+    --surface-sunken: #f2f0e9;
+    --surface-deep: #232220;
+    --surface-deep-elev: #2e2c29;
+
+    --text-primary: #1e1d1a;
+    --text-secondary: #575652;
+    --text-tertiary: #8a8983;
+    --text-inverse: #e8e6df;
+    --text-inverse-muted: #a8a6a0;
+    --text-inverse-dim: #6f6e68;
+
+    --border: #e7e4dc;
+    --border-strong: #d6d3c9;
+    --border-dark: #3a3833;
+
+    --accent: #0d6e61;
+    --accent-strong: #0a574d;
+    --accent-bg: #e3efeb;
+    --accent-soft: #eef5f1;
+    --accent-fg-on-dark: #5ac4a4;
+
+    --amber: #8a5510;
+    --amber-bg: #f4ead5;
+    --amber-soft: #f9f2e3;
+    --amber-fg-on-dark: #d19255;
+
+    --red: #8a2a2a;
+    --red-bg: #f5e3e1;
+
+    --blue: #2c5488;
+    --blue-bg: #e5ebf4;
+    --blue-soft: #eef2f8;
+    --blue-fg-on-dark: #7d9dc9;
+
+    --green-fg-on-dark: #8cb577;
+
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1917;
+      --surface: #242321;
+      --surface-sunken: #1e1d1b;
+      --surface-deep: #2a2926;
+      --surface-deep-elev: #343330;
+
+      --text-primary: #e6e4dd;
+      --text-secondary: #b0aea5;
+      --text-tertiary: #827f78;
+      --text-inverse: #e8e6df;
+      --text-inverse-muted: #a8a6a0;
+      --text-inverse-dim: #6f6e68;
+
+      --border: #36332d;
+      --border-strong: #4a4640;
+      --border-dark: #4a4640;
+
+      --accent: #5ac4a4;
+      --accent-strong: #7ad3b8;
+      --accent-bg: #123c34;
+      --accent-soft: #1a2b27;
+
+      --amber: #d19255;
+      --amber-bg: #3d2c0e;
+      --amber-soft: #2d2316;
+
+      --red: #d88787;
+      --red-bg: #3d1c1c;
+
+      --blue: #7d9dc9;
+      --blue-bg: #1c2c45;
+      --blue-soft: #18222e;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 24px;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-primary);
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Layout ------------------------------------------------------ */
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    max-width: 1240px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 20px 24px;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 13.5px;
+  }
+
+  .sidebar-brand {
+    padding: 0 8px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-brand .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+
+  .sidebar-brand .title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .sidebar-brand .subtitle {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+  }
+
+  .sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .sidebar .group-label {
+    padding: 16px 10px 6px;
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+  }
+
+  .sidebar .group-label:first-child { padding-top: 0; }
+
+  .sidebar a {
+    display: block;
+    padding: 6px 10px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    border-left: 2px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    line-height: 1.4;
+  }
+
+  .sidebar a:hover {
+    color: var(--text-primary);
+    background: var(--surface-sunken);
+  }
+
+  .sidebar a.active {
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+
+  .sidebar-footer {
+    margin-top: 24px;
+    padding: 12px 10px;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    border-top: 1px solid var(--border);
+  }
+
+  .main {
+    min-width: 0;
+    padding: 56px 48px 96px;
+    max-width: 780px;
+  }
+
+  /* Page header ------------------------------------------------- */
+
+  .page-header {
+    margin-bottom: 56px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-header .meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .date-label {
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-header h1 {
+    font-size: 30px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin: 0 0 10px;
+  }
+
+  .page-header .subtitle {
+    font-size: 17px;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+    font-weight: 400;
+  }
+
+  .page-header .kicker {
+    font-size: 14.5px;
+    color: var(--text-secondary);
+    max-width: 640px;
+    margin: 12px 0 0;
+  }
+
+  /* Sections ---------------------------------------------------- */
+
+  section {
+    margin-top: 56px;
+    scroll-margin-top: 24px;
+  }
+
+  section h2 {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    margin: 0 0 8px;
+    color: var(--text-primary);
+  }
+
+  section .lede {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    margin: 0 0 24px;
+  }
+
+  section > p {
+    color: var(--text-secondary);
+  }
+
+  h3 {
+    font-size: 16.5px;
+    font-weight: 500;
+    margin: 0 0 10px;
+    color: var(--text-primary);
+    scroll-margin-top: 24px;
+  }
+
+  p { margin: 12px 0; color: var(--text-secondary); }
+
+  strong { color: var(--text-primary); font-weight: 500; }
+
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-bg); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  ul, ol { color: var(--text-secondary); padding-left: 20px; }
+  ul li, ol li { margin: 4px 0; }
+
+  .inline-code, code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    padding: 1px 6px;
+    background: var(--surface-sunken);
+    border-radius: 4px;
+    color: var(--text-primary);
+  }
+
+  .divider {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* Cards & callouts -------------------------------------------- */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin: 16px 0;
+  }
+
+  .card > :first-child { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+
+  .card-title {
+    font-size: 15.5px;
+    font-weight: 500;
+    margin: 0 0 10px;
+    color: var(--text-primary);
+  }
+
+  .card-eyebrow {
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+
+  .callout {
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 20px 0;
+    border-left: 3px solid var(--border-strong);
+    background: var(--surface-sunken);
+    font-size: 14px;
+  }
+
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+
+  .callout--accent { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout--amber { border-left-color: var(--amber); background: var(--amber-soft); }
+  .callout--red { border-left-color: var(--red); background: var(--red-bg); }
+
+  .callout-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+
+  /* Grids ------------------------------------------------------- */
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  @media (max-width: 720px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* Tags --------------------------------------------------------- */
+
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+  }
+
+  .tag--accent {
+    background: var(--accent-soft);
+    border-color: var(--accent-bg);
+    color: var(--accent-strong);
+  }
+
+  .tag--muted {
+    background: var(--surface-sunken);
+    color: var(--text-tertiary);
+  }
+
+  /* Pipeline arrow row ------------------------------------------ */
+
+  .pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 8px;
+    font-size: 13.5px;
+  }
+
+  .pipeline-step {
+    padding: 5px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+
+  .pipeline-step.is-output {
+    background: var(--accent-soft);
+    border-color: var(--accent-bg);
+    color: var(--accent-strong);
+  }
+
+  .pipeline-step.is-emphasis {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .pipeline-arrow {
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+
+  /* Step list (numbered steps, generic) ------------------------- */
+
+  .step-list { list-style: none; padding: 0; margin: 16px 0; counter-reset: step; }
+  .step-list > li {
+    counter-increment: step;
+    position: relative;
+    padding: 8px 0 8px 36px;
+    font-size: 14.5px;
+    color: var(--text-secondary);
+  }
+  .step-list > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 8px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    font-size: 12px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+  }
+
+  /* Step blocks (Four Steps section) ---------------------------- */
+
+  .step-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin: 14px 0;
+  }
+
+  .step-block--gate { background: var(--amber-soft); border-color: var(--amber-bg); }
+  .step-block--loop { background: var(--blue-soft); border-color: var(--blue-bg); }
+
+  .step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+  .step-num {
+    flex: none;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 500;
+  }
+
+  .step-num--amber { background: var(--amber); }
+  .step-num--blue { background: var(--blue); }
+
+  .step-title { font-size: 16px; font-weight: 500; margin: 0; color: var(--text-primary); }
+
+  .step-block p { font-size: 14px; }
+
+  .sub-block {
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 13.5px;
+  }
+
+  .sub-block > :first-child { margin-top: 0; }
+  .sub-block > :last-child { margin-bottom: 0; }
+
+  .sub-block-label {
+    font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+
+  /* Key Term cards ---------------------------------------------- */
+
+  .term-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+
+  .term-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .term-glyph {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 500;
+    flex: none;
+  }
+
+  .term-glyph--accent { background: var(--accent-bg); color: var(--accent-strong); }
+  .term-glyph--amber { background: var(--amber-bg); color: var(--amber); }
+  .term-glyph--neutral { background: var(--surface-sunken); color: var(--text-secondary); border: 1px solid var(--border); }
+
+  .term-card--highlight {
+    border-color: var(--accent-bg);
+    background: var(--surface);
+  }
+
+  .term-card--highlight .term-glyph { background: var(--accent); color: #fff; }
+
+  .term-card p { margin: 6px 0; font-size: 13.5px; }
+
+  /* Tables ------------------------------------------------------ */
+
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    margin: 16px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-primary);
+    padding: 10px 14px;
+    background: var(--surface-sunken);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 14px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td code, .mono-cell {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--accent-strong);
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Code / ASCII blocks ----------------------------------------- */
+
+  .code-block {
+    background: var(--surface-deep);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    overflow-x: auto;
+    margin: 16px 0;
+    color: var(--text-inverse);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .code-block pre { margin: 0; font: inherit; color: inherit; }
+  .code-block p { margin: 0; color: inherit; }
+  .code-block .label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-fg-on-dark);
+    margin-bottom: 14px;
+    font-family: var(--font-sans);
+  }
+
+  .c-fg { color: var(--text-inverse); }
+  .c-muted { color: var(--text-inverse-muted); }
+  .c-dim { color: var(--text-inverse-dim); }
+  .c-accent { color: var(--accent-fg-on-dark); }
+  .c-amber { color: var(--amber-fg-on-dark); }
+  .c-blue { color: var(--blue-fg-on-dark); }
+  .c-green { color: var(--green-fg-on-dark); }
+  .c-white { color: #fff; }
+
+  /* Option cards (executor modes) ------------------------------- */
+
+  .option-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 22px 20px;
+  }
+
+  .option-card--primary {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .option-card--secondary {
+    border-color: var(--accent-bg);
+  }
+
+  .option-tag {
+    position: absolute;
+    top: -10px; left: 18px;
+    padding: 3px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+  }
+
+  .option-tag--primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .option-tag--secondary {
+    background: var(--accent-bg);
+    border-color: var(--accent-bg);
+    color: var(--accent-strong);
+  }
+
+  .option-card .question {
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+    font-style: italic;
+    margin: 2px 0 8px;
+  }
+
+  .option-pro { color: var(--accent-strong); font-weight: 500; }
+  .option-con { color: var(--red); font-weight: 500; }
+
+  .option-line { font-size: 13px; margin: 4px 0; color: var(--text-secondary); }
+
+  /* Progress row (executor progression) ------------------------- */
+
+  .progress-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 24px;
+    font-size: 12.5px;
+  }
+
+  .progress-pill {
+    padding: 5px 11px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .progress-pill.is-current {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .progress-pill.is-next {
+    background: var(--accent-soft);
+    border-color: var(--accent-bg);
+    color: var(--accent-strong);
+  }
+
+  /* Stack chips ------------------------------------------------- */
+
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  @media (max-width: 720px) {
+    .stack-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .stack-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 10px;
+    text-align: center;
+  }
+
+  .stack-chip .label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+
+  .stack-chip .value {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  /* Folder legend ------------------------------------------------ */
+
+  .folder-legend {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 14px 0;
+  }
+
+  @media (max-width: 720px) {
+    .folder-legend { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .folder-legend-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .folder-legend-item .key {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .folder-legend-item .role {
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  /* Details (deferred section) ---------------------------------- */
+
+  details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 8px 0;
+    transition: border-color 0.15s;
+  }
+
+  details[open] { border-color: var(--border-strong); }
+
+  details summary {
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  details summary::-webkit-details-marker { display: none; }
+
+  details summary::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-right: 1.5px solid var(--text-tertiary);
+    border-bottom: 1.5px solid var(--text-tertiary);
+    transform: rotate(-45deg);
+    transition: transform 0.2s;
+    flex: none;
+    margin-right: 2px;
+  }
+
+  details[open] summary::before {
+    transform: rotate(45deg);
+  }
+
+  details summary:hover { background: var(--surface-sunken); border-radius: var(--radius); }
+
+  details .detail-body {
+    padding: 0 20px 16px 36px;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+  }
+
+  .cut-label {
+    color: var(--red);
+    font-weight: 500;
+  }
+
+  /* Loop-stop grid ---------------------------------------------- */
+
+  .stop-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 14px 0;
+  }
+
+  @media (max-width: 720px) {
+    .stop-grid { grid-template-columns: 1fr; }
+  }
+
+  .stop-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+
+  .stop-card .title {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .stop-card.complete .title { color: var(--accent-strong); }
+  .stop-card.cap .title { color: var(--amber); }
+  .stop-card.stall .title { color: var(--red); }
+  .stop-card.escalate .title { color: var(--red); }
+
+  .stop-card p { margin: 0; font-size: 12.5px; color: var(--text-tertiary); }
+
+  /* Two-column ingestion blocks (controller) -------------------- */
+
+  .controller-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+
+  .controller-col--accent {
+    background: var(--accent-soft);
+    border-color: var(--accent-bg);
+  }
+
+  .controller-col-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 10px;
+  }
+
+  .controller-col--accent .controller-col-label { color: var(--accent-strong); }
+
+  .controller-col ul {
+    padding-left: 18px;
+    margin: 0;
+    font-size: 13.5px;
+  }
+
+  .controller-col li { margin: 4px 0; }
+
+  /* Ship-option block (dark) ------------------------------------ */
+
+  .ship-block {
+    background: var(--surface-deep);
+    border-radius: var(--radius);
+    padding: 22px 26px;
+    margin: 20px 0;
+    color: var(--text-inverse);
+  }
+
+  .ship-block h3 {
+    font-size: 16px;
+    color: var(--text-inverse);
+    margin: 0 0 8px;
+  }
+
+  .ship-block p {
+    color: var(--text-inverse-muted);
+    font-size: 13.5px;
+    margin: 6px 0;
+  }
+
+  .ship-block p.small { font-size: 12.5px; color: var(--text-inverse-dim); }
+
+  /* Footer ------------------------------------------------------ */
+
+  .site-footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  /* Small responsive tweaks ------------------------------------- */
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .main { padding: 32px 24px 64px; max-width: none; }
+  }
+
+  /* Mermaid override -------------------------------------------- */
+
+  .mermaid {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    margin: 20px 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+
+  /* Print ------------------------------------------------------- */
+
+  @media print {
+    .sidebar { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    .main { padding: 0; max-width: none; }
+    .code-block { background: #fff; color: #000; border-color: #999; }
+    .ship-block { background: #f0f0f0; color: #000; }
+    .ship-block h3, .ship-block p { color: #000; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="eyebrow">Proposal</div>
+      <h2 class="title">autoship v1</h2>
+      <p class="subtitle">Demo → Production Candidate</p>
+    </div>
+    <nav>
+      <div class="group-label">Overview</div>
+      <a href="#core">How it works</a>
+      <a href="#problem">Problem</a>
+      <a href="#thesis">Thesis</a>
+      <a href="#scope">Scope</a>
+      <a href="#terms">Key terms</a>
+
+      <div class="group-label">Architecture</div>
+      <a href="#steps">The four steps</a>
+      <a href="#artifacts">Artifact model</a>
+      <a href="#folders">Folder structure</a>
+      <a href="#controller">The controller</a>
+
+      <div class="group-label">Decisions</div>
+      <a href="#executor">Executor modes</a>
+      <a href="#stack">Stack</a>
+      <a href="#delivery">Delivery shape</a>
+      <a href="#why">Why this architecture</a>
+      <a href="#nongoals">Non-goals</a>
+
+      <div class="group-label">Appendix</div>
+      <a href="#deferred">Considered &amp; deferred</a>
+      <a href="#experiment">Next experiment</a>
+    </nav>
+    <div class="sidebar-footer">v1 · 2026-04-14</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <header class="page-header">
+      <div class="meta">
+        <span class="badge">v1 proposal</span>
+        <span class="date-label">2026-04-14</span>
+      </div>
+      <h1>Demo → Production Candidate</h1>
+      <p class="subtitle">Reverse Spec + Ralph Loop</p>
+      <p class="kicker">Turn a vibe-coded AI demo into structured artifacts, generated tests, and a production-candidate app.</p>
+    </header>
+
+    <!-- How It Works -->
+    <section id="core">
+      <h2>How it works</h2>
+      <div class="code-block">
+        <p class="label">The core loop</p>
+<pre>  <span class="c-dim">Vibe-coded Demo</span>            <span class="c-dim">Controller</span>                     <span class="c-dim">Artifacts</span>
+  <span class="c-dim">+--------------+</span>          <span class="c-dim">+---------------------+</span>       <span class="c-dim">+------------------+</span>
+  <span class="c-dim">|</span> HTML, JS,    <span class="c-dim">|</span>          <span class="c-dim">|</span> <span class="c-accent">1. Ingest</span>           <span class="c-dim">|</span>  <span class="c-muted">───&gt;</span>  <span class="c-dim">|</span> prd.md           <span class="c-dim">|</span>
+  <span class="c-dim">|</span> Python,      <span class="c-dim">|</span>  <span class="c-muted">───&gt;</span>   <span class="c-dim">|</span> <span class="c-amber">2. Human Review</span>     <span class="c-dim">|</span>  <span class="c-muted">───&gt;</span>  <span class="c-dim">|</span> api-spec.json    <span class="c-dim">|</span>
+  <span class="c-dim">|</span> notebooks,   <span class="c-dim">|</span>          <span class="c-dim">|</span> <span class="c-accent">3. Generate Tests</span>   <span class="c-dim">|</span>  <span class="c-muted">───&gt;</span>  <span class="c-dim">|</span> data-model.json  <span class="c-dim">|</span>
+  <span class="c-dim">|</span> LLM calls    <span class="c-dim">|</span>          <span class="c-dim">|</span> <span class="c-accent">4. Build</span>            <span class="c-dim">|</span>       <span class="c-dim">|</span> design.md        <span class="c-dim">|</span>
+  <span class="c-dim">+--------------+</span>          <span class="c-dim">+----------+----------+</span>       <span class="c-dim">|</span> + 2 more          <span class="c-dim">|</span>
+                                        <span class="c-dim">|</span>                    <span class="c-dim">+------------------+</span>
+                                        <span class="c-dim">|</span> <span class="c-muted">spawns</span>
+                                        <span class="c-dim">v</span>
+  <span class="c-dim">Ralph Loop</span>                                              <span class="c-dim">Progress</span>
+  <span class="c-dim">+-------------------------------+</span>                   <span class="c-dim">+------------------+</span>
+  <span class="c-dim">|</span>  <span class="c-fg">1.</span> Read artifacts + progress  <span class="c-dim">|</span>  <span class="c-muted">&lt;────&gt;</span>        <span class="c-dim">|</span> <span class="c-green">- [x] User CRUD</span>  <span class="c-dim">|</span>
+  <span class="c-dim">|</span>  <span class="c-fg">2.</span> Pick next task             <span class="c-dim">|</span>                   <span class="c-dim">|</span> <span class="c-muted">- [ ] Post CRUD</span>  <span class="c-dim">|</span>
+  <span class="c-dim">|</span>  <span class="c-fg">3.</span> Implement                  <span class="c-dim">|</span>                   <span class="c-dim">|</span> <span class="c-muted">- [ ] Auth</span>       <span class="c-dim">|</span>
+  <span class="c-dim">|</span>  <span class="c-fg">4.</span> Run tests                  <span class="c-dim">|</span>                   <span class="c-dim">|</span>                  <span class="c-dim">|</span>
+  <span class="c-dim">|</span>  <span class="c-fg">5.</span> Commit if green            <span class="c-dim">|</span>                   <span class="c-dim">|</span> <span class="c-amber">RALPH_DONE</span>       <span class="c-dim">|</span>
+  <span class="c-dim">|</span>  <span class="c-fg">6.</span> Repeat                     <span class="c-dim">|</span>                   <span class="c-dim">+------------------+</span>
+  <span class="c-dim">+-------------------------------+</span>
+                    <span class="c-dim">|</span>
+                    <span class="c-dim">v</span>
+          <span class="c-green">Production Candidate</span></pre>
+      </div>
+      <p>The controller extracts artifacts from the demo, a human reviews them, tests are generated as the oracle, and a Ralph loop builds the app — one task per iteration, fresh context each time, state via git + progress file.</p>
+
+      <h3 style="margin-top: 24px;">End-to-end pipeline</h3>
+      <p>At the highest level, extract is a pipeline from messy prototype to production candidate. Every stage produces disk-persisted artifacts, and the <strong>plan-reviewer</strong> gate between planning and oracle generation is the generator-evaluator pattern made load-bearing: the build-controller authored the plan, so it cannot discharge the plan's gate.</p>
+
+      <div class="mermaid">
+flowchart LR
+    P([Prototype]) --&gt; I[Ingest<br/>4 probes]
+    I --&gt; HR[Human<br/>Review]
+    HR --&gt; PL[Plan<br/>slices]
+    PL --&gt; PR{plan-<br/>reviewer}
+    PR -->|REJECT| PL
+    PR -->|APPROVE| O[Stage 1<br/>Oracle]
+    O --&gt; B[Stage 2<br/>Build]
+    B --&gt; S([Production<br/>Candidate])
+
+    style PR fill:#2c5488,color:#fff,stroke:#1a3a66
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-tertiary);">The diagram omits the Ralph inner loop inside Stage 2 and the mechanical slice gates (dialog-theater grep, screenshot drift) — see <em>The four steps</em> and <em>The controller</em> sections for those.</p>
+    </section>
+
+    <!-- Problem -->
+    <section id="problem">
+      <h2>Problem</h2>
+      <p>The input app usually works just enough to demonstrate value, but it is not a maintainable product.</p>
+      <ul>
+        <li>Inline prompts mixed with UI logic</li>
+        <li>Implicit state and hidden coupling</li>
+        <li>No backend contracts</li>
+        <li>No durable schema design</li>
+        <li>No tests</li>
+        <li>No distinction between intended and accidental behavior</li>
+      </ul>
+      <div class="callout callout--amber">
+        <p><strong>The hard part</strong> is not "rewrite the code." It's turning a messy demo into reliable artifacts that an implementation loop can converge against.</p>
+      </div>
+    </section>
+
+    <!-- Thesis -->
+    <section id="thesis">
+      <h2>Product thesis</h2>
+      <div class="pipeline">
+        <span class="pipeline-step">vibe-coded demo</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step is-output">reversed spec</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step is-output">generated tests</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step">Ralph loop</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step is-emphasis">production candidate</span>
+      </div>
+      <p>The reversed artifacts are the anchor. The generated tests are the oracle. The rewrites are outputs of those artifacts, not direct translations of the original implementation.</p>
+    </section>
+
+    <!-- Scope -->
+    <section id="scope">
+      <h2>What v1 is &amp; isn't</h2>
+      <div class="grid-2">
+        <div>
+          <h3>What v1 is</h3>
+          <p>A <strong>demo-to-production-candidate rewrite system</strong> for LLM-powered workflow apps.</p>
+          <ul>
+            <li>AI accounting &amp; reconciliation tools</li>
+            <li>Marketing content generation</li>
+            <li>Internal ops copilots</li>
+            <li>Report generation &amp; document analysis</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What v1 is not</h3>
+          <ul>
+            <li>A guarantee the original demo was correct</li>
+            <li>A full production-hardening platform</li>
+            <li>A generic autonomous software factory</li>
+            <li>A replacement for security / compliance review</li>
+          </ul>
+          <div class="callout callout--amber">
+            <p><strong>"Production candidate"</strong>, not "fully production-ready."</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Key Terms -->
+    <section id="terms">
+      <h2>Key terms</h2>
+      <div class="grid-2">
+        <div class="term-card">
+          <div class="term-head">
+            <span class="term-glyph term-glyph--accent">A</span>
+            <h3 class="card-title">Artifacts</h3>
+          </div>
+          <p>Structured outputs carried between steps. They capture inferred intent, constraints, and assumptions. <strong>Artifacts describe.</strong></p>
+        </div>
+        <div class="term-card">
+          <div class="term-head">
+            <span class="term-glyph term-glyph--amber">O</span>
+            <h3 class="card-title">Oracles</h3>
+          </div>
+          <p>The generated tests. They produce pass, fail, or escalation signals. <strong>Oracles judge.</strong></p>
+        </div>
+      </div>
+
+      <div class="term-card term-card--highlight" style="margin-top: 14px;">
+        <div class="term-head">
+          <span class="term-glyph">L</span>
+          <h3 class="card-title">External-state convergence loop</h3>
+        </div>
+        <p>autoship's execution pattern is an instance of a structural pattern that independently emerged in two fields.
+          <a href="https://ghuntley.com/loop/" target="_blank">Ralph loop (Huntley)</a> for coding and
+          <a href="https://github.com/karpathy/autoresearch" target="_blank">autoresearch (Karpathy)</a> for ML research converged on the same structure — evidence the pattern is sound.</p>
+
+        <p class="card-eyebrow" style="margin-top:14px">Shared structural traits</p>
+        <ol style="font-size:13.5px; margin: 6px 0 14px;">
+          <li>Fresh context per iteration — no long-running session</li>
+          <li>Declarative goal state — spec describes the end, not the steps</li>
+          <li>External persistence — progress file + git, not LLM context</li>
+          <li>External feedback — machine-verifiable checks, not writer self-judgment</li>
+          <li>Single-writer, single-process — multi-agent fan-out rejected</li>
+        </ol>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Dimension</th><th>Ralph</th><th>autoresearch</th><th>autoship</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Goal</td><td>PRD</td><td>Research prompt</td><td><code class="mono-cell">artifacts/</code></td></tr>
+              <tr><td>Progress</td><td><code class="mono-cell">progress.txt</code></td><td>Experiment log</td><td><code class="mono-cell">.autoship/progress.txt</code></td></tr>
+              <tr><td>Signal</td><td>Tests + types + lint</td><td>Metrics</td><td>Oracle + feedback loops</td></tr>
+              <tr><td>Accept</td><td>Commit if green</td><td>Keep if better</td><td>Slice checks green + controller validates</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p style="font-size:12.5px; color: var(--text-tertiary); font-style: italic; margin-top: 10px;">"Ralph loop" in this doc = autoship's instantiation of the pattern for coding tasks.</p>
+      </div>
+
+      <div class="term-card" style="margin-top:14px">
+        <div class="term-head">
+          <span class="term-glyph term-glyph--neutral">S</span>
+          <h3 class="card-title">Skills</h3>
+        </div>
+        <p>Reusable execution playbooks. The controller assigns skills to sessions based on the task. They improve execution quality but do not define product intent.</p>
+      </div>
+    </section>
+
+    <!-- Four Steps -->
+    <section id="steps">
+      <h2>The four steps</h2>
+
+      <p>Each step produces an artifact downstream stages depend on. Stages 1–3 set the contract; Stage 4 is where the Ralph loop runs — but only after the plan has been independently reviewed and the oracle tests exist. <strong>Tests are written before the app.</strong> Neither the oracle executor nor the slice executor writes the tests it will be judged against.</p>
+
+      <div class="mermaid">
+flowchart TB
+    A[Ingest<br/>4 probes] --&gt; Art[(artifacts/<br/>api-spec, data-model,<br/>journeys, screenshots,<br/>design, external)]
+    Art --&gt; HR[Human Review]
+    HR --&gt; PL[build-controller<br/>drafts slice plan]
+    PL --&gt; PP[(progress.txt<br/>+ decisions.md)]
+    PP --&gt; PR[plan-reviewer<br/>fresh context]
+    PR -->|REJECT| PL
+    PR -->|APPROVE| S1[Stage 1<br/>oracle executor]
+    S1 --&gt; Tests[(oracle/ tests<br/>compile + all fail,<br/>no app yet)]
+    Tests --&gt; Sc[Scaffold<br/>single-shot]
+    Sc --&gt; S2[Stage 2<br/>Ralph loop<br/>slice by slice]
+    S2 --&gt; SG{slice gate<br/>mechanical}
+    SG -->|FAIL| S2
+    SG -->|PASS| NS([next slice<br/>or done])
+
+    style PR fill:#2c5488,color:#fff,stroke:#1a3a66
+    style SG fill:#8a5510,color:#fff
+      </div>
+
+      <div class="step-block">
+        <div class="step-head">
+          <span class="step-num">1</span>
+          <h3 class="step-title">Ingest &amp; reverse spec</h3>
+        </div>
+        <p>The controller reads the demo repo and produces the artifact set. LLM-powered: extracts product intent, API surface, data model, user flows, design direction, and external dependencies. The reversed spec is a reconstruction, not ground truth.</p>
+        <div class="sub-block">
+          <p><strong>Task ordering in the PRD:</strong> follow the <a href="https://skills.sh/oakoss/agent-skills/tracer-bullets" target="_blank">tracer bullet</a> pattern — each slice is an <strong>end-to-end functional slice</strong>, not backend-only and not full frontend design.</p>
+          <p>A slice cuts through: route → handler → persistence → tests → <strong>minimal UI needed to exercise the path</strong>. Enough to prove the path is real (one real screen, one form, stable selectors); not full UI polish.</p>
+          <p class="sub-block-label" style="margin-top: 10px;">Phased structure</p>
+          <ol>
+            <li><strong>Scaffold</strong> (single-shot) — shell, nav, design system, routing</li>
+            <li><strong>Slice 1</strong> — core entity + CRUD + minimal UI, sets conventions</li>
+            <li><strong>Slices 2–N</strong> — one feature each, ordered by data-model dependencies</li>
+            <li><strong>Cross-cutting slice</strong> — middleware, shared validation</li>
+            <li><strong>Polish pass</strong> — visual consistency, design system, responsive behavior (separate oracle)</li>
+          </ol>
+          <p style="font-style: italic; margin-top: 10px;">Why this split: backend has one judge (behavioral); frontend has two (functional + visual). Mixing visual quality into a Ralph oracle makes it non-deterministic. Slice loop judges functional correctness; polish pass judges visual quality separately.</p>
+        </div>
+      </div>
+
+      <div class="step-block step-block--gate">
+        <div class="step-head">
+          <span class="step-num step-num--amber">2</span>
+          <h3 class="step-title">Human review</h3>
+          <span class="tag" style="margin-left:auto">Human gate</span>
+        </div>
+        <p>The human validates: who the product is for, core workflows, high-impact actions, data sensitivity, major assumptions. A lightweight acceptance gate, not a full technical review. After review, the artifacts are the contract.</p>
+      </div>
+
+      <div class="step-block">
+        <div class="step-head">
+          <span class="step-num">3</span>
+          <h3 class="step-title">Generate tests</h3>
+        </div>
+        <p>The controller generates the oracle from approved artifacts. Tests are derived from the reversed spec, not the original implementation.</p>
+        <div class="grid-2" style="margin-top:12px">
+          <div class="sub-block"><strong>Contract</strong> — API shapes, validation, auth, responses</div>
+          <div class="sub-block"><strong>Behavior</strong> — business logic fixtures</div>
+          <div class="sub-block"><strong>State</strong> — DB writes, session changes, side effects</div>
+          <div class="sub-block"><strong>Journey</strong> — Playwright scripts for core user flows</div>
+        </div>
+        <p style="font-size:13px; color: var(--text-tertiary); margin-top: 12px;">Playwright journey tests are the highest-value user-facing QA signal in the system, but they are noisier than unit or contract checks. Browser-agent walkthroughs and side-by-side UI comparison stay supplementary.</p>
+      </div>
+
+      <div class="step-block step-block--loop">
+        <div class="step-head">
+          <span class="step-num step-num--blue">4</span>
+          <h3 class="step-title">Build (Ralph loop)</h3>
+        </div>
+        <p>Controller spawns headless Claude Code sessions. Each iteration: read artifacts + progress → pick highest-priority task → implement → run the <strong>current slice's required feedback loops</strong> → block commit unless that slice passes → update progress → exit. Controller validates before next iteration. Full-suite green is reserved for final completion.</p>
+
+        <div class="sub-block">
+          <p class="sub-block-label">Build phases</p>
+          <p><span class="mono-cell" style="color: var(--text-tertiary);">Pre-loop</span> &nbsp; <strong>Scaffold</strong> (single-shot) — shell, nav, design system, routing. Bounded retry if it fails.</p>
+          <p><span class="mono-cell" style="color: var(--blue);">Loop</span> &nbsp; <strong>Slice iterations</strong> — each slice: backend + minimal UI + journey test. Standard Ralph mechanics.</p>
+          <p><span class="mono-cell" style="color: var(--text-tertiary);">Post-loop</span> &nbsp; <strong>Polish pass</strong> — visual consistency, design system, responsive behavior. Different oracle (screenshot regression vs goldens, design lint, a11y).</p>
+        </div>
+
+        <div class="callout callout--amber">
+          <div class="callout-label">Frontend oracle — functional vs visual</div>
+          <p><strong>Backend has one judge</strong> (behavioral). <strong>Frontend has two targets</strong> (functional + visual). Mixing them makes the loop non-deterministic.</p>
+          <p><strong>Slice loop judges functional correctness:</strong> UI exists, right selectors present, journey test passes. Playwright is not perfectly deterministic, but it is still the best end-to-end behavioral oracle for real user journeys, so it stays in the blocking slice gate.</p>
+          <p><strong>Polish pass judges visual quality:</strong> spacing, fonts, responsive variation, with bounded supplementary UI comparison. Good for catching structural regressions. Bad as main oracle — overfits to pixels instead of behavior.</p>
+        </div>
+
+        <div class="sub-block">
+          <p class="sub-block-label">Affordance presence check (per slice)</p>
+          <p>Before starting the backend loop for a slice, the controller verifies the minimal UI contains every element the journey test references (button labels, form fields, nav targets). Deterministic DOM check. Bounded retry with missing-elements list if it fails. Prevents "backend passes but journey fails at test time because a button is missing."</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Feedback loop</th><th>What it catches</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code class="mono-cell">TypeScript types</code></td><td>Type mismatches, missing props</td></tr>
+              <tr><td><code class="mono-cell">Unit tests</code></td><td>Broken logic, regressions</td></tr>
+              <tr><td><code class="mono-cell">Playwright journey tests</code></td><td>Full-stack user flow regressions for the current slice</td></tr>
+              <tr><td><code class="mono-cell">Agent-browser / visual QA</code></td><td>Missing affordances, obvious layout breakage (supplementary)</td></tr>
+              <tr><td><code class="mono-cell">ESLint / linting</code></td><td>Code style, potential bugs</td></tr>
+              <tr><td><code class="mono-cell">Pre-commit hooks</code></td><td>Blocks bad commits entirely</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="stop-grid">
+          <div class="stop-card complete"><div class="title">Complete</div><p>Session outputs completion signal. Controller verifies independently.</p></div>
+          <div class="stop-card cap"><div class="title">Iteration cap</div><p>Controller enforces configurable limit (5–50). Prevents runaway cost.</p></div>
+          <div class="stop-card stall"><div class="title">Stall</div><p>Same task failing across iterations. Controller escalates with specific blocker.</p></div>
+          <div class="stop-card escalate"><div class="title">Escalation</div><p>Needs spec/test change or human decision. Session exits, doesn't guess.</p></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="sub-block" style="background: var(--amber-soft); border-color: var(--amber-bg);">
+            <p class="sub-block-label" style="color: var(--amber);">HITL mode</p>
+            <p>One iteration at a time. Human reviews between. Recommended for first runs and first tracer bullet slice.</p>
+          </div>
+          <div class="sub-block" style="background: var(--blue-soft); border-color: var(--blue-bg);">
+            <p class="sub-block-label" style="color: var(--blue);">AFK mode</p>
+            <p>Looped with iteration caps. For bulk work once prompts and artifacts are proven.</p>
+          </div>
+        </div>
+
+        <div class="sub-block" style="margin-top: 12px;">
+          <p><strong>progress.txt</strong> — not just a checklist. Each entry: completed task + PRD ref, architectural decisions, files modified, blockers, notes for next iteration.</p>
+          <p><strong>First slice matters most</strong> — the agent follows observed patterns over written instructions. If the first slice sets bad patterns, every subsequent iteration amplifies them.</p>
+          <p><strong>Done</strong> = all required tests green across the full suite and no unresolved blocker.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Artifact Model -->
+    <section id="artifacts">
+      <h2>Artifact model</h2>
+      <p class="lede">Six files. Each separate because it serves a different consumer at a different time.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>File</th><th>Contains</th><th>Read by</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code class="mono-cell">artifacts/prd.md</code></td><td>Core spec: requirements, decisions, LLM prompts</td><td>Every iteration</td></tr>
+            <tr><td><code class="mono-cell">artifacts/api-spec.json</code></td><td>Endpoints: method, path, request / response schemas</td><td>Every iteration + test gen</td></tr>
+            <tr><td><code class="mono-cell">artifacts/data-model.json</code></td><td>Entities, fields, types, relationships</td><td>On-demand (persistence tasks)</td></tr>
+            <tr><td><code class="mono-cell">artifacts/design.md</code></td><td>Structural direction, component hierarchy</td><td>Frontend + on-demand</td></tr>
+            <tr><td><code class="mono-cell">artifacts/user-journeys.json</code></td><td>Step-by-step user flows, expected state transitions</td><td>Test generation only</td></tr>
+            <tr><td><code class="mono-cell">artifacts/external-contracts.json</code></td><td>Third-party API shapes</td><td>On-demand (integration tasks)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <p><strong>Why separate files?</strong> Context management. The controller selects which files each session reads based on the task. A CRUD iteration doesn't need 300 lines of frontend hierarchy. Separate files keep each session's context focused.</p>
+      </div>
+    </section>
+
+    <!-- Folder Structure -->
+    <section id="folders">
+      <h2>Folder structure</h2>
+      <p class="lede">Four concerns, four locations. Everything outside <code>app/</code> is input or runtime. <code>app/</code> is the output.</p>
+
+      <div class="code-block">
+<pre><span class="c-dim">project/</span>
+  <span class="c-amber">prototype/</span>                     <span class="c-dim"># INPUT — original demo, read-only</span>
+
+  <span class="c-accent">artifacts/</span>                     <span class="c-dim"># SPEC — sessions read, never write</span>
+    prd.md                       <span class="c-dim">#   core spec</span>
+    api-spec.json                <span class="c-dim">#   structured endpoints</span>
+    data-model.json              <span class="c-dim">#   schema, entities</span>
+    design.md                    <span class="c-dim">#   structural direction</span>
+    user-journeys.json           <span class="c-dim">#   test generation input</span>
+    external-contracts.json      <span class="c-dim">#   third-party APIs</span>
+
+  <span class="c-blue">app/</span>                           <span class="c-dim"># OUTPUT — sessions write here</span>
+    package.json                 <span class="c-dim">#   monorepo root</span>
+    <span class="c-blue">frontend/</span>
+      src/
+      package.json
+    <span class="c-blue">backend/</span>
+      src/
+      <span class="c-green">tests-oracle/</span>              <span class="c-dim">#   contract, behavior, state tests</span>
+      package.json
+    <span class="c-green">e2e/</span>                         <span class="c-dim">#   Playwright journey tests (full stack)</span>
+    playwright.config.ts
+
+  <span class="c-muted">.autoship/</span>                     <span class="c-dim"># RUNTIME — machine state, human status, forensics</span>
+    config.json                  <span class="c-dim">#   budgets, iteration limits</span>
+    progress.txt                 <span class="c-dim">#   HUMAN view — derived during synthesis, agent handoff during build</span>
+    boot-report.json             <span class="c-dim">#   live service wiring</span>
+    current-run                  <span class="c-dim">#   active run id (for resume)</span>
+    run-log.jsonl                <span class="c-dim">#   tick-by-tick build iteration events</span>
+    report.md                    <span class="c-dim">#   final run report</span>
+    <span class="c-muted">runs/</span>                        <span class="c-dim">#   per-run records</span>
+      2026-04-15-ingest/
+        <span class="c-muted">state/</span>                   <span class="c-dim">#     MACHINE state — markers drive controller</span>
+          phase_boot.done        <span class="c-dim">#       written only after artifact verification passes</span>
+          phase_fanout.done
+          phase_reconcile.done
+          phase_critic.done
+        started_at               <span class="c-dim">#     ISO run start timestamp</span>
+        prompts/                 <span class="c-dim">#     rendered prompts (forensic)</span>
+        logs/                    <span class="c-dim">#     subagent outputs (forensic)</span>
+        decisions.log            <span class="c-dim">#     append-only trail of phase transitions + anomalies</span></pre>
+      </div>
+
+      <div class="folder-legend">
+        <div class="folder-legend-item"><div class="key">prototype/</div><div class="role">Input</div></div>
+        <div class="folder-legend-item"><div class="key">artifacts/</div><div class="role">Spec (read-only)</div></div>
+        <div class="folder-legend-item"><div class="key">app/</div><div class="role">Output (writable)</div></div>
+        <div class="folder-legend-item"><div class="key">.autoship/</div><div class="role">Runtime state</div></div>
+      </div>
+
+      <div class="callout">
+        <p><strong>Controller protocol lives in code, not in files.</strong></p>
+        <p>No per-run "dispatch plan" artifact. The controller's source encodes the default protocol — <em>how</em> ingest fans out, how build slices are ordered. Runtime deviations from that default (e.g., "no frontend detected, skipped ui-walker") are appended to <code>decisions.log</code>. To know what the controller <em>intends</em>, read the controller. To know what it <em>did</em> this run, read <code>prompts/</code> + <code>logs/</code> + <code>decisions.log</code>.</p>
+      </div>
+
+      <div class="callout callout--accent">
+        <p><strong><code>progress.txt</code> is the single human-readable status file across the whole lifecycle. Its role adapts per step.</strong></p>
+        <ul>
+          <li><strong>Ingest / review / generate-tests</strong> (bounded synthesis): <code>progress.txt</code> is a <em>derived view</em>. The controller's machine state lives in marker files (<code>phase_*.done</code>). The controller renders <code>progress.txt</code> from state, never parses it to decide what runs next.</li>
+          <li><strong>Build</strong> (the true Ralph loop): <code>progress.txt</code> is <em>agent handoff state</em>. Fresh sessions read it each iteration; they write back completed tasks, decisions, and blockers. This is Ralph's original pattern.</li>
+        </ul>
+        <p>Only <code>build</code> is the true Ralph loop. Ingest is a short pipeline; review is a gate; generate-tests is bounded synthesis. One file name for human-readable status is a UX choice, not a claim that all four steps share the same state model.</p>
+      </div>
+    </section>
+
+    <!-- The Controller -->
+    <section id="controller">
+      <h2>The controller</h2>
+      <p class="lede">An Agent SDK application — a program that uses LLM calls for judgment and spawns Claude Code sessions for execution.</p>
+
+      <div class="grid-2">
+        <div class="controller-col controller-col--accent">
+          <div class="controller-col-label">LLM-powered (controller judgment)</div>
+          <ul>
+            <li>Extract reversed spec from demo</li>
+            <li>Generate test suite from artifacts</li>
+            <li>Evaluate stalls: code / test / spec problem?</li>
+            <li>Decide: continue / retry / revision step / escalate</li>
+            <li>Independent quality check (separate from the writing session)</li>
+          </ul>
+        </div>
+        <div class="controller-col">
+          <div class="controller-col-label">Deterministic orchestration</div>
+          <ul>
+            <li>Spawn Claude Code sessions with focused context</li>
+            <li>Enforce budgets: tokens, wall clock, iterations</li>
+            <li>Validate progress: check git, run tests independently, don't trust session self-reports</li>
+            <li>Route: continue / retry / escalate</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout callout--red">
+        <p><strong>Artifact guardrail.</strong> Claude Code sessions should not edit artifacts or tests unless the controller explicitly opens a revision step. If a session hits a problem requiring spec or test changes, it escalates — it does not silently revise the contract it's building against.</p>
+      </div>
+
+      <div class="callout">
+        <p><strong>Skill assignment.</strong> The controller assigns skills to each session based on the task. Backend iteration gets <code>backend-rewrite-loop</code>. Frontend gets <code>frontend-regeneration</code>. Skills are reusable execution playbooks — they carry workflow logic and quality gates.</p>
+      </div>
+
+      <h3 style="margin-top: 28px;">Generator-evaluator: author ≠ judge</h3>
+      <p>The load-bearing insight from probes 2.1–2.5: <strong>the controller cannot discharge its own gates</strong>. An agent that authored the slice plan will confidently approve that same plan — the failure mode Anthropic's harness team found was not tractable to tune away. The fix is structural: a separate, fresh-context <strong>plan-reviewer</strong> agent that reads the plan with a skeptical posture, cites evidence from the spec pack, and returns APPROVED or REJECTED. The verdict is binding.</p>
+
+      <div class="mermaid">
+flowchart LR
+    C[build-controller<br/>authors plan] --&gt;|writes| PP[(progress.txt<br/>+ decisions.md)]
+    PP --&gt; PR[plan-reviewer<br/>fresh context, skeptical,<br/>calibrated by<br/>calibration set]
+    PR --&gt;|writes| V[(review-NN.md)]
+    V -->|APPROVE| O([Stage 1<br/>oracle dispatch])
+    V -->|REJECT| C
+
+    style PR fill:#2c5488,color:#fff,stroke:#1a3a66
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Mechanical vs judgment — the dividing rule</div>
+        <p><strong>Mechanical checks the controller runs itself</strong> (tests compile, dev server boots, dialog-theater regex matches zero). <strong>Judgment checks a reviewer agent discharges</strong> (is the plan defensible? does the slice match the journey?). The rule: if the check would sound the same when the tools changed (<em>"journey works end-to-end on seeded data = slice done"</em>), it's judgment — reviewer. If it's written in terms of specific tool invocations (<em>"grep -rE 'preventDefault\(\)\s*;[^{}]*closeDialog\(\)' app/"</em>), it's a recipe — controller runs it.</p>
+      </div>
+    </section>
+
+    <!-- Executor Mode Options -->
+    <section id="executor">
+      <h2>Executor mode options</h2>
+      <p class="lede">A natural progression. Each option solves a specific failure mode of the one before it.</p>
+
+      <div class="progress-row">
+        <span class="progress-pill is-current">A · Can we converge?</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="progress-pill is-next">B · Can we trust it?</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="progress-pill">C · Can we go faster?</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="progress-pill">D · Less human intervention?</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="option-card option-card--primary">
+          <span class="option-tag option-tag--primary">v1 — ship this</span>
+          <h3 class="card-title" style="margin-top:8px">A — Single Ralph loop</h3>
+          <p class="question">"Can we converge?"</p>
+          <p class="option-line">One session per iteration. Prove reversed spec + tests = production candidate.</p>
+          <p class="option-line"><span class="option-pro">+</span> Simplest, lowest cost, clear ownership, easiest debugging.</p>
+          <p class="option-line"><span class="option-con">−</span> Can get stuck, no second opinion, may overfit to weak tests.</p>
+        </div>
+
+        <div class="option-card option-card--secondary">
+          <span class="option-tag option-tag--secondary">Next</span>
+          <h3 class="card-title" style="margin-top:8px">B — Ralph + critic</h3>
+          <p class="question">"Can we trust the output?"</p>
+          <p class="option-line">A critic session evaluates output — not just "does code match spec" but <strong>"is the spec sufficient?"</strong> Identifies spec gaps, coverage holes, wrong assumptions. Proposes improvements to artifacts.</p>
+          <p class="option-line" style="color: var(--text-tertiary);"><strong>Trigger:</strong> A converges but quality is inconsistent — code passes tests but spec itself has gaps.</p>
+          <p class="option-line"><span class="option-pro">+</span> Catches spec gaps, improves artifacts, independent judgment.</p>
+          <p class="option-line"><span class="option-con">−</span> Higher cost, may over-correct, needs revision protocol.</p>
+        </div>
+
+        <div class="option-card">
+          <span class="option-tag">Scale</span>
+          <h3 class="card-title" style="margin-top:8px">C — Parallel slices</h3>
+          <p class="question">"Can we go faster?"</p>
+          <p class="option-line">Multiple Ralph loops run in parallel on independent tracer-bullet slices. Controller orchestrates dependency ordering and merging.</p>
+          <p class="option-line" style="color: var(--text-tertiary);"><strong>Trigger:</strong> Loop + critic work but too slow for large apps (15+ entities).</p>
+          <p class="option-line"><span class="option-pro">+</span> Faster wall-clock, natural fit with tracer bullets.</p>
+          <p class="option-line"><span class="option-con">−</span> Merge conflicts, shared state assumptions, harder debugging.</p>
+        </div>
+
+        <div class="option-card">
+          <span class="option-tag">Future</span>
+          <h3 class="card-title" style="margin-top:8px">D — Self-correcting loop</h3>
+          <p class="question">"Can we reduce human intervention?"</p>
+          <p class="option-line">When evidence suggests spec/tests are wrong (3 sessions fail same test), controller proposes a revision. Human approves the fix, but controller does the diagnostic work.</p>
+          <p class="option-line" style="color: var(--text-tertiary);"><strong>Trigger:</strong> Loop works but escalates too often.</p>
+          <p class="option-line"><span class="option-pro">+</span> Fewer escalations, automates critic's improvement loop.</p>
+          <p class="option-line"><span class="option-con">−</span> Risk of auto-correcting wrong, requires high trust in controller.</p>
+        </div>
+      </div>
+
+      <div class="ship-block">
+        <h3>Ship Option A. Earn the rest.</h3>
+        <p>The unproven part is not agent coordination — it's whether the reversed spec and tests are strong enough for the loop to converge.</p>
+        <p class="small">A fails on quality → B (critic). B is too slow → C (parallel). C escalates too much → D (self-correction). Don't build the next option until the current one proves its failure mode.</p>
+      </div>
+    </section>
+
+    <!-- Stack -->
+    <section id="stack">
+      <h2>Recommended v1 stack</h2>
+      <div class="stack-grid">
+        <div class="stack-chip"><div class="label">Frontend</div><div class="value">TypeScript</div></div>
+        <div class="stack-chip"><div class="label">Backend</div><div class="value">Hono</div></div>
+        <div class="stack-chip"><div class="label">Runtime</div><div class="value">Bun</div></div>
+        <div class="stack-chip"><div class="label">ORM</div><div class="value">Drizzle</div></div>
+        <div class="stack-chip"><div class="label">Database</div><div class="value">Postgres</div></div>
+        <div class="stack-chip"><div class="label">Tests</div><div class="value">Vitest + Playwright</div></div>
+      </div>
+      <p>One stack removes complexity in four places: scaffolding, test targets, loop config, and runtime assumptions.</p>
+    </section>
+
+    <!-- Delivery -->
+    <section id="delivery">
+      <h2>Delivery shape</h2>
+      <p class="lede">Two install modes. In-place transforms the demo repo; <code>--from</code> creates a separate workspace.</p>
+
+      <div class="grid-2">
+        <div class="option-card option-card--primary">
+          <span class="option-tag option-tag--primary">Default</span>
+          <h3 class="card-title" style="margin-top:8px">Mode A — In place</h3>
+          <p class="option-line">Demo is being replaced by the production candidate.</p>
+          <div class="code-block" style="padding: 14px 18px; margin: 10px 0;">
+<pre><span class="c-dim">$ cd my-demo-repo</span>
+<span class="c-green">$</span> <span class="c-white">npx autoship init</span></pre>
+          </div>
+          <p class="option-line" style="color: var(--text-tertiary);">Moves existing files into <code>prototype/</code>, scaffolds <code>artifacts/</code>, <code>app/</code>, <code>.autoship/</code>. Preserves git history. Reversible.</p>
+        </div>
+
+        <div class="option-card">
+          <span class="option-tag">Flag</span>
+          <h3 class="card-title" style="margin-top:8px">Mode B — Separate workspace</h3>
+          <p class="option-line">Demo stays alive as its own repo for continued prototyping.</p>
+          <div class="code-block" style="padding: 14px 18px; margin: 10px 0;">
+<pre><span class="c-green">$</span> <span class="c-white">npx autoship init</span> <span class="c-amber">\</span>
+<span class="c-green">   </span> <span class="c-amber">--from</span> <span class="c-muted">./demo</span> <span class="c-muted">./new-app</span></pre>
+          </div>
+          <p class="option-line" style="color: var(--text-tertiary);">Copies demo into <code>prototype/</code> as read-only snapshot. Demo repo stays untouched.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <h3 style="font-size: 14px; margin-bottom: 10px;">Choosing the mode</h3>
+        <table style="font-size: 13px;">
+          <tbody>
+            <tr><td>Prototype is being replaced, nobody iterates on it further</td><td style="text-align:right"><code class="mono-cell">In place</code></td></tr>
+            <tr><td>Prototype stays alive as a scratchpad</td><td style="text-align:right"><code class="mono-cell">--from</code></td></tr>
+            <tr><td>Reference-only, historical context</td><td style="text-align:right; color: var(--text-tertiary);">Either</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size: 12.5px; color: var(--text-tertiary); margin-top: 10px;">Most common early state: prototype as living scratchpad. Use <code>--from</code> to keep the fast-iteration workspace clean.</p>
+      </div>
+
+      <h3 style="margin-top: 28px;">Daily commands</h3>
+      <div class="code-block">
+<pre><span class="c-green">$</span> <span class="c-white">npx autoship ingest</span>         <span class="c-dim"># Step 1: extract spec from prototype/</span>
+<span class="c-green">$</span> <span class="c-white">npx autoship review</span>          <span class="c-dim"># Step 2: human reviews artifacts/</span>
+<span class="c-green">$</span> <span class="c-white">npx autoship generate-tests</span>  <span class="c-dim"># Step 3: generate oracle tests</span>
+<span class="c-green">$</span> <span class="c-white">npx autoship build</span>           <span class="c-dim"># Step 4: Ralph loop</span>
+<span class="c-green">$</span> <span class="c-white">npx autoship status</span>          <span class="c-dim"># progress, blockers</span></pre>
+      </div>
+
+      <div class="callout callout--amber">
+        <p><strong>Re-initialization.</strong> <code>npx autoship init</code> on an already-initialized workspace fails with an error. Use <code>npx autoship reingest</code> to refresh artifacts from an updated prototype while preserving current app and test work. Separate command, separate intent.</p>
+      </div>
+    </section>
+
+    <!-- Why -->
+    <section id="why">
+      <h2>Why this architecture</h2>
+      <ol class="step-list">
+        <li>The user often <strong>does not understand the internals</strong> of the vibe-coded app well enough to validate a full technical plan.</li>
+        <li>Claude Code is <strong>already strong</strong> at local code generation and iterative repair.</li>
+        <li>The missing value is not "write code." It's <strong>"turn a messy demo into reliable artifacts that make code generation converge."</strong></li>
+      </ol>
+    </section>
+
+    <!-- Non-Goals -->
+    <section id="nongoals">
+      <h2>Non-goals for v1</h2>
+      <div class="tag-row">
+        <span class="tag tag--muted">Multi-runtime backend</span>
+        <span class="tag tag--muted">Unattended CI runs</span>
+        <span class="tag tag--muted">Production hardening</span>
+        <span class="tag tag--muted">Compliance / security cert</span>
+        <span class="tag tag--muted">Every app category</span>
+        <span class="tag tag--muted">Preserving original frontend</span>
+      </div>
+    </section>
+
+    <!-- Considered & Deferred -->
+    <section id="deferred">
+      <h2>Considered &amp; deferred</h2>
+      <p class="lede">Ideas explored and cut. Kept to prevent re-derivation.</p>
+
+      <details>
+        <summary>Trace-diff oracle with corpus splits</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> traces freeze stochastic behavior, memorization attacks are trivially gameable, demos encode bugs.</div>
+      </details>
+      <details>
+        <summary>L0 / L1 containerize / shell around unchanged logic</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> Claude Code already does both in one shot.</div>
+      </details>
+      <details>
+        <summary>Executor mode picker heuristic</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> picking between modes is a research project. Ralph alone proves the loop.</div>
+      </details>
+      <details>
+        <summary>Adversarial LLM reviewer</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> primarily defended against the now-removed trace oracle.</div>
+      </details>
+      <details>
+        <summary>Production hardening as part of this loop</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> productionization applies to any codebase. Separate concern.</div>
+      </details>
+      <details>
+        <summary>Screenshot comparison against demo visuals</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> demo UI is usually ugly. Pixel-matching is fidelity to the wrong target.</div>
+      </details>
+      <details>
+        <summary>Agent-browser as the primary loop oracle</summary>
+        <div class="detail-body"><span class="cut-label">Cut:</span> browser-agent judgment is too soft to be the main judge of record. Kept only as supplementary QA at loop time and as synthesis-time help for Playwright generation.</div>
+      </details>
+      <details>
+        <summary>Heavy stage model (DEFINE / PLAN / BUILD / VERIFY / REVIEW / SHIP)</summary>
+        <div class="detail-body"><span class="cut-label">Simplified to 4 steps:</span> the stage model added formalism without changing what the system does. Can be reintroduced from earlier drafts if complex routing is needed later.</div>
+      </details>
+      <details>
+        <summary>3-tier skill model</summary>
+        <div class="detail-body"><span class="cut-label">Simplified:</span> skills are consumed at session level. The tier taxonomy didn't change how skills are used.</div>
+      </details>
+      <details>
+        <summary>Formal mutable / protected surfaces</summary>
+        <div class="detail-body"><span class="cut-label">Simplified to a guardrail rule:</span> sessions don't edit artifacts or tests unless the controller opens a revision step.</div>
+      </details>
+    </section>
+
+    <!-- Next Experiment -->
+    <section id="experiment">
+      <h2>Immediate next experiment</h2>
+      <p class="lede">Before building the full tool, run one manual end-to-end probe.</p>
+
+      <ol class="step-list">
+        <li>Pick one real vibe-coded LLM app</li>
+        <li>Extract the artifact set manually</li>
+        <li>Generate tests from the artifacts</li>
+        <li>Use Claude Code to rewrite the frontend</li>
+        <li>Run a Ralph loop for the backend</li>
+        <li>Record where the process fails</li>
+      </ol>
+
+      <h3 style="margin-top: 24px;">Measure</h3>
+      <div class="grid-2">
+        <div class="sub-block">How much of the spec had to be <strong>invented</strong></div>
+        <div class="sub-block">Whether generated tests were <strong>useful</strong> as an oracle</div>
+        <div class="sub-block">Whether the Ralph loop <strong>converges</strong></div>
+        <div class="sub-block">What <strong>escalations</strong> occur most often</div>
+      </div>
+
+      <div class="callout callout--amber" style="margin-top: 20px;">
+        <p>If this experiment fails, revise the architecture before building product scaffolding around it.</p>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      autoship v1 · 2026-04-14
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // Mermaid initialization — theme matching the article's palette
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+      fontSize: '13px',
+      primaryColor: '#fdfcf9',
+      primaryTextColor: '#1e1d1a',
+      primaryBorderColor: '#d6d3c9',
+      lineColor: '#575652',
+      secondaryColor: '#f2f0e9',
+      tertiaryColor: '#eef5f1',
+      mainBkg: '#fdfcf9',
+      nodeBorder: '#d6d3c9',
+      clusterBkg: '#f8f7f3',
+      clusterBorder: '#e7e4dc',
+      edgeLabelBackground: '#fdfcf9'
+    },
+    flowchart: {
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 12
+    }
+  });
+
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+        fontSize: '13px',
+        primaryColor: '#242321',
+        primaryTextColor: '#e6e4dd',
+        primaryBorderColor: '#4a4640',
+        lineColor: '#b0aea5',
+        secondaryColor: '#1e1d1b',
+        tertiaryColor: '#1a2b27',
+        mainBkg: '#242321',
+        nodeBorder: '#4a4640',
+        clusterBkg: '#1a1917',
+        clusterBorder: '#36332d',
+        edgeLabelBackground: '#242321'
+      }
+    });
+  }
+
+  (function () {
+    var links = document.querySelectorAll('.sidebar a[href^="#"]');
+    var idToLink = {};
+    links.forEach(function (a) {
+      var id = a.getAttribute('href').slice(1);
+      idToLink[id] = a;
+    });
+
+    var sections = document.querySelectorAll('section[id]');
+    if (!('IntersectionObserver' in window) || !sections.length) return;
+
+    var currentActive = null;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          var link = idToLink[e.target.id];
+          if (!link || link === currentActive) return;
+          if (currentActive) currentActive.classList.remove('active');
+          link.classList.add('active');
+          currentActive = link;
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+    sections.forEach(function (s) { observer.observe(s); });
+  })();
+</script>
+</body>
+</html>

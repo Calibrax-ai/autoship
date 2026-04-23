@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoship Deliver — Safe Automated Software Delivery</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f7f3;
+    --surface: #fdfcf9;
+    --surface-sunken: #f2f0e9;
+    --surface-deep: #232220;
+    --surface-deep-elev: #2e2c29;
+
+    --text-primary: #1e1d1a;
+    --text-secondary: #575652;
+    --text-tertiary: #8a8983;
+    --text-inverse: #e8e6df;
+    --text-inverse-muted: #a8a6a0;
+    --text-inverse-dim: #6f6e68;
+
+    --border: #e7e4dc;
+    --border-strong: #d6d3c9;
+    --border-dark: #3a3833;
+
+    --accent: #0d6e61;
+    --accent-strong: #0a574d;
+    --accent-bg: #e3efeb;
+    --accent-soft: #eef5f1;
+    --accent-fg-on-dark: #5ac4a4;
+
+    --amber: #8a5510;
+    --amber-bg: #f4ead5;
+    --amber-soft: #f9f2e3;
+    --amber-fg-on-dark: #d19255;
+
+    --red: #8a2a2a;
+    --red-bg: #f5e3e1;
+    --red-soft: #faeceb;
+
+    --blue: #2c5488;
+    --blue-bg: #e5ebf4;
+    --blue-soft: #eef2f8;
+    --blue-fg-on-dark: #7d9dc9;
+
+    --purple: #5f3a8e;
+    --purple-bg: #ebe2f2;
+    --purple-soft: #f3eefa;
+
+    --green-fg-on-dark: #8cb577;
+
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1917;
+      --surface: #242321;
+      --surface-sunken: #1e1d1b;
+      --surface-deep: #2a2926;
+      --surface-deep-elev: #343330;
+
+      --text-primary: #e6e4dd;
+      --text-secondary: #b0aea5;
+      --text-tertiary: #827f78;
+
+      --border: #36332d;
+      --border-strong: #4a4640;
+      --border-dark: #4a4640;
+
+      --accent: #5ac4a4;
+      --accent-strong: #7ad3b8;
+      --accent-bg: #123c34;
+      --accent-soft: #1a2b27;
+
+      --amber: #d19255;
+      --amber-bg: #3d2c0e;
+      --amber-soft: #2d2316;
+
+      --red: #d88787;
+      --red-bg: #3d1c1c;
+      --red-soft: #2d1818;
+
+      --blue: #7d9dc9;
+      --blue-bg: #1c2c45;
+      --blue-soft: #18222e;
+
+      --purple: #b39bd9;
+      --purple-bg: #2a1e3d;
+      --purple-soft: #1f1828;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 24px;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-primary);
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    max-width: 1240px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 20px 24px;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 13.5px;
+  }
+
+  .sidebar-brand {
+    padding: 0 8px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-brand .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+
+  .sidebar-brand .title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .sidebar-brand .subtitle {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+  }
+
+  .sidebar nav { display: flex; flex-direction: column; gap: 1px; }
+
+  .sidebar .group-label {
+    padding: 16px 10px 6px;
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+  }
+
+  .sidebar .group-label:first-child { padding-top: 0; }
+
+  .sidebar a {
+    display: block;
+    padding: 6px 10px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    border-left: 2px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    line-height: 1.4;
+  }
+
+  .sidebar a:hover {
+    color: var(--text-primary);
+    background: var(--surface-sunken);
+  }
+
+  .sidebar a.active {
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+
+  .sidebar-footer {
+    margin-top: 24px;
+    padding: 12px 10px;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    border-top: 1px solid var(--border);
+  }
+
+  .main {
+    min-width: 0;
+    padding: 56px 48px 96px;
+    max-width: 820px;
+  }
+
+  .page-header {
+    margin-bottom: 56px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-header .meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .date-label {
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-header h1 {
+    font-size: 32px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    margin: 0 0 12px;
+  }
+
+  .page-header .subtitle {
+    font-size: 17.5px;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+    font-weight: 400;
+  }
+
+  .page-header .lead {
+    font-size: 15.5px;
+    color: var(--text-secondary);
+    max-width: 680px;
+    margin: 16px 0 0;
+    line-height: 1.6;
+  }
+
+  section {
+    margin-top: 56px;
+    scroll-margin-top: 24px;
+  }
+
+  section h2 {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    margin: 0 0 8px;
+    color: var(--text-primary);
+  }
+
+  section .lede {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    margin: 0 0 24px;
+  }
+
+  section > p { color: var(--text-secondary); }
+
+  h3 {
+    font-size: 16.5px;
+    font-weight: 500;
+    margin: 28px 0 10px;
+    color: var(--text-primary);
+    scroll-margin-top: 24px;
+  }
+
+  h4 {
+    font-size: 14.5px;
+    font-weight: 500;
+    margin: 22px 0 8px;
+    color: var(--text-primary);
+  }
+
+  p { margin: 12px 0; color: var(--text-secondary); }
+
+  strong { color: var(--text-primary); font-weight: 500; }
+
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-bg); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  ul, ol { color: var(--text-secondary); padding-left: 20px; }
+  ul li, ol li { margin: 4px 0; }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    padding: 1px 6px;
+    background: var(--surface-sunken);
+    border-radius: 4px;
+    color: var(--text-primary);
+  }
+
+  pre {
+    background: var(--surface-deep);
+    color: var(--text-inverse);
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 16px 0;
+  }
+
+  pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+
+  .divider {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* Cards and callouts */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin: 16px 0;
+  }
+
+  .card > :first-child { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+
+  .callout {
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 20px 0;
+    border-left: 3px solid var(--border-strong);
+    background: var(--surface-sunken);
+    font-size: 14px;
+  }
+
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+
+  .callout--accent { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout--amber { border-left-color: var(--amber); background: var(--amber-soft); }
+  .callout--red { border-left-color: var(--red); background: var(--red-soft); }
+  .callout--blue { border-left-color: var(--blue); background: var(--blue-soft); }
+
+  .callout-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+
+  /* Tables */
+
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    margin: 16px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-primary);
+    padding: 10px 14px;
+    background: var(--surface-sunken);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  /* Grids */
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  @media (max-width: 820px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; }
+    .main { padding: 24px; }
+  }
+
+  /* Type chips */
+
+  .type-chip {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .type-chip--bug { background: var(--red-bg); color: var(--red); }
+  .type-chip--feature { background: var(--accent-bg); color: var(--accent-strong); }
+  .type-chip--refactor { background: var(--amber-bg); color: var(--amber); }
+  .type-chip--nonfunc { background: var(--purple-bg); color: var(--purple); }
+
+  /* Layer cards (four-layer agent contract) */
+
+  .layer-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  @media (max-width: 820px) {
+    .layer-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .layer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+
+  .layer-card .layer-name {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+
+  .layer-card .layer-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 10px;
+  }
+
+  .layer-card .layer-q {
+    font-size: 13px;
+    color: var(--accent-strong);
+    font-style: italic;
+    margin: 0 0 10px;
+  }
+
+  .layer-card ul {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 12.5px;
+  }
+
+  .layer-card ul li { margin: 2px 0; }
+
+  /* Mermaid override */
+
+  .mermaid {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    margin: 20px 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+
+  /* Pipeline arrow row */
+
+  .pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 8px;
+    font-size: 13.5px;
+  }
+
+  .pipeline-step {
+    padding: 5px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+
+  .pipeline-step.is-highlight {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  .pipeline-arrow { color: var(--text-tertiary); font-size: 12px; }
+
+  /* Anti-pattern card */
+
+  .anti-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--red);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+
+  .anti-card .anti-title {
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+
+  .anti-card p { font-size: 13.5px; margin: 6px 0; }
+
+  /* Foundation card */
+
+  .foundation-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 10px 0;
+  }
+
+  .foundation-card .fnum {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 22px;
+    margin-right: 8px;
+  }
+
+  .foundation-card .ftitle {
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: inline;
+  }
+
+  .foundation-card p { font-size: 13.5px; margin: 8px 0 0; }
+
+  /* Schema tree */
+
+  .schema-tree {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 16px 0;
+    color: var(--text-secondary);
+    overflow-x: auto;
+  }
+
+  .schema-tree .comment { color: var(--text-tertiary); }
+  .schema-tree .key { color: var(--accent-strong); font-weight: 500; }
+  .schema-tree .type-bug { color: var(--red); font-weight: 500; }
+  .schema-tree .type-feature { color: var(--accent-strong); font-weight: 500; }
+  .schema-tree .type-refactor { color: var(--amber); font-weight: 500; }
+  .schema-tree .type-nonfunc { color: var(--purple); font-weight: 500; }
+
+  /* Posture badge */
+  .posture {
+    display: inline-block;
+    padding: 1px 8px;
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="eyebrow">Autoship</div>
+      <h1 class="title">Deliver</h1>
+      <p class="subtitle">Safe automated delivery</p>
+    </div>
+    <nav>
+      <a href="#intro">Introduction</a>
+
+      <div class="group-label">Context</div>
+      <a href="#problem">The problem</a>
+      <a href="#approach">The approach</a>
+
+      <div class="group-label">Architecture</div>
+      <a href="#pipeline">End-to-end pipeline</a>
+      <a href="#lifecycle">Lifecycle &amp; state machine</a>
+      <a href="#types">Issue types</a>
+      <a href="#grooming">Per-type grooming</a>
+
+      <div class="group-label">Contracts</div>
+      <a href="#agent-contract">Agent contract</a>
+      <a href="#brief-schema">Brief schema</a>
+
+      <div class="group-label">Discipline</div>
+      <a href="#foundations">Foundations</a>
+      <a href="#anti-patterns">Anti-patterns</a>
+
+      <div class="group-label">Execution</div>
+      <a href="#preconditions">Preconditions</a>
+      <a href="#probe">Probe-0.1 shape</a>
+      <a href="#extensions">Post-0.1 extensions</a>
+    </nav>
+    <div class="sidebar-footer">
+      Architecture proposal v0.1<br>
+      2026-04-21
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-header">
+      <div class="meta">
+        <span class="badge">v0.1 proposal</span>
+        <span class="date-label">2026-04-21</span>
+      </div>
+      <h1>Autoship Deliver</h1>
+      <p class="subtitle">A lightweight agent harness for continuous, oracle-guided software delivery</p>
+      <p class="lead">
+        Autoship Deliver is an agent harness that auto-grooms incoming issues, builds the specified change, and verifies it against a runnable oracle — all while staying inside the guard-rails of an existing codebase. The system never lets one agent judge its own work, never drifts scope silently, and never leaves state in memory. Every transition is grounded in code, tests, and reviewer verdicts that persist on disk.
+      </p>
+    </header>
+
+    <section id="intro">
+      <h2>What it is</h2>
+      <p class="lede">Agent harness + conventions, not a framework.</p>
+
+      <p>
+        <strong>Deliver</strong> is a new track of the Autoship product family. Where <strong>extract</strong> turns a messy prototype into a reliable spec, and <strong>build</strong> drives a full rewrite from that spec, <strong>deliver</strong> addresses the largest problem surface of all: the everyday work of maintaining and evolving a real, running codebase. Bugs, features, refactors, performance regressions — the unglamorous work that keeps products alive.
+      </p>
+
+      <p>
+        Deliver ships as a set of Claude Code agent definitions plus conventions about where state lives. No CLI. No runtime. No build step. You install it by copying agent files into your repo's <code>.claude/agents/</code> directory; artifacts accumulate under <code>.autoship/issues/&lt;id&gt;/</code> beside your code. Claude Code is the runtime. The repo is the source of truth. Operators (or, later, a thin controller agent) dispatch the work.
+      </p>
+
+      <div class="callout callout--accent">
+        <div class="callout-label">Core claim</div>
+        <p>
+          The hard part of automated software delivery isn't writing code — LLMs are already strong at that. The hard part is producing <em>trustworthy specifications</em> from fuzzy human intent, and verifying changes against those specifications without any one agent becoming both author and judge. Improve is designed around that insight.
+        </p>
+      </div>
+    </section>
+
+    <section id="problem">
+      <h2>The problem</h2>
+      <p class="lede">Existing projects have different failure modes than greenfield builds.</p>
+
+      <p>
+        Greenfield systems optimize for <em>discovery</em> — what should this product become? Existing projects optimize for <em>controlled change</em> — this code runs in production, thousands of lines are already deciding behavior, and every change risks breaking something the team forgot existed.
+      </p>
+
+      <p>The challenges stack up:</p>
+
+      <ul>
+        <li>The codebase already exists — the agent must respect what is, not invent what could be</li>
+        <li>Issues are narrower than full product specs — one bug, one feature, one refactor at a time</li>
+        <li>Regression risk matters more than discovery breadth — "works + nothing else broke" is the minimum bar</li>
+        <li>Author-equals-judge is devastating here — an agent that writes a fix and confirms "yep, looks good" will ship broken code at scale</li>
+      </ul>
+
+      <p>
+        These are not hypothetical concerns. Autoship's probe series has run directly into them. Three consecutive probes — 2.2, 2.3, and 2.4 — hit the same structural failure: observe a new failure mode, add a forcing-function gate to catch it, watch the controller cheerfully satisfy the gate while reproducing the same failure under a new label. The accumulated-gates pattern. It took probe 2.5 and a separate fresh-context reviewer agent with a calibration set to break the loop.
+      </p>
+
+      <div class="callout callout--amber">
+        <div class="callout-label">The lesson</div>
+        <p>
+          No amount of rephrasing a self-judged gate fixes self-judgment. The structural fix is to separate the <strong>author</strong> from the <strong>judge</strong>. Every handoff in deliver carries a generator-evaluator boundary — the agent that produces never discharges the gates that accept it.
+        </p>
+      </div>
+    </section>
+
+    <section id="approach">
+      <h2>The approach</h2>
+      <p class="lede">External state machine, fresh context per unit, evidence anchors every transition.</p>
+
+      <p>
+        Autoship Deliver is built around four structural commitments that every probe lesson has reinforced:
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">1. Evidence-first</p>
+          <h3 style="margin: 0 0 8px;">Truth comes from code, not from claims</h3>
+          <p style="font-size: 13.5px; margin: 0;">
+            Every brief, every review, every transition cites runnable evidence: a reproduction command, a grep-verifiable file path, a test that actually exercises the change. An agent that claims "root cause is in the auth module" must point to <code>file:line</code>. An agent claiming "alternative A fits our patterns" must cite where the pattern lives.
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">2. Generator-evaluator</p>
+          <h3 style="margin: 0 0 8px;">Author and judge are different agents</h3>
+          <p style="font-size: 13.5px; margin: 0;">
+            The pre-groomer writes briefs. The brief-reviewer judges them with fresh context — no memory of how the brief was produced. Same pattern at every later stage: plan-reviewer judges plans, post-build reviewer council judges the built change. The author never marks its own work approved.
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">3. Fresh context per unit</p>
+          <h3 style="margin: 0 0 8px;">No session is long-lived</h3>
+          <p style="font-size: 13.5px; margin: 0;">
+            Every structural unit of work — groom, review, regroom, oracle plan, build — runs in a fresh context window. Context accumulation silently degrades agent quality; fresh starts keep the signal-to-noise ratio predictable. State persists on disk between units, not in-session.
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">4. External state machine</p>
+          <h3 style="margin: 0 0 8px;">Filesystem is the source of truth</h3>
+          <p style="font-size: 13.5px; margin: 0;">
+            State is derived from filesystem presence: <code>brief.md</code> exists → proposed; <code>reviews/review-NN.md</code> with REJECTED → changes-requested. No parallel state file that can drift from reality. Crash recovery and resumption are both automatic consequences.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="pipeline">
+      <h2>End-to-end pipeline</h2>
+      <p class="lede">Five stages. Every stage is reviewer-gated. Probe-0.1 validates the first.</p>
+
+      <p>
+        At the highest level, deliver is a pipeline that takes an issue from intake to ship. Every stage produces disk-persisted artifacts, and every stage ends with a fresh-context reviewer that either approves the work or sends it back.
+      </p>
+
+      <div class="mermaid">
+flowchart LR
+    I([Issue]) --&gt; G[Groom]
+    G --&gt; P[Plan]
+    P --&gt; B[Build]
+    B --&gt; V[Verify]
+    V --&gt; S([Ship])
+
+    style G fill:#2c5488,color:#fff,stroke:#1a3a66
+      </div>
+
+      <p>
+        The diagram omits the feedback loops for clarity — at every stage, a REJECT verdict loops back to the same stage with updated inputs. Those loops are the generator-evaluator pattern in action: the agent that produced the work is never the one that accepts it. The state machine and per-type grooming diagrams in the next sections show what this looks like in detail.
+      </p>
+
+      <div class="callout">
+        <div class="callout-label">Probe-0.1 scope</div>
+        <p>
+          Probe-0.1 validates the <strong>Groom</strong> stage alone — pre-groom, brief, brief-review, and regroom. It answers one narrow question: can the generator-evaluator pattern produce trustworthy briefs from fuzzy issues? Everything downstream is reserved for probes 0.2+, where grooming's answers shape how Plan, Build, Verify, and Ship are built.
+        </p>
+      </div>
+    </section>
+
+    <section id="lifecycle">
+      <h2>Lifecycle &amp; state machine</h2>
+      <p class="lede">State is filesystem presence. Every transition is observable.</p>
+
+      <p>
+        At the grooming layer, an issue moves through four states driven entirely by what exists on disk under <code>.autoship/issues/&lt;id&gt;/</code>. The state machine is small enough to audit at a glance, large enough to support the regroom feedback loop.
+      </p>
+
+      <div class="mermaid">
+stateDiagram-v2
+    [*] --&gt; new: issue.md created
+    new --&gt; proposed: pre-groom<br/>writes brief.md
+    proposed --&gt; changes_requested: reviewer REJECTS<br/>(review-NN.md)
+    changes_requested --&gt; proposed: regroom writes<br/>new brief.md
+    proposed --&gt; ready_for_oracle: reviewer APPROVES
+    ready_for_oracle --&gt; [*]: handoff to<br/>downstream (post-0.1)
+      </div>
+
+      <h3>Reading state from disk</h3>
+      <p>
+        No parallel <code>state.json</code> exists. The filesystem is the state machine. This prevents drift between a claimed state and what actually happened, and makes resumption automatic — crash recovery is just "re-read the directory."
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Filesystem condition</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>issue.md</code> exists, no <code>brief.md</code></td>
+              <td><span class="posture">new</span></td>
+            </tr>
+            <tr>
+              <td><code>brief.md</code> exists, no <code>reviews/</code></td>
+              <td><span class="posture">proposed</span></td>
+            </tr>
+            <tr>
+              <td>latest <code>reviews/review-NN.md</code> verdict is REJECTED</td>
+              <td><span class="posture">changes-requested</span></td>
+            </tr>
+            <tr>
+              <td>latest <code>reviews/review-NN.md</code> verdict is APPROVED</td>
+              <td><span class="posture">ready-for-oracle</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Feedback edges</h3>
+      <p>
+        Improve is not a linear chain. At every stage, the reviewer can return REJECT, which loops the work back for another pass:
+      </p>
+
+      <ul>
+        <li><strong>Regroom</strong> — brief-reviewer REJECTS → pre-groomer re-grooms from updated inputs. Prior review preserved as <code>review-NN.md</code> history.</li>
+        <li><strong>Re-plan</strong> (future) — oracle-reviewer REJECTS → oracle-planner revises.</li>
+        <li><strong>Rebuild</strong> (future) — walker or post-build review REJECTS → builder re-dispatches.</li>
+        <li><strong>Rollback + new issue</strong> (future) — production monitor detects regression → automatic rollback + investigative issue created.</li>
+      </ul>
+    </section>
+
+    <section id="types">
+      <h2>Issue types</h2>
+      <p class="lede">Four types, distinguished by where the truth lives.</p>
+
+      <p>
+        Improve recognizes four issue types. The split is not by severity or priority — it's by <em>the shape of grooming each requires</em>. Different types have different truth sources, and grooming has to meet the truth where it actually lives.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Grooming shape</th>
+              <th>Truth location</th>
+              <th>Posture</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="type-chip type-chip--bug">Bug</span></td>
+              <td>Forensic</td>
+              <td>Latent in code: reproduce → root cause</td>
+              <td>Observe, diagnose, specify</td>
+            </tr>
+            <tr>
+              <td><span class="type-chip type-chip--feature">Feature</span></td>
+              <td>Generative</td>
+              <td>Has to be invented: research → design → pick</td>
+              <td>Smallest design that fits existing patterns</td>
+            </tr>
+            <tr>
+              <td><span class="type-chip type-chip--refactor">Refactor</span></td>
+              <td>Structural</td>
+              <td>Code-quality criteria: define "better", preserve behavior</td>
+              <td>Preserve behavior, improve structure</td>
+            </tr>
+            <tr>
+              <td><span class="type-chip type-chip--nonfunc">Non-functional</span></td>
+              <td>Measured</td>
+              <td>In benchmarks: baseline → target</td>
+              <td>Observe a number, not an error</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--accent">
+        <div class="callout-label">Design discipline</div>
+        <p>
+          <strong>Types are classifications, not pipelines.</strong> One pre-groomer + one brief-reviewer handle all four types. Type is a field on the brief; type-specific sections carry the shape differences. Specializing into four grooming pipelines is deferred until observed quality demands it — structure before evidence is formalism.
+        </p>
+      </div>
+
+      <h3>What's out of scope</h3>
+      <p>Improve explicitly does not handle:</p>
+
+      <ul>
+        <li><strong>Spikes and research tickets</strong> — they produce knowledge, not code</li>
+        <li><strong>Strategic planning</strong> — "should we rewrite X in Y?" is not a change request</li>
+        <li><strong>Multi-repo coordination</strong> — deliver is single-repo by design</li>
+        <li><strong>Standalone documentation updates</strong> — doc changes bundled with code are part of the parent type</li>
+      </ul>
+    </section>
+
+    <section id="grooming">
+      <h2>Per-type grooming flows</h2>
+      <p class="lede">Same outer shape, different type-specific procedures.</p>
+
+      <p>
+        All four types share the same wrapper: <em>read issue → apply type-specific procedure → map blast-radius → write brief → review</em>. Only the middle differs, because only the middle depends on where the truth lives.
+      </p>
+
+      <div class="mermaid">
+flowchart TB
+    I([Issue<br/>+ type]) --&gt; Classify{Type}
+
+    Classify --&gt;|Bug| B1[Reproduce via<br/>curl/test/query]
+    B1 --&gt; B2[Trace to<br/>file:line root cause]
+
+    Classify --&gt;|Feature| F1[Research existing<br/>pattern in codebase]
+    F1 --&gt; F2[Explore 2-3<br/>alternatives, pick fit]
+
+    Classify --&gt;|Refactor| R1[Inventory existing<br/>test coverage]
+    R1 --&gt; R2[Define structural<br/>target + axis]
+
+    Classify --&gt;|Non-functional| N1[Measure baseline<br/>via benchmark]
+    N1 --&gt; N2[Identify hotspot,<br/>define target]
+
+    B2 --&gt; Map[Map blast-radius<br/>create / change /<br/>may / must-not]
+    F2 --&gt; Map
+    R2 --&gt; Map
+    N2 --&gt; Map
+
+    Map --&gt; Write[Write brief<br/>with type-specific<br/>section]
+    Write --&gt; BriefOut[(brief.md)]
+
+    style B1 fill:#8a2a2a,color:#fff
+    style B2 fill:#8a2a2a,color:#fff
+    style F1 fill:#0d6e61,color:#fff
+    style F2 fill:#0d6e61,color:#fff
+    style R1 fill:#8a5510,color:#fff
+    style R2 fill:#8a5510,color:#fff
+    style N1 fill:#5f3a8e,color:#fff
+    style N2 fill:#5f3a8e,color:#fff
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">Bug <span class="posture">forensic</span></p>
+          <p style="font-size: 13.5px; margin: 8px 0 0;">
+            The truth is latent in the code — something is broken. Grooming reproduces the bug (confirmed / cannot-reproduce / need-info), traces to a specific <code>file:line</code>, bounds the scope, writes Reproduction Steps and Root Cause sections. Evidence is runtime observation.
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">Feature <span class="posture">generative</span></p>
+          <p style="font-size: 13.5px; margin: 8px 0 0;">
+            The truth has to be designed. Grooming researches existing patterns in the codebase, explores 2-3 alternative approaches with cost + fit tradeoffs, picks the smallest fit. Design Rationale records the alternatives and the pick. Evidence is cited <code>file:line</code> patterns.
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">Refactor <span class="posture">conservational</span></p>
+          <p style="font-size: 13.5px; margin: 8px 0 0;">
+            The truth is: behavior must not change; structure must improve. Grooming inventories existing test coverage (grep, not line-coverage), identifies gaps the refactor must fill first, defines a concrete improvement target with a measurable axis. Behavior Preservation is the load-bearing brief section.
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-eyebrow" style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 6px;">Non-functional <span class="posture">measured</span></p>
+          <p style="font-size: 13.5px; margin: 8px 0 0;">
+            The truth is in benchmarks. Grooming measures a baseline, identifies the hotspot, defines a concrete target with tolerance. Same shape as Bug — observation is a number instead of an error. <em>Design deferred to probe-0.2+</em> once Bug / Feature / Refactor validation completes.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="agent-contract">
+      <h2>The agent contract</h2>
+      <p class="lede">Every dispatch binds four layers: identity, skill, prompt, context.</p>
+
+      <p>
+        Every agent invocation in deliver carries four explicit contracts. Making them explicit is how we avoid the default failure mode of "whatever the session drags in" — agents burning turns re-orienting, hallucinating because pre-injection was incomplete, or drifting into files they shouldn't have read.
+      </p>
+
+      <div class="layer-grid">
+        <div class="layer-card">
+          <div class="layer-name">Identity</div>
+          <div class="layer-title">Agent</div>
+          <p class="layer-q">Who is this agent?</p>
+          <ul>
+            <li>Role</li>
+            <li>Posture</li>
+            <li>System prompt</li>
+            <li>Default tools</li>
+            <li>Model / effort</li>
+          </ul>
+        </div>
+        <div class="layer-card">
+          <div class="layer-name">Skill</div>
+          <div class="layer-title">Capability</div>
+          <p class="layer-q">How to do X?</p>
+          <ul>
+            <li>Procedure</li>
+            <li>Inputs / outputs</li>
+            <li>Required tools</li>
+            <li>Reusable across agents</li>
+          </ul>
+        </div>
+        <div class="layer-card">
+          <div class="layer-name">Prompt</div>
+          <div class="layer-title">Task</div>
+          <p class="layer-q">What to do now?</p>
+          <ul>
+            <li>Identity reference</li>
+            <li>Skills declared</li>
+            <li>Task spec</li>
+            <li>Completion criteria</li>
+          </ul>
+        </div>
+        <div class="layer-card">
+          <div class="layer-name">Context</div>
+          <div class="layer-title">Data</div>
+          <p class="layer-q">What data is visible?</p>
+          <ul>
+            <li>Pre-injected</li>
+            <li>Tool-accessible</li>
+            <li>Explicitly denied</li>
+            <li>Fresh vs carried</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Rules for extending the system</h3>
+
+      <ul>
+        <li><strong>Extend capability with skills.</strong> New procedure (reproduce a UI bug, map blast-radius, write a regression test)? Add a skill, not a new agent and not a longer system prompt.</li>
+        <li><strong>Extend orchestration with the controller.</strong> Need a different role or fresh context? Add a controller-dispatched step, not a direct agent-to-agent invocation.</li>
+        <li><strong>Never let context be accidental.</strong> Every dispatch prompt declares what's pre-injected and what the agent is allowed to discover via tools.</li>
+      </ul>
+
+      <div class="callout callout--blue">
+        <div class="callout-label">Agents do not invoke agents directly</div>
+        <p>
+          Consistent with autoship's established pattern, leaf agents never dispatch other leaf agents. If <code>pre-groomer</code> needs information beyond its current task scope, it either invokes a <em>skill</em> in-session (browser automation, DB query, test run) or outputs a structured signal to the <em>controller</em> for a fresh-context dispatch. This preserves single-writer invariants and keeps every transition observable.
+        </p>
+      </div>
+    </section>
+
+    <section id="brief-schema">
+      <h2>The brief schema</h2>
+      <p class="lede">Seven base fields, one optional universal, one type-specific section.</p>
+
+      <p>
+        The brief is the <em>handoff artifact</em> from grooming to everything downstream. It carries enough structured content to be reviewable by a fresh-context agent, executable by an eventual builder, and diffable when regroom updates it. Base fields are universal; type-specific sections carry what differs.
+      </p>
+
+      <div class="schema-tree"><span class="comment">brief.md</span>
+│
+├── [<span class="key">Frontmatter</span>]
+│   ├── issue, issue-rev, groomed-at, trigger, type
+│   └── type-specific status:
+│       ├── Bug         → reproduction-status
+│       ├── Feature     → design-status
+│       └── Refactor    → preservation-status
+│
+├── [<span class="key">Base fields</span> — all types]
+│   ├── Outcome                 <span class="comment">one-line user-visible result</span>
+│   ├── Acceptance Criteria     <span class="comment">runnable predicates</span>
+│   ├── Scope Fence             <span class="comment">Always / Ask / Never</span>
+│   ├── Rabbit-Hole Patches     <span class="comment">pre-answered decisions</span>
+│   ├── Blast-Radius Manifest   <span class="comment">Create / Change / May / Must-not</span>
+│   ├── Skeleton Position       <span class="comment">single-slice vs multi-slice</span>
+│   └── Concrete Example        <span class="comment">input/output or reference</span>
+│
+├── [<span class="key">Optional universal</span>]
+│   └── Failure Modes           <span class="comment">runtime risk scenarios</span>
+│
+└── [<span class="key">Type-specific</span> — exactly one of:]
+    ├── <span class="type-bug">Bug</span>         → Reproduction Steps + Root Cause
+    ├── <span class="type-feature">Feature</span>     → Design Rationale (menu)
+    │                │
+    │                ├── Alternatives (always)
+    │                ├── Picked + Reason (always)
+    │                ├── Constraints (conditional)
+    │                ├── Migration Plan (conditional)
+    │                ├── Backward Compat (conditional)
+    │                ├── Rollback Plan (conditional)
+    │                ├── Schema Diff (conditional)
+    │                └── Deferred (optional)
+    ├── <span class="type-refactor">Refactor</span>    → Behavior Preservation
+    │                │
+    │                ├── What must be preserved
+    │                ├── Preservation Proof
+    │                └── Structure Improvement
+    └── <span class="type-nonfunc">Non-functional</span> → Baseline + Target <span class="comment">(deferred)</span></div>
+
+      <p>
+        Mechanical content (acceptance criteria, blast-radius manifest, subsection presence) is grep-checkable at review time. Judgment content (scope fence, rabbit-hole patches, picked alternative) is what the reviewer actually evaluates. This mapping — <em>mechanical → grep; judgment → reviewer</em> — is a design principle that runs throughout autoship.
+      </p>
+
+      <h3>Why this schema shape</h3>
+
+      <p>
+        Each field exists because observation showed briefs without it produce failure:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Failure it prevents</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Outcome</strong></td>
+              <td>Executors optimizing for AC pass rates instead of user-visible results</td>
+            </tr>
+            <tr>
+              <td><strong>Acceptance Criteria</strong></td>
+              <td>"Done" becoming subjective; no runnable check means no verification</td>
+            </tr>
+            <tr>
+              <td><strong>Scope Fence</strong></td>
+              <td>Scope drift into adjacent files the change was never meant to touch</td>
+            </tr>
+            <tr>
+              <td><strong>Rabbit-Hole Patches</strong></td>
+              <td>Executors silently guessing at ambiguities (and guessing differently each time)</td>
+            </tr>
+            <tr>
+              <td><strong>Blast-Radius Manifest</strong></td>
+              <td>"I'll change whatever I need to" — regression by accretion</td>
+            </tr>
+            <tr>
+              <td><strong>Skeleton Position</strong></td>
+              <td>First-slice conventions becoming accidental; later slices inheriting bad patterns</td>
+            </tr>
+            <tr>
+              <td><strong>Concrete Example</strong></td>
+              <td>Prose interpretation drift — different readers take different meanings</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="foundations">
+      <h2>Foundations</h2>
+      <p class="lede">Nine load-bearing commitments for probe-0.1.</p>
+
+      <div class="foundation-card">
+        <span class="fnum">1</span>
+        <span class="ftitle">Disk-backed execution state</span>
+        <p>State lives on disk, not in a long-running session. Crash recovery, resumption, and human steering all fall out for free.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">2</span>
+        <span class="ftitle">Fresh session per unit</span>
+        <p>Every major unit runs in a fresh context window. Context accumulation silently degrades agent quality — fresh starts keep signal-to-noise predictable.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">3</span>
+        <span class="ftitle">Hard unit sizing</span>
+        <p>A unit must fit in one context window. If grooming needs more, split into codebase scan, baseline snapshot, and oracle draft as separate units.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">4</span>
+        <span class="ftitle">Explicit state machine</span>
+        <p>States (new / proposed / changes-requested / ready-for-oracle) are derivable from filesystem presence. No parallel state file to drift.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">5</span>
+        <span class="ftitle">Mechanical gates</span>
+        <p>The outer loop's transitions are mechanically checkable — brief exists, required sections populated, verdict parseable. Judgment calls live inside the reviewer; the transitions themselves are not judgment-only.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">6</span>
+        <span class="ftitle">Repo-local canonical state</span>
+        <p>Artifacts live in the target repo (<code>.autoship/issues/&lt;id&gt;/</code>). Trackers (GitHub, Linear) are input and coordination surfaces, not truth sources.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">7</span>
+        <span class="ftitle">Brief schema</span>
+        <p>Seven base fields, one optional universal, one type-specific section. Each field earns its place by preventing a specific failure mode.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">8</span>
+        <span class="ftitle">Voice-coded anti-pattern framing</span>
+        <p>Agent prompts carry a short adversarial section — specific failure modes written in a voice the agent internalizes, thicker than a principle list but lighter than a rubric.</p>
+      </div>
+
+      <div class="foundation-card">
+        <span class="fnum">9</span>
+        <span class="ftitle">Pre-injected dispatch context</span>
+        <p>The dispatch prompt inlines everything the unit needs. The agent is told explicitly what it has and what it does not — no fishing for context the dispatcher already holds.</p>
+      </div>
+    </section>
+
+    <section id="anti-patterns">
+      <h2>Anti-patterns</h2>
+      <p class="lede">Five patterns deliver explicitly does not adopt.</p>
+
+      <div class="anti-card">
+        <h3 class="anti-title">1. Issue-first truth model</h3>
+        <p>Issue text reflects what the reporter <em>hoped</em>; code reflects what the system <em>does</em>. Autoship's differentiator is evidence-first reasoning — an issue tracker is an input and coordination surface, never the truth source.</p>
+      </div>
+
+      <div class="anti-card">
+        <h3 class="anti-title">2. Replanning as scope escape hatch</h3>
+        <p>Self-judged gates get absorbed by the agent that authored them. Probes 2.2 → 2.4 ran this failure three times, each under a new label. Any replanning must stay reviewer-controlled and evidence-constrained. The reviewer is the fixed point; the plan is negotiable.</p>
+      </div>
+
+      <div class="anti-card">
+        <h3 class="anti-title">3. Ceremony before it pays for itself</h3>
+        <p>No milestone machinery, reporting layers, sync adapters, or recovery subsystems before the first grooming probe proves they are needed. Every additional file is a surface for inconsistency — earn the separation.</p>
+      </div>
+
+      <div class="anti-card">
+        <h3 class="anti-title">4. Static gate registries without calibration</h3>
+        <p>A static list of questions drifts from actual failure modes. The reviewer degrades into a checkbox machine that satisfies its rubric while missing the failure shape that matters. Autoship's calibration methodology — operator overrides become labeled cases; calibration grows over time — is what makes reviewer judgment transferable across probes.</p>
+      </div>
+
+      <div class="anti-card">
+        <h3 class="anti-title">5. Accumulating supervisor modules</h3>
+        <p>When a new failure mode appears, the fix is <em>structural</em> — move the check to the reviewer boundary — not a new supervisor module for every symptom (stuck-detection, timeout-recovery, verification-guard). Each new gate at the author boundary gets absorbed by the author. The reviewer is the fixed point against which structural fixes are made.</p>
+      </div>
+    </section>
+
+    <section id="preconditions">
+      <h2>Preconditions</h2>
+      <p class="lede">Test infrastructure is a precondition for the full pipeline, not for probe-0.1.</p>
+
+      <p>
+        Deliver's automation rests on a dependency chain: <em>code change → verification → tests → test infrastructure</em>. Break any link and deliver cannot operate. The full pipeline — grooming through merge — requires:
+      </p>
+
+      <ul>
+        <li><strong>Test infrastructure</strong> — runnable test command, functional tests covering observable behavior, deterministic, reasonably fast (minutes not hours)</li>
+        <li><strong>Reproducible environment</strong> — seedable database, consistent fixtures, runnable locally or in CI</li>
+        <li><strong>Clean version control</strong> — git with a stable main branch to anchor against</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-label">Probe-0.1 nuance</div>
+        <p>
+          These preconditions apply to the <strong>full pipeline</strong>, not to probe-0.1 specifically. Probe-0.1's grooming stage produces briefs that <em>reference</em> tests; it does not execute them. A testbed with thin tests can host grooming — test infrastructure becomes blocking at oracle and build stages in later probes.
+        </p>
+      </div>
+
+      <p>
+        When preconditions are not met, the fix is itself a change. Adding tests, seeding fixtures, or stabilizing CI is a precursor issue that deliver can groom and drive like any other change request.
+      </p>
+    </section>
+
+    <section id="probe">
+      <h2>Probe-0.1 shape</h2>
+      <p class="lede">Operator-driven, filesystem-derived state, one happy path.</p>
+
+      <p>
+        The first deliver probe stays deliberately narrow. It validates one question: can the generator-evaluator pattern produce trustworthy briefs from fuzzy issues? No code is built. No oracle is planned. No PR is merged. Just brief → review → either approved or sent back for regroom.
+      </p>
+
+      <div class="mermaid">
+flowchart LR
+    Op([Operator]) --&gt;|1. create| Iss[(issue.md)]
+    Op --&gt;|2. dispatch| PG[pre-groomer]
+    Iss --&gt; PG
+    PG --&gt;|writes| Brief[(brief.md)]
+    Op --&gt;|3. dispatch| BR[brief-reviewer]
+    Brief --&gt; BR
+    BR --&gt;|writes| Rev[(review-NN.md)]
+    Rev --&gt;|APPROVE| Done([ready-for-oracle])
+    Rev --&gt;|REJECT| Regroom[operator<br/>triggers regroom]
+    Regroom --&gt; PG
+      </div>
+
+      <h3>Filesystem layout</h3>
+
+<pre><code>autoship-deliver-0.1/
+  app/                   # cloned testbed, pinned commit
+    .autoship/
+      issues/&lt;id&gt;/
+        issue.md         # issue body + comments
+        brief.md         # pre-groomer output
+        reviews/
+          review-01.md   # first reviewer verdict
+          review-02.md   # after regroom (if any)</code></pre>
+
+      <p>
+        Per-issue artifacts live inside the testbed repo under <code>app/.autoship/issues/&lt;id&gt;/</code>. This is the <em>production shape</em> where deliver gets installed into a repo the way <code>.github/</code> or <code>.claude/</code> does. If controller-backed deliver arrives later, its run-scoped <code>program.md</code> lives one level up so it doesn't contaminate the testbed's git history.
+      </p>
+
+      <h3>0.1-specific simplifications</h3>
+      <p>Each graduates to a richer shape when observed need justifies it — not before.</p>
+
+      <ul>
+        <li><strong>Controller scope stays staged.</strong> Current runtime reaches draft PR: claim → pre-groom → review → <code>Ready | needs-human-input</code>, then after human promotion to <code>Building</code>: worktree → Stage 1 → Stage 2 → validation → draft PR. Merge/deploy remain deferred.</li>
+        <li><strong>Skills are inlined in the agent's system prompt.</strong> <code>reproduce-api-bug</code>, <code>map-blast-radius</code>, and <code>write-brief</code> live as numbered procedure steps inside <code>pre-groomer.md</code>, not separate SKILL.md files. Promote to skills when a second agent needs them.</li>
+        <li><strong>State derived from filesystem.</strong> No <code>state.json</code>; presence of <code>brief.md</code> / <code>reviews/review-NN.md</code> says everything.</li>
+        <li><strong>No calibration set at start.</strong> Calibration is born from observed operator overrides, not invented upfront.</li>
+        <li><strong>Reproduction outcome is a brief field.</strong> A bug that cannot be reproduced is a <code>brief.md</code> with <code>reproduction-status: cannot-reproduce</code>; reviewer's groundedness check flags it. No separate <code>needs-info.md</code> artifact.</li>
+        <li><strong>Non-functional deferred.</strong> Only Bug, Feature, and Refactor are designed for 0.1; Non-functional grooming gets designed when probe-0.2+ has real data.</li>
+      </ul>
+
+      <h3>Current Runtime And Next Candidates</h3>
+      <p>Current implemented runtime reaches draft PR:</p>
+      <ul>
+        <li>claim → pre-groom → review → <code>Ready | needs-human-input</code></li>
+        <li>after human promotion to <code>Building</code>: worktree → Stage 1 → Stage 2 → validation → draft PR → <code>In Review</code></li>
+      </ul>
+
+      <p>Explicitly not yet implemented:</p>
+      <ul>
+        <li>merge orchestration</li>
+        <li>deploy orchestration</li>
+        <li>post-deploy monitoring</li>
+        <li>outcome verification against business/product success criteria</li>
+        <li>parallel builds</li>
+        <li>auto-promotion past <code>Ready</code></li>
+      </ul>
+
+      <p>Next placeholders:</p>
+      <ul>
+        <li><strong>Next:</strong> review + merge lane</li>
+        <li><strong>Later:</strong> deploy + monitor, outcome verification, and parallelism once the serial path is boring.</li>
+      </ul>
+    </section>
+
+    <section id="extensions">
+      <h2>Post-0.1 extensions</h2>
+      <p class="lede">Deferred until observed need justifies the complexity.</p>
+
+      <p>
+        Strong architectural choices that don't yet earn their place in probe-0.1. Each waits for a real failure that makes it load-bearing.
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">1. Branch or worktree isolation</h3>
+          <p style="font-size: 13px; margin: 0;">Autonomous work is safer when isolated from the main tree. Becomes load-bearing once deliver <em>builds</em> rather than just grooms.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">2. Crash recovery &amp; stuck detection</h3>
+          <p style="font-size: 13px; margin: 0;">Detect failed retries, missing artifacts, blocked verification loops. Required before long-running unattended build mode.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">3. Stronger verification artifacts</h3>
+          <p style="font-size: 13px; margin: 0;">Verification JSON, walker results, reviewer decision records. Supports recovery and learning capture once build lands.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">4. Persistent learnings</h3>
+          <p style="font-size: 13px; margin: 0;">Closed issues feed back into durable project memory — decisions, learnings, eventually calibration.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">5. Tracker adapters</h3>
+          <p style="font-size: 13px; margin: 0;">GitHub / Linear integration for coarse issue state sync, review-outcome mirroring, PR opening. Adapters don't define the architecture.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">6. Model &amp; complexity routing</h3>
+          <p style="font-size: 13px; margin: 0;">Heavy for planning, standard for execution, light for triage. Matters once deliver runs continuously.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">7. Multi-reviewer council</h3>
+          <p style="font-size: 13px; margin: 0;">At post-build validation: parallel fresh-context reviewers with distinct rubrics (Requirements Coverage, Integration, Acceptance). Any FAIL → remediation.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 6px; font-size: 14.5px;">8. Controller agent for orchestration</h3>
+          <p style="font-size: 13px; margin: 0;">At ~10+ issues, the top-level <code>controller</code> running in <code>deliver</code> mode iterates through <code>.autoship/issues/</code>, dispatches sub-agents, and maintains single-writer invariants.</p>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <h3>What the architecture delivers</h3>
+
+      <p>
+        When all foundations are in place and all the deferred extensions have earned their keep, deliver becomes what it was designed to be: <strong>a bounded-change delivery engine where evidence anchors every transition, generator and judge are never the same agent, and state lives on disk</strong>. Operators move from manually steering individual issues to overseeing a pipeline that handles the unglamorous work at a scale a team of humans alone cannot match — while still refusing to ship a change it cannot defend with evidence.
+      </p>
+
+      <p>
+        That is the thesis. Probe-0.1 is the first empirical test of it.
+      </p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Mermaid initialization — theme matching the article's palette
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+      fontSize: '13px',
+      primaryColor: '#fdfcf9',
+      primaryTextColor: '#1e1d1a',
+      primaryBorderColor: '#d6d3c9',
+      lineColor: '#575652',
+      secondaryColor: '#f2f0e9',
+      tertiaryColor: '#eef5f1',
+      mainBkg: '#fdfcf9',
+      nodeBorder: '#d6d3c9',
+      clusterBkg: '#f8f7f3',
+      clusterBorder: '#e7e4dc',
+      edgeLabelBackground: '#fdfcf9'
+    },
+    flowchart: {
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 12
+    }
+  });
+
+  // Dark mode palette
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+        fontSize: '13px',
+        primaryColor: '#242321',
+        primaryTextColor: '#e6e4dd',
+        primaryBorderColor: '#4a4640',
+        lineColor: '#b0aea5',
+        secondaryColor: '#1e1d1b',
+        tertiaryColor: '#1a2b27',
+        mainBkg: '#242321',
+        nodeBorder: '#4a4640',
+        clusterBkg: '#1a1917',
+        clusterBorder: '#36332d',
+        edgeLabelBackground: '#242321'
+      }
+    });
+  }
+
+  // Simple active-section tracking in sidebar
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('.sidebar a');
+
+  function setActiveLink() {
+    const scrollY = window.scrollY + 60;
+    let current = '';
+    sections.forEach(s => {
+      if (s.offsetTop <= scrollY) current = s.id;
+    });
+    links.forEach(l => {
+      l.classList.toggle('active', l.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', setActiveLink, { passive: true });
+  setActiveLink();
+</script>
+
+</body>
+</html>

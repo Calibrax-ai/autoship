@@ -112,7 +112,7 @@ The split matters because it makes test mutation itself a signal:
 
 - if Stage 2 needs to change Stage 1's tests, something upstream is wrong
 
-**Implication:** if `deliver` grows a controller, the controller must enforce this split mechanically.
+**Implication:** the `deliver` controller enforces this split mechanically. Stage 1 records sha256 hashes of oracle files in `stage1.md`; the controller verifies those hashes before committing or opening a PR and parks the issue at `needs-human-input` on any mismatch.
 
 ## Early calibration candidates are already visible
 
@@ -212,7 +212,7 @@ Probe-0.5 closed the UI-build type-shape question. FRD-162 (materialized from 0.
 3. ~~Does build validation generalize from a Bug to a Feature, especially FRD-122?~~ **Answered by 0.2.** FRD-122 → 20/20 tests green, 66 assertions, single-pass Stage 2, zero brief ambiguities.
 4. ~~Does build validation generalize to a Refactor shape?~~ **Answered by 0.3.** REF-001 → 12/12 tests green, 55 assertions, zero test mutations, zero diffs outside the 3 expected files.
 5. ~~Does UI-functional testing fit the current deliver pattern, or does it require a different oracle shape?~~ **Answered by 0.5.** Playwright E2E works as oracle for UI; 12/12 green on first Stage 2 run. Mechanical `impeccable detect` as Stage 2 verification gate suffices for well-scoped UI additions. Harness stability (Playwright version semver drift) is a real operator-side concern but not a pattern concern.
-6. When `deliver` expands beyond manual dispatch, which stage should gain a controller first: grooming only, or grooming plus build validation?
+6. ~~When `deliver` expands beyond manual dispatch, which stage should gain a controller first: grooming only, or grooming plus build validation?~~ **Implementation decision, 2026-04-23:** controller handles both grooming AND build (through draft PR) in one mode. First real-world validation pending.
 7. *From 0.3 D05 finding.* Does the brief-reviewer's Groundedness check need to verify that cited coverage tests actually pass at baseline, not just that they exist? *Single data point from REF-001; needs second confirmation before spec revision.*
 8. *From 0.3 companion.* Should `design-status: need-info` + `verdict: APPROVED` be explicitly codified as a terminal state in the brief-reviewer spec, with a named next-action for the operator? *Two data points now — FRD-143 (0.3) + FRD-161 (0.4). Pattern stable; worth codifying.*
 9. *Cross-repo.* All five probes ran against finance_backend_agent. Does the pattern generalize to a different codebase with different stack and conventions?
