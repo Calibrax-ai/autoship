@@ -1,0 +1,65 @@
+---
+import '../styles/global.css';
+import TopBar from '../components/TopBar.astro';
+import ArticleHero from '../components/ArticleHero.astro';
+
+interface Props {
+	title: string;
+	dek?: string;
+	date: Date;
+	tags?: string[];
+}
+
+const { title, dek, date, tags = [] } = Astro.props;
+const formattedDate = new Intl.DateTimeFormat('en-US', {
+	year: 'numeric',
+	month: 'long',
+	day: 'numeric',
+}).format(date);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<title>{title} — autoship</title>
+		{dek && <meta name="description" content={dek} />}
+	</head>
+	<body class="bg-[color:var(--color-essay-bg)] text-[color:var(--color-essay-ink)] font-sans antialiased">
+		<TopBar />
+
+		<main>
+			<ArticleHero title={title} dek={dek} date={formattedDate} tags={tags} />
+
+			<article
+				class="essay-prose prose prose-lg max-w-[42rem] mx-auto px-6 py-12
+					prose-headings:text-[color:var(--color-essay-ink)]
+					prose-p:text-[color:var(--color-essay-ink)]
+					prose-p:leading-[1.75]
+					prose-a:text-[color:var(--color-essay-accent)]
+					prose-a:no-underline hover:prose-a:underline
+					prose-strong:text-[color:var(--color-essay-ink)]
+					prose-code:text-[color:var(--color-essay-ink)]
+					prose-code:bg-[color:var(--color-essay-rule)]
+					prose-code:px-1.5 prose-code:py-0.5
+					prose-code:rounded prose-code:before:content-none prose-code:after:content-none
+					prose-pre:bg-[#0f0e13] prose-pre:text-zinc-100
+					prose-blockquote:border-l-[color:var(--color-essay-accent)]
+					prose-blockquote:text-[color:var(--color-essay-muted)]
+					prose-blockquote:font-normal prose-blockquote:not-italic
+					prose-hr:border-[color:var(--color-essay-rule)]"
+			>
+				<slot />
+			</article>
+
+			<footer class="max-w-[42rem] mx-auto px-6 py-16 text-sm text-[color:var(--color-essay-muted)] border-t border-[color:var(--color-essay-rule)]">
+				<p>
+					More ideas at <a class="underline underline-offset-2" href="/ideas/">/ideas</a>.
+					Reference docs at <a class="underline underline-offset-2" href="/">autoship</a>.
+				</p>
+			</footer>
+		</main>
+	</body>
+</html>

@@ -1,0 +1,34 @@
+---
+interface Props {
+	title: string;
+	dek?: string;
+	date: string;
+	tags?: string[];
+}
+
+const { title, dek, date, tags = [] } = Astro.props;
+---
+
+<section class="max-w-[52rem] mx-auto px-6 pt-20 pb-12">
+	<div class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-[color:var(--color-essay-muted)] mb-6">
+		<span>Ideas</span>
+		<span class="w-1 h-1 rounded-full bg-[color:var(--color-essay-rule)]"></span>
+		<time>{date}</time>
+		{tags.length > 0 && (
+			<>
+				<span class="w-1 h-1 rounded-full bg-[color:var(--color-essay-rule)]"></span>
+				<span>{tags.join(' · ')}</span>
+			</>
+		)}
+	</div>
+
+	<h1 class="text-5xl md:text-6xl font-semibold tracking-[-0.03em] leading-[1.05] text-[color:var(--color-essay-ink)]">
+		{title}
+	</h1>
+
+	{dek && (
+		<p class="mt-6 text-xl md:text-2xl leading-[1.4] tracking-[-0.01em] text-[color:var(--color-essay-muted)] max-w-[38rem]">
+			{dek}
+		</p>
+	)}
+</section>

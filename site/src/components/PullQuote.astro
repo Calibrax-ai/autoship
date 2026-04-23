@@ -1,0 +1,18 @@
+---
+interface Props {
+	attribution?: string;
+}
+
+const { attribution } = Astro.props;
+---
+
+<aside class="my-10 md:-mx-12 md:px-12 py-8 border-y border-[color:var(--color-essay-rule)]">
+	<p class="text-2xl md:text-3xl leading-[1.35] tracking-[-0.015em] font-medium text-[color:var(--color-essay-ink)]">
+		<slot />
+	</p>
+	{attribution && (
+		<p class="mt-4 text-sm uppercase tracking-[0.15em] text-[color:var(--color-essay-muted)]">
+			— {attribution}
+		</p>
+	)}
+</aside>

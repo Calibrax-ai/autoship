@@ -1,0 +1,87 @@
+---
+import '../../styles/global.css';
+import { getCollection } from 'astro:content';
+import TopBar from '../../components/TopBar.astro';
+
+const ideas = (await getCollection('ideas', ({ data }) => !data.draft)).sort(
+	(a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<title>Ideas — autoship</title>
+		<meta
+			name="description"
+			content="Sharing thinking about agent systems, orchestration, and the patterns we're learning as we build autoship."
+		/>
+	</head>
+	<body class="bg-[color:var(--color-essay-bg)] text-[color:var(--color-essay-ink)] font-sans antialiased">
+		<TopBar />
+
+		<main class="max-w-3xl mx-auto px-6 py-20">
+			<header class="mb-16">
+				<p class="text-xs uppercase tracking-[0.15em] text-[color:var(--color-essay-muted)] mb-4">
+					Ideas
+				</p>
+				<h1 class="text-5xl md:text-6xl font-semibold tracking-[-0.03em] leading-[1.05]">
+					Sharing what we're learning.
+				</h1>
+				<p class="mt-6 text-xl leading-[1.4] tracking-[-0.01em] text-[color:var(--color-essay-muted)] max-w-[36rem]">
+					Notes on agent orchestration, harness design, and the patterns that keep appearing as we build autoship. Not a proposal. Not a pitch. Just the thinking, out loud.
+				</p>
+			</header>
+
+			<ul class="flex flex-col divide-y divide-[color:var(--color-essay-rule)]">
+				{ideas.map((idea) => (
+					<li class="py-8">
+						<a
+							href={`/ideas/${idea.id}/`}
+							class="group block"
+						>
+							<div class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-[color:var(--color-essay-muted)] mb-3">
+								<time>
+									{new Intl.DateTimeFormat('en-US', {
+										year: 'numeric',
+										month: 'short',
+										day: 'numeric',
+									}).format(idea.data.date)}
+								</time>
+								{idea.data.tags.length > 0 && (
+									<>
+										<span class="w-1 h-1 rounded-full bg-[color:var(--color-essay-rule)]"></span>
+										<span>{idea.data.tags.join(' · ')}</span>
+									</>
+								)}
+							</div>
+							<h2 class="text-2xl md:text-3xl font-semibold tracking-[-0.02em] leading-[1.15] group-hover:text-[color:var(--color-essay-accent)] transition-colors">
+								{idea.data.title}
+							</h2>
+							{idea.data.dek && (
+								<p class="mt-3 text-lg leading-[1.5] text-[color:var(--color-essay-muted)] max-w-[34rem]">
+									{idea.data.dek}
+								</p>
+							)}
+						</a>
+					</li>
+				))}
+			</ul>
+
+			{ideas.length === 0 && (
+				<p class="text-[color:var(--color-essay-muted)] italic">
+					Nothing published yet.
+				</p>
+			)}
+		</main>
+
+		<footer class="max-w-3xl mx-auto px-6 py-16 text-sm text-[color:var(--color-essay-muted)] border-t border-[color:var(--color-essay-rule)]">
+			<p>
+				Reference docs at <a class="underline underline-offset-2" href="/">autoship</a>.
+			</p>
+		</footer>
+	</body>
+</html>

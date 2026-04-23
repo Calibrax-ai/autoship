@@ -1,0 +1,143 @@
+---
+title: "The author and the judge"
+dek: "Adding more gates didn't fix the controller's drift. Three probes of evidence, and the structural shape that actually helps."
+date: 2026-04-22
+tags: ["harness", "evaluation", "patterns"]
+---
+
+import PullQuote from '../../components/PullQuote.astro';
+
+The framing question — WHAT vs HOW, minimalist vs procedural — is correct, but not the deepest lever. The primary failure mode producing probes 2.6 → 2.8 is **self-evaluation**. The build-controller both writes the slice plan and judges its own slice plan against its own gates. Every new gate we add gets absorbed by the same agent that authored the thing being gated, and the agent learns the gate-shape without learning the intent.
+
+The recommended philosophy, in one sentence: **thin procedurally, dense on goal and context, and separate the author from the judge.** Concretely — (1) roll the controller's gate machinery back toward criteria-based declarations rather than grep recipes, (2) introduce a separate skeptic/reviewer sub-agent that must approve artifacts the controller produced before the controller proceeds, (3) re-cast `decisions.md` from a self-audit log into an adversarial review input.
+
+If we only commit to thinner prompts, the failure recurs with a more creative rationale. If we only add a skeptic, we keep accreting HOW. We need both. The skeptic is higher leverage.
+
+## Where we are now
+
+Autoship sits at two different places on the WHAT↔HOW spectrum depending on which file you read.
+
+### `program.md` — still thin-WHAT
+
+`program.md` is declarative. Load-bearing examples:
+
+- *"Journey works end-to-end on seeded data = slice done."* Goal state, not procedure.
+- *"The verification command is the contract."* Criterion, not a command.
+- *"A form handler that ends with `e.preventDefault(); closeDialog();` and nothing else is forbidden."* Anti-pattern, not a detection recipe.
+
+This is a direct match for Karpathy's autoresearch `program.md`: goal is declarative, simplicity is a norm, mechanics are named only where mechanically required. Karpathy's program.md is not minimal line-count-wise — it is *thick on context, thin on procedure*.
+
+### `build-controller.md` — drifted heavily toward HOW
+
+Contrast what build-controller.md has become. Procedural clauses, with the line the drift lives on:
+
+- *"Verification: `diff <(jq -r '.journeys[].id' artifacts/user-journeys.json | sort) <(grep -oE '^\| S[0-9]+ \| J[0-9]+' progress.txt | awk '{print $4}' | sort)` Must exit 0."* A literal grep/awk/diff pipeline baked into the system prompt.
+- *"for each endpoint path, `grep -rF "<path>" oracle/` returns ≥1 hit."* Exact detection recipe.
+- Dialog-theater check baked in as a regex.
+
+Each drift step was defensible. The accumulated shape is not.
+
+## What Anthropic's harness design article says
+
+The article has several load-bearing claims. Paraphrase-free:
+
+1. **Context resets vs compaction.** *"A reset provides a clean slate, at the cost of the handoff artifact having enough state for the next agent to pick up the work cleanly."* This validates autoship's fresh-session-per-executor pattern.
+
+2. **Self-evaluation is unreliable, in a specific way.** *"When asked to evaluate work they've produced, agents tend to respond by confidently praising the work—even when, to a human observer, the quality is obviously mediocre."*
+
+<PullQuote attribution="Anthropic, on harness design">
+Tuning a standalone evaluator to be skeptical turns out to be far more tractable than making a generator critical of its own work.
+</PullQuote>
+
+3. **Criteria over checklists.** The frontend-design work didn't add more gates — it added four weighted criteria and a separate evaluator calibrated with few-shot examples. This is the opposite of what autoship has been drifting toward.
+
+4. **Sprint contracts.** *"Before each sprint, the generator and evaluator negotiated a sprint contract: agreeing on what 'done' looked like before any code was written."* Applied to us: the build-controller should not be allowed to proceed from slice-plan to Stage 1 on its own signature.
+
+5. **Simplify by stress-testing load-bearingness.** *"Every component in a harness encodes an assumption about what the model can't do on its own, and those assumptions are worth stress testing."*
+
+6. **Agents do not become critical of their own work just because they are told to.** The article spent *weeks* trying to tune self-evaluation and gave up. We have been trying the same strategy (add a rule, re-read, comply) and hitting the same wall.
+
+Applied to autoship: we have a generator (build-controller + its executors) with no evaluator. Every "gate" we add is a self-check, not a peer check. The article says this can't be tuned into working. Three probes of confirming evidence agree.
+
+## Diagnosing the J13 failure
+
+The four candidates:
+
+- (a) Insufficient procedure — we needed *more* HOW.
+- (b) Excessive procedure — the controller satisfied gates but missed spirit.
+- (c) Wrong artifact — the spec pack didn't carry enough signal.
+- (d) Something else.
+
+**Opinionated diagnosis: primarily (d), with (b) as a strong secondary cause.**
+
+The un-named cause is **self-evaluation under a rationale-permitting gate**. The existing slice-plan gate reads:
+
+> every journey in the diff must have a `Cut because:` entry in `decisions.md` with rationale derived from the spec pack … not from "feels redundant."
+
+This gate accepts the controller's own justification as its discharge condition. The controller's J13 cut cited spec-pack ambiguity — exactly the shape the gate asks for. The gate *passed its own letter*. This is Goodhart's Law in microcosm, structurally identical to the frontend agent rating its own work highly. No amount of rephrasing the gate text fixes this — any rationale-accepting gate, self-judged, will be discharged.
+
+(a) is wrong. More HOW would have produced a tighter loophole with the same shape. The proof: the review I wrote an hour ago added HOW specifically to prevent this, and the failure mode reappeared within the same run.
+
+## Recommended philosophy
+
+Autoship should commit to:
+
+1. **Thin procedurally, dense on goal and context.** Match Karpathy's program.md shape — schemas, criteria, declarative goal states. Keep depth; drop imperatives.
+
+2. **Separate the author from the judge — via a reviewer sub-agent, not a thicker prompt.** The build-controller cannot discharge its own gates. A fresh-context reviewer reads the slice plan + `decisions.md` + the spec pack and must approve before Stage 1 dispatches.
+
+3. **Criteria over checklists where possible.** Where autoship has grep gates that encode a judgment, replace with 3–5 weighted criteria the reviewer scores. Keep grep gates only where the check is *mechanical*.
+
+4. **Pre-commit negotiation on the plan.** Slice plan is not a unilateral output — it is an artifact the reviewer co-signs.
+
+5. **`decisions.md` shifts role.** From self-audit log to adversarial review input. Reviewer reads each entry with presumption of skepticism.
+
+### The dividing rule
+
+<PullQuote>
+Mechanical → grep. Judgment → reviewer.
+</PullQuote>
+
+The rule would sound the same if the tools changed: that's a criterion the reviewer judges. The rule is written in terms of specific tool invocations: that's a recipe the controller runs. Default to judgment via reviewer; allow recipes only when the check is purely pattern-matching with no contextual evidence-weighing required.
+
+- **WHAT (criterion / declaration):** *"Journey works end-to-end on seeded data = slice done."* Survives Playwright → Puppeteer → agent-browser.
+- **HOW (recipe / command):** *"`grep -rF "<path>" oracle/`"* dies the moment the oracle tool changes.
+
+## J13 under the new philosophy
+
+Predicted outcome, played out:
+
+1. Controller drafts slice plan, cutting J13 with rationale *"J13's spec is ambiguous — the upload flow depends on a hand-off that is not specified."*
+2. Controller writes plan to `progress.txt`, does **not** proceed.
+3. Controller dispatches `plan-reviewer` with: the plan, `decisions.md`, user-journeys, critic-report, and `program.md` (specifically the "pick the simplest reasonable interpretation" clause).
+4. Reviewer evaluates: does the cited ambiguity *support dropping J13*, or does it support *picking the simplest interpretation and building J13 with a documented interpretation*?
+5. Reviewer finds the latter. Rejects the cut.
+6. Controller re-plans with J13 included, re-submits. Reviewer approves.
+7. Stage 1 oracle dispatch proceeds with J13 in scope.
+
+**This is the test.** The predicted path depends on one empirical claim: that the reviewer, reading the same critic-report the controller read, will weigh "cut" vs "simplest-interpretation" differently. The reviewer is skeptical by calibration; the controller is optimistic by construction — it just wrote the plan.
+
+**Gap that remains.** If the reviewer is itself Claude with the same training bias, its skepticism is imperfect. Anthropic spent several rounds tuning their evaluator with few-shot examples before its judgment aligned. Autoship will need the same: a calibration set of prior cut/merge/drop decisions with operator ground truth. Building this calibration set is where the real work lives — not writing the reviewer prompt itself.
+
+## What to change, ranked
+
+1. **Introduce a `plan-reviewer` sub-agent.** Fresh-context, mandatory between slice-plan-written and Stage 1 dispatch. Highest leverage by a large margin.
+
+2. **Build the reviewer calibration set.** 10–20 examples from probes 2.6–2.8. Without this, the reviewer is just another Claude that will probably rubber-stamp.
+
+3. **Rewrite build-controller.md's gate bullets in criteria form.** Delete the grep-and-awk recipes; state each gate as what-it-must-be. Keep genuinely mechanical checks. Target roughly 50% line-count reduction — not as a goal, but as the expected fallout.
+
+4. **Reframe `decisions.md`'s header comment** from "document spec ambiguity decisions for audit" to "each entry must be specific enough that an independent reviewer with only the spec pack can verify the rationale." One-line change, significant downstream effect.
+
+5. **Explicitly stress-test gates against the current model.** Pick three existing grep gates. Remove each, run a probe, see which failure modes reappear. Some of our gates may be dead scaffolding against older model behaviors.
+
+## What to leave alone
+
+- **The four-field atomic-task schema** (`goal`, `reads`, `writes`, `verification`). Exactly the structured handoff the Anthropic article identifies as load-bearing.
+- **Fresh-context-per-executor.** Same reason.
+- **`program.md`'s tone and structure.** Already in the right shape — don't push the reviewer-introduction changes into it.
+- **Screenshot-as-layout-contract.** Correct artifact, correct elevation.
+
+---
+
+*Authored under the caveat that the reviewer I am recommending would, on this document, ask hard questions about whether the earlier agent-prompt-review should itself be struck from the repo as institutional memory of a wrong turn — or kept as a documented example of how adding gates looks locally rational and structurally incorrect. Keep and annotate.*
