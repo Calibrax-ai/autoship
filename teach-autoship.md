@@ -6,6 +6,8 @@ This file is **what autoship is** — philosophy, roles, and non-negotiable disc
 
 This file is **controller-only**. Manual worker dispatch (`pre-groomer`, `brief-reviewer`) does not require it.
 
+This file is the *durable* layer. Worker contracts, per-track phase machines, and deliver-specific comment/state policy live in their authoritative files and are referenced from here — never restated. Restating them would guarantee drift.
+
 ---
 
 ## Autoship in one paragraph
@@ -79,7 +81,7 @@ The controller is the single writer to external systems (Linear state, comments,
 - `verdict: APPROVED | REJECTED` (from brief-reviewer)
 - `stage1-green` / `stage1-red-expected` / `stage1-failed` (from Stage 1 executor)
 - `stage2-passed` / `stage2-failed` / `test-mutation-detected` (from Stage 2 executor)
-- `needs-human-input` + reason (from any worker that hits a blocking ambiguity)
+- `needs-human-input` + reason (from any worker that hits a blocking ambiguity; the reason is a filled blocker report per the `blocker-escalation` skill — `skills/blocker-escalation/assets/blocker-report-template.md`, lint-checked by `skills/blocker-escalation/scripts/validate-blocker.py`)
 
 The controller parses these, transitions Linear state per policy, posts comments per policy, and dispatches the next worker.
 
@@ -116,89 +118,29 @@ Never promote work silently past a boundary. Every promotion is either an operat
 
 **Hard rule:** workers never write to Linear. If a worker emits a `needs-human-input` signal, the controller is responsible for posting the Linear comment and transitioning state.
 
-### Comment and state policy (defaults for deliver)
+For future `audit` mode, the same ownership rule applies:
+- `auditor` may propose issue candidates inside the audit artifact
+- `audit-reviewer` may approve or reject that artifact
+- only the controller may create the approved issues in Linear / GitHub
+- default creation state is `Backlog`, not `Grooming`
 
-Default state transitions per issue:
-- `Backlog | Todo` → `Grooming` when pre-groom dispatches
-- `Grooming` → `Ready` when brief-reviewer APPROVES and the brief is build-worthy
-- `Ready` → `Building` when a human promotes the issue for execution
-- `Building` → `In Review` when draft PR is opened
-- any active state → `needs-human-input` on a typed blocker
-
-`Ready` remains the explicit outer approval boundary. A ticket in `Ready` is waiting for human promotion; it is not actively executing. The controller honors that boundary rather than auto-advancing through it.
-
-Default comment posts (free-form text, no templates required):
-- Claim / grooming started
-- Final `Ready`
-- Build started
-- Draft PR opened
-- Final `needs-human-input`
-
-Do not post comments for every intermediate regroom pass. Comments are ad-hoc prose today. Templates earn their place if operator reports noise or missing information after real-world use.
+Per-track comment, label, and state-transition policy (deliver defaults, extract-ingest thresholds, audit approval flow, etc.) is tuned per run in the testbed's `.autoship/program.md`, not here. If you find yourself wanting to put a specific transition rule in this file, it probably belongs in the program instead.
 
 ---
 
-## Worker roles
+## Worker contracts
 
-### pre-groomer
+Leaf worker roles, the artifacts each one writes, and the structured results each one returns are defined in `.claude/agents/*.md` — one file per role (`pre-groomer.md`, `brief-reviewer.md`, `stage1-executor.md`, `stage2-executor.md`, plus the ingest probes under extract). Those files are the source of truth; do not restate their contracts here.
 
-Reads: issue.md, testbed source, parent brief if sub-issue.
-Writes: `.autoship/issues/<id>/brief.md`.
-Returns to controller: `brief-written` + `design-status | reproduction-status | preservation-status` value.
-Never calls Linear.
-
-### brief-reviewer
-
-Reads: brief.md, issue.md, testbed source (for grounding spot-checks).
-Writes: `.autoship/issues/<id>/reviews/review-NN.md` (appends; never modifies prior).
-Returns to controller: `verdict: APPROVED | REJECTED`.
-Never calls Linear.
-
-### Stage 1 executor
-
-Reads: brief.md, review.
-Writes: oracle artifacts (test files, harness/config fixes if needed) plus `stage1.md`.
-Returns to controller: `stage1-outcome`, test counts, files created/modified, any blockers.
-Never calls Linear. Never modifies production source (Refactor type: tests may go all-green against unmodified source; other types: tests go red to signal implementation gap).
-
-### Stage 2 executor
-
-Reads: brief.md, Stage 1 artifacts (frozen), testbed source.
-Writes: production source changes plus `stage2.md`.
-Returns to controller: `stage2-outcome`, test pass/fail counts, diff stat, any test mutations detected.
-Never calls Linear. Never modifies test files written by Stage 1.
+The invariants that apply uniformly across all workers are stated above: workers own their artifacts, return structured results to the controller, and never mutate Linear or other external systems directly (§7).
 
 ---
 
-## Issue lifecycle (controller view, current deliver runtime)
+## Issue lifecycle
 
-In deliver mode, every issue progresses through this machine. The controller reads runtime artifacts, consults `program.md` for policy, dispatches the next worker, then parks the issue at the next explicit boundary.
+The deliver-mode state machine (derivable local runtime states, Linear transitions, stage transitions, the `Ready → Building` human-promotion boundary) is defined in `docs/architecture/deliver-architecture.md`. The extract track's phase machine is defined in `docs/architecture/extract-architecture.md`.
 
-```
-new ──groom──▶ proposed ──review──▶ changes-requested ──regroom──▶ proposed
-                                 └──approved──▶ ready-for-oracle
-                                                        │
-                                                        ▼
-                                                      Ready
-                                                        │
-                                     (human promotion to outer Building state)
-                                                        │
-                                                        ▼
-                                                   stage1-writing
-                                                        │
-                                                        ▼
-                                                   oracle-written
-                                                        │
-                                                        ▼
-                                                   stage2-building
-                                                        │
-                                     ┌──────────────────┴──────────────────┐
-                                     ▼                                     ▼
-                               needs-human-input                        built
-                                                                            │
-                                                                            ▼
-                                                                        draft-pr
-```
+The invariant that matters at *this* layer is §4: state is derived from runtime artifacts; there is no parallel state file. If you find yourself reaching for a state variable that isn't a file on disk, stop.
 
 ---
 
@@ -233,31 +175,9 @@ Resumption: on restart, the controller reads filesystem state of each eligible i
 
 ## Cross-track notes
 
-Autoship uses **one top-level controller** role. Track (extract vs deliver) is a mode — selected by the per-run `program.md` or invocation argument — not a separate agent.
+Autoship uses **one top-level controller** role. Track (extract vs deliver vs future audit) is a mode — selected by the per-run `program.md` or invocation argument — not a separate agent. The controller's responsibilities are identical across tracks: read run contract, pick eligible work, dispatch workers, collect structured results, update outer workflow, stop on typed conditions. Only the phase-machine shape differs per track, and those shapes are defined in `docs/architecture/extract-architecture.md`, `docs/architecture/deliver-architecture.md`, and (planned) `docs/architecture/audit-architecture.md`.
 
-The controller's role is identical across tracks:
-- read run contract (program.md)
-- pick eligible work
-- dispatch workers via subprocess (with caffeinate)
-- collect structured results
-- update outer workflow (Linear state + comments)
-- stop on `needs-human-input` or other typed conditions
-
-Per-track differences are phase-machine shapes:
-
-### Extract-ingest mode
-
-Linear pipeline: boot → fanout → reconcile → critic. Artifact-gated phases. Single target per run (the whole prototype). Workers: ui-walker, static, data, external, reconciler, critic.
-
-### Extract-build mode
-
-Slice-based: plan → oracle → build → review per slice. Workers: oracle-planner, plan-reviewer, builder, post-build reviewer.
-
-### Deliver mode
-
-Current runtime: groom → review → `Ready` → human promotion to `Building` → Stage 1 → Stage 2 → validation → draft PR. Workers today: pre-groomer, brief-reviewer, stage1-executor, stage2-executor.
-
-**Current state:** `.claude/agents/controller.md` now supports extract-ingest and deliver-through-draft-PR. Merge, deploy, and outcome verification remain future work. Manual dispatch of `pre-groomer` + `brief-reviewer` remains the fallback path for grooming-only use.
+Audit mode specifically does *not* continue directly into implementation. Its job is to decide what work should exist, not to spend build compute on it in the same run. Once issues exist in `Backlog`, normal `deliver` policy applies.
 
 ---
 
@@ -268,15 +188,18 @@ Current runtime: groom → review → `Ready` → human promotion to `Building` 
 - **Controller judging artifacts** — controller is mechanical; if the check requires judgment, dispatch a reviewer.
 - **Silent state transitions** — every transition leaves an artifact (brief, review, comment, state change). Never advance state without visible evidence.
 - **Wide context windows** — fresh context per unit; do not let sessions accumulate 100+ tool calls before completing a single decision.
+- **Restating worker contracts or phase machines here** — this file drifts the moment another file is updated and this one isn't. Point, don't duplicate.
 
 ---
 
 ## References
 
 - `docs/architecture/system-overview.md` — top-level concern map
-- `docs/architecture/deliver-architecture.md` — deliver track in detail
-- `docs/architecture/extract-architecture.md` — extract track in detail
+- `docs/architecture/extract-architecture.md` — extract track phase machines in detail
+- `docs/architecture/deliver-architecture.md` — deliver track phase machine, state transitions, approval boundaries
+- `docs/architecture/deliver-program-template.md` — shape of the per-repo `program.md` (comment/state policy lives here, per run)
 - `docs/harness-philosophy.md` — generator-evaluator pattern + mechanical-vs-judgment dividing rule
 - `docs/learnings.md` — cross-track empirical findings
-- `.claude/agents/controller.md` — extract track controller (reference implementation)
-- `.claude/agents/build-controller.md` — extract track build-stage controller
+- `.claude/agents/*.md` — authoritative worker contracts (inputs, outputs, structured results, forbidden actions)
+- `.claude/agents/controller.md` — controller agent definition (mode-aware; extract-ingest + deliver today)
+- `skills/blocker-escalation/` — blocker report template, category enum, lint script

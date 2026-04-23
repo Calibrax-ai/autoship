@@ -287,7 +287,7 @@ The controller is an **Agent SDK application** — a program that uses LLM calls
 
 **Artifact guardrail:** Claude Code sessions should not edit artifacts or tests unless the controller explicitly opens a revision step. The session writes application code and updates `progress.txt`. If the session encounters a problem that requires changing the spec or tests, it escalates — it does not silently revise the contract it's building against.
 
-**Skill assignment:** The controller assigns skills to each session based on the task. A backend implementation session gets the `backend-rewrite-loop` skill. A frontend session gets the `frontend-regeneration` skill. Skills are reusable execution playbooks — they carry workflow logic, quality gates, and task-specific guidance that improves how the session performs.
+**Skill assignment:** The controller assigns skills to each session based on the task. A build session gets the `autoship-build` skill plus an explicit active surface (`oracle`, `backend`, or `frontend`) so the session reads the right per-surface reference. Skills are reusable execution playbooks — they carry workflow logic, quality gates, and task-specific guidance that improves how the session performs.
 
 ## Agents in this module
 

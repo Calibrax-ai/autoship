@@ -15,6 +15,10 @@ Use autoship in one of two modes:
   - **controller-backed runtime** through draft PR: `claude --agent controller -p "deliver"` from the testbed root (reads `.autoship/program.md`)
   - **manual fallback** via `pre-groomer` + `brief-reviewer` dispatched directly
 
+Planned next mode:
+
+- **`audit` next** — controller-backed readiness audit that stops at reviewed findings plus approved issue creation in `Backlog`. It does not fix code in the same run.
+
 Important boundary:
 
 - **`teach-autoship.md`** and **`program.md`** are **controller-only** artifacts.
@@ -27,7 +31,7 @@ Important boundary:
 - `.claude/agents/` — agent definitions:
   - **Ingest probes** (Phase 1): ui-walker, static, data, external
   - **Ingest synthesis**: reconciler, critic
-  - **Orchestration**: controller — one top-level controller role. Supports extract-ingest and deliver-through-draft-PR today. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
+  - **Orchestration**: controller — one top-level controller role. Supports extract-ingest and deliver-through-draft-PR today; `audit` is the next planned mode. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
   - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.5 onward)
   - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `controller` in deliver mode.
   - **Deliver build**: stage1-executor, stage2-executor — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
@@ -43,7 +47,7 @@ Important boundary:
 - `docs/harness-philosophy.md` — synthesis on prompt + tools + artifacts design. Reads Anthropic's harness-design article and applies to autoship. Source of the generator-evaluator pattern + mechanical-vs-judgment dividing rule.
 - `docs/plan-reviewer-calibration.md` — labeled few-shot cases the plan-reviewer scores against. Operator overrides become new cases; calibration grows over time.
 - `docs/archive/agent-prompt-review.md` — superseded review (kept as institutional memory of the "add more grep gates" wrong turn). The supersede note at the top explains why; the body explains what.
-- `skills/` — five autoship-specific skill packs that the product will ship. They are deliverables, not skills for operating on this repo.
+- `skills/` — autoship-specific skill packs that the product will ship. They are deliverables, not skills for operating on this repo. Current set: `reverse-spec-extraction` (extract track), `autoship-build` (build track, covers the oracle/backend/frontend surfaces via per-surface `references/`), `blocker-escalation` (shared). The three former build-track skills (`backend-rewrite-loop`, `frontend-regeneration`, `oracle-assembly`) were consolidated into `autoship-build` on 2026-04-24 because their shared discipline was ~80% overlapping and the boundaries were surface-of-output, not workflow.
 - `site/` — Starlight (Astro) documentation site. Content is sourced from `docs/` via symlink `site/src/content/docs -> ../../../docs`. Canonical MDs stay at `docs/…`. Build: `cd site && bun install && bun run build`. No hand-crafted HTML — everything renders from MD.
 - `probe-artifacts/deliver-probes/` — historical probe artifacts (briefs, reviews, issues from probes 0.1–0.5). Institutional memory; not part of the published docs site.
 

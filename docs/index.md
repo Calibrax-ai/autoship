@@ -20,7 +20,7 @@ Autoship does the grinding. Humans approve at the moments that matter: *is this 
 
 **Coming soon**
 
-- **Discover** — take messy signals (tickets, threads, usage, incidents) and produce a grounded, evidence-cited statement of intent.
+- **Audit** — inspect a real repo against a fixed readiness lens, produce evidence-backed findings, and create bounded issue candidates for downstream delivery.
 - **Validate** — take a shipped change and produce outcome truth: did this actually move the thing it claimed to?
 
 One runtime drives all four. Different internal shapes, the same discipline — described below.

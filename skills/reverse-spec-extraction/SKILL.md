@@ -80,7 +80,7 @@ Never run on the bare host with no isolation. That is the only hard rule.
 
 **Step 0.6 — Verify responsiveness.** For HTTP prototypes: `GET /` returns any 2xx/3xx/404 (anything that isn't connection-refused means the server is up). For non-HTTP: process stays healthy >5s, produces no fatal stderr. For CLI-only prototypes: a sample invocation returns exit 0.
 
-**Step 0.7 — On failure, emit `boot-failed` blocker.** Include: detected runtime, exact commands attempted, full stderr of the last failing command, inferred missing dependency (env var name, missing binary, port conflict, absent service). Do not fall back to static-only extraction silently. The controller decides whether to request human input, try a fallback runtime, or abort.
+**Step 0.7 — On failure, emit `boot-failed` blocker** using the `blocker-escalation` skill. Category is `implementation-failure`; the failing surface is the boot step; observed behavior must include the detected runtime, exact commands attempted, and the full stderr of the last failing command; the smallest decision required names the specific missing dependency (env var name, missing binary, port conflict, absent service) or asks the controller to authorize a fallback. Fill in `blocker-escalation/assets/blocker-report-template.md` and validate with `blocker-escalation/scripts/validate-blocker.py` before filing. Do not fall back to static-only extraction silently — the controller decides whether to request human input, try a fallback runtime, or abort.
 
 ### Phase 1 — Parallel Fan-Out by Artifact Type
 

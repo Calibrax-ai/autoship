@@ -2,7 +2,7 @@
 title: "System Overview"
 ---
 
-**Status:** draft · **Last updated:** 2026-04-22
+**Status:** draft · **Last updated:** 2026-04-24
 
 ## In plain English
 
@@ -23,11 +23,11 @@ Across all four, a human stays in the loop at the moments that matter — approv
 
 ```mermaid
 flowchart LR
-    I[Intent] --> E[Enrichment + Decomposition]
-    E --> X[extract]
-    E --> D[deliver]
-    D --> O[Outcome Verification]
-    X --> O
+    I[Intent] --> A[audit]
+    I --> X[extract]
+    A --> D[deliver]
+    D --> V[validate]
+    X --> V
 ```
 
 ### Extract
@@ -62,9 +62,21 @@ Handles the **known repo, bounded change** problem.
 
 Canonical doc: [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md)
 
-### Discover
+### Audit
 
-*Coming soon.*
+Handles the **known repo, unclear readiness / unclear work queue** problem.
+
+**Input:**
+- existing production candidate or near-production repo
+- launch / handoff / go-no-go context
+- current deployment, CI, env, and operational setup
+
+**Output:**
+- an evidence-backed readiness report
+- bounded issue candidates ranked `P0` / `P1` / `P2`
+- approved tracker issues created in `Backlog`, ready to enter `deliver`
+
+For `audit-0.1`, the workflow stops at approved issue creation. It does not fix code in the same run.
 
 ### Validate
 
@@ -72,22 +84,23 @@ Canonical doc: [deliver-architecture.md](/Users/shyangcalibrax/Documents/Project
 
 ## End-to-end Flow
 
-One issue, start to draft pull request. The two `coming soon` pieces (Discover, Validate) are the bookends around today's operational middle.
+One repo, from readiness audit to draft pull request. `Audit` is the upstream bookend that creates bounded work; `validate` remains the downstream bookend after shipping.
 
 ```mermaid
 flowchart LR
-    L["Issue surfaces<br/>in the tracker"]
+    R["Repo / launch target"]
 
-    subgraph FUT1 ["Discover · coming soon"]
-      D["AI researches<br/>and suggests<br/>intent"]
+    subgraph FUT1 ["Audit · coming soon"]
+      A["AI audits repo,<br/>writes findings,<br/>proposes issues"]
     end
 
     subgraph TODAY ["Operational today"]
       direction LR
+      BQ["Controller creates<br/>approved issues<br/>in Backlog"]
       G["Groom<br/>AI writes<br/>a shared plan"]
       HA["Approve<br/>Human promotes<br/>to Building"]
       B["Build<br/>AI writes and<br/>tests the code"]
-      G --> HA --> B
+      BQ --> G --> HA --> B
     end
 
     subgraph FUT2 ["Validate · coming soon"]
@@ -96,20 +109,20 @@ flowchart LR
 
     PR["Draft pull request<br/>ready for human review"]
 
-    L --> D
-    D --> G
-    B --> V
-    V --> PR
+    R --> A
+    A --> BQ
+    B --> PR
+    PR --> V
 
     classDef live fill:#eef5f1,stroke:#0d6e61,color:#0a574d
     classDef human fill:#eef2f8,stroke:#2c5488,color:#2c5488
     classDef ext fill:#f2f0e9,stroke:#8a8983,color:#575652
     classDef fut fill:#fdf8ea,stroke:#8a5510,color:#8a5510
 
-    class G,B live
+    class BQ,G,B live
     class HA human
-    class L,PR ext
-    class D,V fut
+    class R,PR ext
+    class A,V fut
 
     style FUT1 fill:#fdf8ea,stroke:#8a5510,stroke-width:1.5px,stroke-dasharray: 6 3,color:#8a5510
     style FUT2 fill:#fdf8ea,stroke:#8a5510,stroke-width:1.5px,stroke-dasharray: 6 3,color:#8a5510
@@ -123,6 +136,8 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 | Agent | Module | Role | Status |
 |---|---|---|---|
 | **Controller** | All | The conductor. Reads the run contract, dispatches each agent in order, owns all tracker mutations. | Operational |
+| **Auditor** | Audit | Inspects the repo against a fixed readiness lens and writes the audit artifact plus bounded issue candidates. | Coming soon |
+| **Audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, and issue-candidate quality before any issues are created. | Coming soon |
 | **Pre-groomer** | Deliver | Writes the *brief* (plain-English plan) from an approved issue. | Operational |
 | **Brief-reviewer** | Deliver | Judges the brief. Separate agent from the one that wrote it. | Operational |
 | **Stage 1 executor** | Deliver | Writes the *oracle* (tests) from the approved brief. | Operational |
@@ -135,7 +150,6 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 | **Critic** | Extract · ingest | Judges whether the spec is sufficient to build against. | Operational |
 | **Build-controller** | Extract · build | Dispatches per-slice build executors and runs the feedback loop. | Operational |
 | **Plan-reviewer** | Extract · build | Fresh-context skeptic between slice planning and the build. Must approve before code is written. | Operational |
-| **Discovery agents** | Discover | Research signals (tickets, threads, usage, incidents) and propose intent. | Coming soon |
 | **Validation agents** | Validate | Check security, code quality, and outcome against stated intent. | Coming soon |
 
 ### Design principles shared across all agents
@@ -160,6 +174,8 @@ That creates a deliberate split:
 
 The outer surface is for coordination.
 The inner contract is for reliable execution.
+
+For `audit`, the controller is also the only actor allowed to create tracker issues. Workers may propose issue candidates inside the audit artifact; only the controller materializes approved ones in Linear or GitHub.
 
 ### Stable knowledge vs run contract
 
@@ -205,6 +221,9 @@ When autoship integrates with an outer workflow surface such as Linear:
 - **The controller owns tracker mutations.**
   Status changes, official milestone comments, and other Linear MCP actions happen at the controller boundary.
 
+- **Audit-created issues start in `Backlog` by default.**
+  Audit does not silently throw new work straight into execution. The controller creates approved issues in `Backlog`; `deliver` begins when an issue is later promoted to `Grooming`.
+
 - **Policy lives in instructions, not worker improvisation.**
   The rules for when to comment, when to advance state, and when to stop at `needs-human-input` belong in the stable operating layer and the run contract.
 
@@ -223,7 +242,8 @@ Instead:
 Examples:
 
 - `extract` owns its own probe/build workflow
-- `deliver` currently owns a small local issue workflow (`new -> proposed -> changes-requested -> ready-for-oracle`)
+- `audit` will own a bounded audit workflow (`new -> audited -> approved-to-create -> issues-created`)
+- `deliver` owns the issue workflow that starts once a bounded issue exists and enters `Grooming`
 
 ## What Exists Today
 
@@ -260,6 +280,8 @@ Current implementation status:
 - `deliver` controller mode is live through draft PR:
   - `claim -> pre-groom -> review -> Ready | needs-human-input`
   - after human promotion to `Building`: `worktree -> Stage 1 -> Stage 2 -> validation -> draft PR -> In Review`
+- `audit` is the next planned controller mode:
+  - `assess repo -> review findings -> create approved issues in Backlog -> stop`
 - merge, deploy, and outcome verification remain future work
 
 ### Next candidates
@@ -280,5 +302,6 @@ Use the docs in this order:
 1. This file for the top-level system shape
 2. [extract-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/extract-architecture.md) for the `extract` module
 3. [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for the `deliver` module
+4. `audit` architecture doc once the module leaves placeholder status
 
 Do not duplicate detailed module mechanics here. This file stays intentionally light.
