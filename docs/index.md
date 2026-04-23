@@ -1,19 +1,11 @@
 ---
 title: autoship
 description: Turns messy software work into bounded, reviewable, executable units.
-template: splash
-hero:
-  tagline: Generator-evaluator discipline. Fresh context per unit. Disk-backed state. Four modules around one controller.
-  actions:
-    - text: System overview
-      link: /architecture/system-overview/
-      icon: right-arrow
-      variant: primary
-    - text: GitHub
-      link: https://github.com/Calibrax-ai/autoship
-      icon: external
-      variant: minimal
 ---
+
+Generator-evaluator discipline. Fresh context per unit. Disk-backed state. Four modules around one controller.
+
+[→ System overview](/architecture/system-overview/) · [GitHub ↗](https://github.com/Calibrax-ai/autoship)
 
 ## What autoship does
 
@@ -35,10 +27,9 @@ All four share the same operational discipline: generator-evaluator at every han
 
 ## Start here
 
-- **[System overview](/architecture/system-overview/)** — top-level concerns and how the modules fit together
-- **[Extract architecture](/architecture/extract-architecture/)** — prototype → trustworthy artifacts
-- **[Deliver architecture](/architecture/deliver-architecture/)** — issue → validated change
+- **[Architecture](/architecture/)** — canonical docs per module, with the system overview on top
 - **[Cross-track learnings](/learnings/)** — what five probes taught us
+- **[Ideas](/ideas/)** — essays, notes, open thinking
 
 ## Core principles
 

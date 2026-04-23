@@ -11,6 +11,8 @@ export default defineConfig({
           title: 'autoship',
           description:
               'Turns messy software work into bounded, reviewable, executable units.',
+          customCss: ['./src/styles/starlight-overrides.css'],
+          defaultLocale: 'root',
           components: {
               Head: './src/components/Head.astro',
           },
@@ -22,6 +24,16 @@ export default defineConfig({
               },
           ],
           sidebar: [
+              {
+                  label: 'Architecture →',
+                  link: '/architecture/',
+                  attrs: { 'data-cross-section': 'true' },
+              },
+              {
+                  label: 'Ideas →',
+                  link: '/ideas/',
+                  attrs: { 'data-cross-section': 'true' },
+              },
               {
                   label: 'Learnings',
                   items: [

@@ -7,12 +7,14 @@
 	--font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
 
-	/* Essay (magazine) palette — /ideas/ */
-	--color-essay-bg: #fbfaf7;
-	--color-essay-ink: #111013;
-	--color-essay-muted: #5b5a5f;
+	/* Essay (magazine) palette — /ideas/
+	 * Aliased to the longform palette for site-wide visual consistency.
+	 * Variable names kept for legibility in /ideas/ components. */
+	--color-essay-bg: #f8f7f3;
+	--color-essay-ink: #1e1d1a;
+	--color-essay-muted: #575652;
 	--color-essay-rule: #e7e4dc;
-	--color-essay-accent: #1f4a9f;
+	--color-essay-accent: #0a574d;
 
 	/* Longform (architecture) palette — ported from the original proposal HTML */
 	--color-lf-bg: #f8f7f3;
