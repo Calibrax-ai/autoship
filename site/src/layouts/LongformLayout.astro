@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import TopBar from '../components/TopBar.astro';
 import type { MarkdownHeading } from 'astro';
 
 interface Props {
@@ -27,9 +28,10 @@ const tocEntries = headings.filter((h) => h.depth === 2 || h.depth === 3);
 		{description && <meta name="description" content={description} />}
 	</head>
 	<body class="longform">
+		<TopBar />
 		<div
 			class="longform-shell"
-			style="display: grid; grid-template-columns: 280px 1fr; min-height: 100vh;"
+			style="display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 60px);"
 		>
 			<aside class="longform-sidebar">
 				<div class="longform-sidebar-brand">

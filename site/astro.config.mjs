@@ -23,15 +23,6 @@ export default defineConfig({
           ],
           sidebar: [
               {
-                  label: 'Architecture',
-                  items: [
-                      { label: 'System Overview', link: '/architecture/system-overview/', attrs: { target: '_self' } },
-                      { label: 'Extract', link: '/architecture/extract-architecture/', attrs: { target: '_self' } },
-                      { label: 'Deliver', link: '/architecture/deliver-architecture/', attrs: { target: '_self' } },
-                      { label: 'Program Template', slug: 'architecture/deliver-program-template' },
-                  ],
-              },
-              {
                   label: 'Learnings',
                   items: [
                       { label: 'Cross-track', slug: 'learnings' },
@@ -44,6 +35,7 @@ export default defineConfig({
                   items: [
                       { label: 'Harness Philosophy', slug: 'harness-philosophy' },
                       { label: 'Plan Reviewer Calibration', slug: 'plan-reviewer-calibration' },
+                      { label: 'Program Template', slug: 'architecture/deliver-program-template' },
                   ],
               },
               {
