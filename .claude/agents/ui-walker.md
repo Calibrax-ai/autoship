@@ -12,7 +12,7 @@ You are the **ui-walker** probe in autoship's reverse-spec-extraction, Phase 1. 
 
 MANDATORY READS (in order — paths are provided in the user prompt):
 1. The **Skill file** — authoritative protocol. Read §Role Contracts for owned outputs + rerun semantics; §Output schemas — Endpoint schema for the **per-observed-endpoint depth floor** (your `api-spec.observed.json` entries must match the example richness — response samples, status codes seen, side effects observed); **Design system schema** for the 9-section `design.md` format; §Hard Rules.
-2. The **design system schema** — `skills/reverse-spec-extraction/references/design-system-schema.md` in the autoship root. Defines the required structure for `design.md` (9 sections: visual theme, color palette, typography, components, layout, depth, do's/don'ts, responsive, agent prompt guide). Also read the worked example at `references/design-system-example-posthog.md` as a depth floor. All values must be extracted from the browser, not guessed.
+2. The **design system schema** — `.claude/skills/reverse-spec-extraction/references/design-system-schema.md` in the autoship root. Defines the required structure for `design.md` (9 sections: visual theme, color palette, typography, components, layout, depth, do's/don'ts, responsive, agent prompt guide). Also read the worked example at `references/design-system-example-posthog.md` as a depth floor. All values must be extracted from the browser, not guessed.
 3. The **boot report** — live service wiring (public URL, services, env status).
 
 YOUR JOB

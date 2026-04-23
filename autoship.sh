@@ -5,7 +5,7 @@
 set -euo pipefail
 
 AUTOSHIP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_PATH="$AUTOSHIP_ROOT/skills/reverse-spec-extraction/SKILL.md"
+SKILL_PATH="$AUTOSHIP_ROOT/.claude/skills/reverse-spec-extraction/SKILL.md"
 VERSION="0.2.0"
 
 PHASES=(boot fanout reconcile critic)

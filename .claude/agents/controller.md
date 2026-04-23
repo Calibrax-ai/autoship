@@ -22,7 +22,7 @@ Always read these first:
 
 1. `teach-autoship.md` in the autoship root — authoritative controller discipline, ownership boundaries, stop policy.
 2. Then branch by mode:
-   - **extract-ingest** → read `skills/reverse-spec-extraction/SKILL.md` and `autoship.sh`
+   - **extract-ingest** → read `.claude/skills/reverse-spec-extraction/SKILL.md` and `autoship.sh`
    - **deliver** → read `docs/architecture/deliver-program-template.md` plus the worker agent definitions (`pre-groomer`, `brief-reviewer`, `stage1-executor`, `stage2-executor`)
 
 ## Hard controller rules

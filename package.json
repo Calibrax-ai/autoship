@@ -26,7 +26,7 @@
     "bin/",
     "cli/",
     ".claude/agents/",
-    "skills/",
+    ".claude/skills/",
     "teach-autoship.md",
     "README.md"
   ],

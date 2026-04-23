@@ -81,7 +81,7 @@ The controller is the single writer to external systems (Linear state, comments,
 - `verdict: APPROVED | REJECTED` (from brief-reviewer)
 - `stage1-green` / `stage1-red-expected` / `stage1-failed` (from Stage 1 executor)
 - `stage2-passed` / `stage2-failed` / `test-mutation-detected` (from Stage 2 executor)
-- `needs-human-input` + reason (from any worker that hits a blocking ambiguity; the reason is a filled blocker report per the `blocker-escalation` skill — `skills/blocker-escalation/assets/blocker-report-template.md`, lint-checked by `skills/blocker-escalation/scripts/validate-blocker.py`)
+- `needs-human-input` + reason (from any worker that hits a blocking ambiguity; the reason is a filled blocker report per the `blocker-escalation` skill — `.claude/skills/blocker-escalation/assets/blocker-report-template.md`, lint-checked by `.claude/skills/blocker-escalation/scripts/validate-blocker.py`)
 
 The controller parses these, transitions Linear state per policy, posts comments per policy, and dispatches the next worker.
 
@@ -202,4 +202,4 @@ Audit mode specifically does *not* continue directly into implementation. Its jo
 - `docs/learnings.md` — cross-track empirical findings
 - `.claude/agents/*.md` — authoritative worker contracts (inputs, outputs, structured results, forbidden actions)
 - `.claude/agents/controller.md` — controller agent definition (mode-aware; extract-ingest + deliver today)
-- `skills/blocker-escalation/` — blocker report template, category enum, lint script
+- `.claude/skills/blocker-escalation/` — blocker report template, category enum, lint script

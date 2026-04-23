@@ -97,15 +97,9 @@ export async function init() {
 
 	console.log('\nInstalling autoship...');
 
-	// Copy agents
-	copyDir(
-		join(PKG_ROOT, '.claude', 'agents'),
-		join(cwd, '.claude', 'agents')
-	);
+	// Copy agents + skills (everything under .claude/)
+	copyDir(join(PKG_ROOT, '.claude'), join(cwd, '.claude'));
 	console.log('  ✓ agents → .claude/agents/');
-
-	// Copy skills
-	copyDir(join(PKG_ROOT, 'skills'), join(cwd, '.claude', 'skills'));
 	console.log('  ✓ skills → .claude/skills/');
 
 	// Create .autoship/
