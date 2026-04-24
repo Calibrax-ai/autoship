@@ -27,7 +27,6 @@
     "cli/",
     ".claude/agents/",
     ".claude/skills/",
-    "teach-autoship.md",
     "README.md"
   ],
   "engines": {

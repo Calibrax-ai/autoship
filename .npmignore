@@ -3,7 +3,6 @@
 
 docs/
 site/
-probe-artifacts/
 .claude/projects/
 .claude/settings*.json
 .claude/plans/

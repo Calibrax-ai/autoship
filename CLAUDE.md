@@ -15,15 +15,16 @@ Use autoship in one of two modes:
   - **controller-backed runtime** through draft PR: `claude --agent controller -p "deliver"` from the testbed root (reads `.autoship/program.md`)
   - **manual fallback** via `pre-groomer` + `brief-reviewer` dispatched directly
 
-Planned next mode:
+Scaffolded next mode:
 
-- **`audit` next** — controller-backed readiness audit that stops at reviewed findings plus approved issue creation in `Backlog`. It does not fix code in the same run.
+- **`audit` scaffolded** — controller-backed readiness audit that stops at reviewed findings plus approved issue creation in `Backlog`. The harness shape now exists, but it is not yet probe-validated the way `extract` and `deliver` are.
 
 Important boundary:
 
-- **`teach-autoship.md`** and **`program.md`** are **controller-only** artifacts.
+- **`.claude/agents/controller.md`** and **`program.md`** are **controller-only** — manual worker dispatch (`pre-groomer`, `brief-reviewer` run directly) does not read them. The controller agent file now holds the stable operating discipline (workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) plus per-mode procedure — the separate `autoship-controller` skill was collapsed into the agent on 2026-04-24 because it had exactly one reader and the split was creating drift between two files.
+- **`.autoship/standards.yaml`** is the repo-local policy file. Use it for stack standards; use `.env.example` as evidence of current repo shape, not as the source of truth for policy.
 - You do **not** need them for the manual `deliver` fallback.
-- The checked-in `.claude/agents/controller.md` is mode-aware for `extract ingest` and `deliver` through draft PR.
+- The checked-in `.claude/agents/controller.md` is mode-aware for `extract ingest`, `audit`, and `deliver` through draft PR.
 
 ## Key Files
 
@@ -31,14 +32,17 @@ Important boundary:
 - `.claude/agents/` — agent definitions:
   - **Ingest probes** (Phase 1): ui-walker, static, data, external
   - **Ingest synthesis**: reconciler, critic
-  - **Orchestration**: controller — one top-level controller role. Supports extract-ingest and deliver-through-draft-PR today; `audit` is the next planned mode. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
+  - **Orchestration**: controller — one top-level controller role. Supports extract-ingest, audit, and deliver-through-draft-PR. Track/mode comes from `program.md`, not a separate agent file. `build-controller` is a transitional extract-specific orchestrator; collapsing into `controller` is deferred until observed value.
   - **Build review**: plan-reviewer — fresh-context skeptic dispatched between slice-plan and Stage 1 oracle (probe-2.5 onward)
+  - **Audit**: auditor, audit-reviewer — generator-evaluator pair for readiness assessment and issue-candidate review. Controller owns issue creation; workers own only artifacts.
   - **Deliver grooming**: pre-groomer, brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `controller` in deliver mode.
-  - **Deliver build**: stage1-executor, stage2-executor — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
+  - **Deliver build**: oracle-writer, implementation-executor — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
 - `.claude/skills/reverse-spec-extraction/SKILL.md` — authoritative protocol, output schemas, role contracts
-- `teach-autoship.md` — controller-only stable operating knowledge shared by the controller across modes. Read by the controller before consulting its per-run `program.md`. Contains generator-evaluator discipline, workflow-surface ownership, per-mode phase machines, stop conditions, NEVER STOP posture.
+- `docs/architecture/audit-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in audit mode.
 - `docs/architecture/deliver-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in deliver mode. Commit one to each testbed; manual fallback does not need it.
+- `cli/init.mjs` — scaffolds `.autoship/program.md` and `.autoship/standards.yaml` into a target repo. Agents + skills ship under `.claude/` via npm and auto-discover.
 - `docs/architecture/extract-architecture.md` — canonical architecture for the `extract` track.
+- `docs/architecture/audit-architecture.md` — scaffolded architecture for the `audit` track.
 - `docs/architecture/deliver-architecture.md` — canonical architecture for the `deliver` track.
 - `docs/architecture/system-overview.md` — top-level concern map above the `extract` / `deliver` modules.
 - `docs/learnings.md` — cross-track synthesis. Updated after each probe completes.
@@ -47,9 +51,8 @@ Important boundary:
 - `docs/harness-philosophy.md` — synthesis on prompt + tools + artifacts design. Reads Anthropic's harness-design article and applies to autoship. Source of the generator-evaluator pattern + mechanical-vs-judgment dividing rule.
 - `docs/plan-reviewer-calibration.md` — labeled few-shot cases the plan-reviewer scores against. Operator overrides become new cases; calibration grows over time.
 - `docs/archive/agent-prompt-review.md` — superseded review (kept as institutional memory of the "add more grep gates" wrong turn). The supersede note at the top explains why; the body explains what.
-- `.claude/skills/` — autoship-specific skill packs that the product ships. Lives under `.claude/` because that's where Claude Code auto-discovers project-scoped skills (same mechanism as `.claude/agents/`). Current set: `reverse-spec-extraction` (extract track), `autoship-build` (build track, covers the oracle/backend/frontend surfaces via per-surface `references/`), `blocker-escalation` (shared). The three former build-track skills (`backend-rewrite-loop`, `frontend-regeneration`, `oracle-assembly`) were consolidated into `autoship-build` on 2026-04-24 because their shared discipline was ~80% overlapping and the boundaries were surface-of-output, not workflow.
+- `.claude/skills/` — autoship-specific skill packs that the product ships. Lives under `.claude/` because that's where Claude Code auto-discovers project-scoped skills (same mechanism as `.claude/agents/`). Current set: `reverse-spec-extraction` (extract track), `autoship-audit` (audit track), `deliver-grooming` (deliver track, shared by `pre-groomer` + `brief-reviewer`), `autoship-build` (build track, covers the oracle/backend/frontend surfaces via per-surface `references/`), `blocker-escalation` (shared). The three former build-track skills (`backend-rewrite-loop`, `frontend-regeneration`, `oracle-assembly`) were consolidated into `autoship-build` on 2026-04-24 because their shared discipline was ~80% overlapping and the boundaries were surface-of-output, not workflow. `deliver-grooming` was extracted from `pre-groomer`/`brief-reviewer` on 2026-04-24 because the brief schema, type postures, status enums, and anti-patterns were duplicated verbatim across both agents — the generator and its evaluator now read one source.
 - `site/` — Starlight (Astro) documentation site. Content is sourced from `docs/` via symlink `site/src/content/docs -> ../../../docs`. Canonical MDs stay at `docs/…`. Build: `cd site && bun install && bun run build`. No hand-crafted HTML — everything renders from MD.
-- `probe-artifacts/deliver-probes/` — historical probe artifacts (briefs, reviews, issues from probes 0.1–0.5). Institutional memory; not part of the published docs site.
 
 ## Running the Ingest
 

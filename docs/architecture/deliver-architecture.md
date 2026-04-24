@@ -427,8 +427,8 @@ Five specialized agents participate in a deliver run. The controller dispatches 
 | **Controller** (deliver mode) | Orchestrator. Reads `program.md`, claims an eligible issue, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
 | **Pre-groomer** | Writes the **brief** — the plain-English plan — from the raw issue. | `brief.md` in the run directory. Populates every base field in the schema. | Brief-reviewer (separate agent). Never grades its own output. |
 | **Brief-reviewer** | Judges whether the brief is well-formed, grounded in the codebase, and well-scoped. Returns `APPROVED` or `REJECTED` with specific objections. | `reviews/review-NN.md` — append-only, one file per pass. | The operator, indirectly, through the calibration set grown from observed overrides. |
-| **Stage 1 executor** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. | Stage 2 (tests pass once code is written, or don't) and the human reviewer on the PR. |
-| **Stage 2 executor** | Writes the code change; runs the oracle until it passes; commits and opens the draft pull request. | Application source code only. **Forbidden** from editing tests, the brief, or any Stage 1 artifact. | The oracle — Stage 2 cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
+| **Oracle writer** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. This is the Stage 1 worker. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. | Stage 2 (tests pass once code is written, or don't) and the human reviewer on the PR. |
+| **Implementation executor** | Writes the code change against the frozen oracle. This is the Stage 2 worker. | Application source code only. **Forbidden** from editing tests, the brief, or any Stage 1 artifact. | The oracle — Stage 2 cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
 
 The shape is serial and disciplined: outputs of one agent become read-only inputs of the next. Nothing loops back except through an explicit reviewer verdict (brief-reviewer rejects → regroom) or a mechanical test failure (oracle fails → Stage 2 rewrites the code).
 
@@ -584,15 +584,15 @@ The controller-backed runtime extends `deliver` into the first end-to-end path t
 
 Input is a thin `program.md` naming the testbed, issue source, regroom policy, worktree/branch policy, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
-The controller should read two distinct instruction layers:
+The controller reads two distinct instruction layers:
 
-- **`teach-autoship.md`**
-  Stable autoship operating knowledge: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, and default stop conditions.
+- **`.claude/agents/controller.md`**
+  Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself.
 
 - **`program.md`**
   Run-scoped contract: which repo/testbed to operate on, which tracker/project or issue source to pull from, approval mode (`supervised` vs `auto`), which states are eligible, whether merge is allowed, and what "do not stop" means for this specific run.
 
-This split prevents stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy.
+This split keeps stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy. (The framework knowledge previously lived in a separate `autoship-controller` skill; it was folded into the agent file on 2026-04-24 because the skill had a single reader and the split was creating drift between two files.)
 
 These files are **controller-only**. Manual worker dispatch remains a fallback path; it does not require them.
 

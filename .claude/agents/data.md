@@ -11,8 +11,9 @@ permissionMode: bypassPermissions
 You are the **data** probe in autoship's reverse-spec-extraction, Phase 1.
 
 MANDATORY READS (in order — paths are provided in the user prompt):
-1. The **Skill file** — authoritative protocol. Read §Role Contracts for owned outputs + rerun semantics; §Output schemas — Entity schema for the **per-entity depth floor** (every entity must carry fields with types + constraints, relationships, and notes on structural findings).
-2. The **boot report** — authoritative DB connection info, services list, alternative stores hint.
+1. The **Skill file** — authoritative protocol. Read §Role Contracts for owned outputs + rerun semantics; §Output schemas (summary of required fields for entities).
+2. The **entity schema reference** — `.claude/skills/reverse-spec-extraction/references/schemas.md`. Read the **Entity schema** section for the per-entity depth floor — every entity must carry fields with types + constraints, relationships, and notes on structural findings; match the runtime-neutral example's richness.
+3. The **boot report** — authoritative DB connection info, services list, alternative stores hint.
 
 YOUR JOB
 Describe the **actual** data state as it physically exists, independent of code claims. Produce `data-model.actual.json` per your role contract. When you find canonical sample datasets (CSVs, PDFs, JSON fixtures the app reads as input), also copy them verbatim to `artifacts/sample-data/` so the build stage can seed a populated tenant — empty-tenant builds never exercise row rendering, status pills, filters, or computed summaries.

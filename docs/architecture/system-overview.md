@@ -78,6 +78,8 @@ Handles the **known repo, unclear readiness / unclear work queue** problem.
 
 For `audit-0.1`, the workflow stops at approved issue creation. It does not fix code in the same run.
 
+When autoship audits a repo, `.autoship/standards.yaml` is the policy source for stack choices and release expectations. Repo artifacts such as `.env.example`, CI files, and deploy config are evidence sources. If standards are missing and the repo does not already constrain the choice, the right outcome is `decision-required`, not an invented platform decision.
+
 ### Validate
 
 *Coming soon.*
@@ -136,12 +138,12 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 | Agent | Module | Role | Status |
 |---|---|---|---|
 | **Controller** | All | The conductor. Reads the run contract, dispatches each agent in order, owns all tracker mutations. | Operational |
-| **Auditor** | Audit | Inspects the repo against a fixed readiness lens and writes the audit artifact plus bounded issue candidates. | Coming soon |
-| **Audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, and issue-candidate quality before any issues are created. | Coming soon |
+| **Auditor** | Audit | Inspects the repo against a fixed readiness lens and writes the audit artifact plus bounded issue candidates. | Scaffolded |
+| **Audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, and issue-candidate quality before any issues are created. | Scaffolded |
 | **Pre-groomer** | Deliver | Writes the *brief* (plain-English plan) from an approved issue. | Operational |
 | **Brief-reviewer** | Deliver | Judges the brief. Separate agent from the one that wrote it. | Operational |
-| **Stage 1 executor** | Deliver | Writes the *oracle* (tests) from the approved brief. | Operational |
-| **Stage 2 executor** | Deliver | Writes the code; forbidden from editing the oracle. | Operational |
+| **Oracle writer** | Deliver | Writes the *oracle* (tests) from the approved brief. This is the Stage 1 worker. | Operational |
+| **Implementation executor** | Deliver | Writes the code; forbidden from editing the oracle. This is the Stage 2 worker. | Operational |
 | **UI walker** | Extract · ingest | Drives the running demo in a browser to discover user journeys. | Operational |
 | **Static probe** | Extract · ingest | Extracts the API surface and data model from source code. | Operational |
 | **Data probe** | Extract · ingest | Introspects the live database to describe actual state. | Operational |
@@ -189,11 +191,14 @@ Autoship should distinguish between:
 
 That split maps naturally to two artifacts:
 
-- **`teach-autoship.md`**
-  Stable framework knowledge. Changes slowly.
+- **`.claude/agents/controller.md`**
+  Stable framework knowledge plus per-mode procedure. Changes slowly. Holds the load-bearing discipline (workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) inline with each mode's loop. Collapsed here from the former `autoship-controller` skill because it had a single reader and the split was creating drift.
 
 - **`program.md`**
   Run-scoped marching orders for one controller loop. Changes per repo, environment, or operating mode.
+
+- **`.autoship/standards.yaml`**
+  Repo-local policy. Captures the standards autoship should assume for hosting, CI, observability, secrets, and release expectations.
 
 Skills can teach the stable layer, but the active "non-stop" contract belongs to the run layer, not to a timeless teaching document.
 
@@ -269,7 +274,7 @@ The runtime shape is now:
 
 In other words:
 
-- `teach-autoship.md` explains how autoship behaves
+- `.claude/agents/controller.md` explains how autoship behaves (stable discipline + per-mode procedure)
 - `program.md` tells one controller run what to do
 
 That preserves the successful `extract` probe pattern without collapsing stable product knowledge and per-run policy into one file.
@@ -280,8 +285,9 @@ Current implementation status:
 - `deliver` controller mode is live through draft PR:
   - `claim -> pre-groom -> review -> Ready | needs-human-input`
   - after human promotion to `Building`: `worktree -> Stage 1 -> Stage 2 -> validation -> draft PR -> In Review`
-- `audit` is the next planned controller mode:
+- `audit` now has scaffolded controller + worker contracts:
   - `assess repo -> review findings -> create approved issues in Backlog -> stop`
+  - the shape exists, but it is not yet probe-validated the way `extract` and `deliver` are
 - merge, deploy, and outcome verification remain future work
 
 ### Next candidates
@@ -302,6 +308,6 @@ Use the docs in this order:
 1. This file for the top-level system shape
 2. [extract-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/extract-architecture.md) for the `extract` module
 3. [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for the `deliver` module
-4. `audit` architecture doc once the module leaves placeholder status
+4. [audit-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/audit-architecture.md)
 
 Do not duplicate detailed module mechanics here. This file stays intentionally light.

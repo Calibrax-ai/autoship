@@ -106,13 +106,6 @@ export async function init() {
 	const autoshipDir = join(cwd, '.autoship');
 	mkdirSync(autoshipDir, { recursive: true });
 
-	// Copy teach-autoship.md
-	const teachSrc = join(PKG_ROOT, 'teach-autoship.md');
-	if (existsSync(teachSrc)) {
-		copyFileSync(teachSrc, join(autoshipDir, 'teach-autoship.md'));
-		console.log('  ✓ teach-autoship.md → .autoship/');
-	}
-
 	// Write program.md
 	const programContent = renderProgram({
 		tracker,
@@ -123,6 +116,10 @@ export async function init() {
 	writeFileSync(join(autoshipDir, 'program.md'), programContent);
 	console.log('  ✓ program.md → .autoship/');
 
+	// Write standards.yaml
+	writeFileSync(join(autoshipDir, 'standards.yaml'), renderStandards());
+	console.log('  ✓ standards.yaml → .autoship/');
+
 	// Update .gitignore
 	updateGitignore(cwd);
 	console.log('  ✓ .gitignore updated');
@@ -130,12 +127,14 @@ export async function init() {
 	console.log(`
 Done. Next steps:
 
-  1. Review .autoship/program.md and adjust any details.${
+  1. Review .autoship/program.md and adjust any details.
+  2. Review .autoship/standards.yaml and set your repo standards (hosting, CI, observability, secrets).${
 		tracker === 'linear'
-			? '\n  2. Install the Linear MCP: https://docs.anthropic.com/en/docs/mcp'
+			? '\n  3. Install the Linear MCP: https://docs.anthropic.com/en/docs/mcp'
 			: ''
 	}
-  ${tracker === 'linear' ? 3 : 2}. From this directory, run:
+  ${tracker === 'linear' ? 4 : 3}. If this repo uses environment variables, keep .env.example current — autoship treats it as evidence, not the policy source.
+  ${tracker === 'linear' ? 5 : 4}. From this directory, run:
 
        claude --agent controller -p "deliver"
 
@@ -256,4 +255,59 @@ pr:
   draft: true
   base_branch: main
 ${linearWritesBlock}`;
+}
+
+function renderStandards() {
+	return `# autoship standards.yaml — repo/org policy for controller-guided work
+# Commit this file. Keep it short and specific. These are the defaults autoship
+# should assume when auditing or delivering work in this repo.
+
+platform:
+  hosting: "SET_ME"        # e.g. gcp, vercel, aws
+  deploy: "SET_ME"         # e.g. cloud-run, app-runner, vercel
+
+ci:
+  provider: "SET_ME"       # e.g. github-actions
+  required_checks: []      # e.g. [test, typecheck, build]
+
+observability:
+  errors: "SET_ME"         # e.g. sentry
+  logs: "SET_ME"           # e.g. cloud-logging, datadog
+  traces: "none"           # e.g. none, opentelemetry
+
+database:
+  migrations: "SET_ME"     # e.g. prisma, drizzle, rails
+  rollback_required: true
+
+secrets:
+  provider: "SET_ME"       # e.g. gcp-secret-manager, vercel-env, doppler
+
+security:
+  dependency_scan: "SET_ME" # e.g. npm-audit, snyk, github-dependabot, none
+  secret_scan: "SET_ME"     # e.g. gitleaks, github-secret-scanning, none
+  rate_limits_required: true
+
+tenancy:
+  model: "single-tenant"    # single-tenant, multi-tenant, account-scoped
+  isolation_required: false
+
+roles:
+  model: "SET_ME"           # e.g. none, user-admin, org-roles, rbac
+
+async:
+  provider: "none"          # e.g. none, inngest, bullmq, cloud-tasks, sqs
+  retries_required: true
+  idempotency_required: true
+
+performance:
+  latency_budget: "SET_ME"  # e.g. p95 < 500ms on core flows, SET_ME
+  load_test_required: false
+
+release:
+  require_smoke_test: true
+  require_manual_approval: true
+
+audit:
+  if_no_standard: decision-required
+`;
 }

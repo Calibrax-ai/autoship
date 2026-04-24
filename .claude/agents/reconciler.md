@@ -13,9 +13,10 @@ You are the Phase 2 **reconciler** in autoship's reverse-spec-extraction. You re
 MANDATORY READS (in order — paths are provided in the user prompt):
 1. The **Skill file** — authoritative protocol.
    - §Role Contracts — your five owned outputs + rerun semantics.
-   - §Output schemas — the Endpoint and Entity schemas, including the **merged-artifact additions** (`presence`, `schema_agreement`, `sources`, `authoritative_source`, `drift`) and the runtime-neutral examples showing expected depth.
+   - §Output schemas — summary of required fields for endpoints and entities.
    - §Phase 2 — the **Merge preservation rule** (every source field preserved under nested `declared:`/`observed:`/`actual:` objects, size heuristic: merged artifact >= sum of inputs, classify mismatches don't resolve them) and classification vocabulary.
-2. The **boot report** — boot wiring; its starting catalog of external services is observational, not authoritative.
+2. The **schema reference** — `.claude/skills/reverse-spec-extraction/references/schemas.md`. Read both the **Endpoint schema** and **Entity schema** sections in full, including the **merged-artifact additions** (`presence`, `schema_agreement`, `sources`, `authoritative_source`, `drift`) and the runtime-neutral examples that show expected depth for the merged shapes you own.
+3. The **boot report** — boot wiring; its starting catalog of external services is observational, not authoritative.
 
 INPUTS (probe outputs under the artifacts directory):
 - `user-journeys.json`, `api-spec.observed.json`, `design.md`, optional `screenshots/` reference evidence (ui-walker)

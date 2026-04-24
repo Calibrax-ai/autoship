@@ -6,7 +6,9 @@ title: "program.md — deliver run contract"
 
 **Location:** `.autoship/program.md` at the root of the testbed repo. Commit it — the whole team shares the run contract.
 
-Stable knowledge (how autoship works in general) lives in `teach-autoship.md`. This file is per-repo: what THIS repo's deliver runs should do.
+Stable knowledge (how autoship works in general) lives in the controller agent file (`.claude/agents/controller.md`). This file is per-repo: what THIS repo's deliver runs should do.
+
+Repo standards are a separate input. Keep preferred hosting, CI, observability, migrations, and secrets policy in `.autoship/standards.yaml`. Keep `.env.example` current if the app uses environment variables, but treat it as evidence of current repo shape, not as the policy source.
 
 ## Contract shape
 
@@ -125,5 +127,6 @@ state_map:
 
 - **Scope:** the controller drives groom → review → Stage 1 → Stage 2 → validate → commit → push → draft PR. Merging, deploying, and issue closure happen in your normal code-review workflow. Do not add merge or deploy policy here.
 - **`mode: deliver` is fixed.** Omit it and the controller rejects the contract.
+- **Tooling and platform standards live elsewhere.** Do not hide stack choices in `program.md`; put them in `.autoship/standards.yaml`.
 - **Per-dev overrides** can live at `.autoship/local.md` (gitignored). Not required; add only when a developer needs to override team defaults.
 - **Invocation:** from the testbed root, `claude --agent controller -p "deliver"` to resume in-flight work, or `claude --agent controller -p "deliver FRD-162"` to restrict to one issue.
