@@ -35,8 +35,9 @@ Audit decisions follow this order:
 
 1. **Policy** — `.autoship/standards.yaml`
 2. **Repo evidence** — `.env.example`, CI files, deploy config, infra files, tests, docs
-3. **Cheap verification** — safe commands such as tests, build, typecheck when useful
-4. **Inference**
+3. **External exposure evidence** — safe black-box observations from the configured public URL, when `external_exposure.enabled: true`
+4. **Cheap verification** — safe commands such as tests, build, typecheck when useful
+5. **Inference**
 
 If policy and repo evidence do not constrain the choice, return `decision-required`. Do not invent a platform standard.
 
@@ -44,20 +45,21 @@ If policy and repo evidence do not constrain the choice, return `decision-requir
 
 1. Read `.autoship/standards.yaml` if present.
 2. Inspect the real repo: build files, workflows, deploy path, env docs, tests, operational docs, infra config, auth/tenant boundaries, job/queue surfaces, and performance-sensitive paths.
-3. Run only cheap, non-destructive verification commands when useful.
-4. Score findings using the exact vocabulary:
+3. If `external_exposure.enabled: true`, run the safe checks in `references/external-exposure.md`.
+4. Run only cheap, non-destructive verification commands when useful.
+5. Score findings using the exact vocabulary:
    - `PASS`
    - `FAIL`
    - `UNVERIFIED`
-5. Rank actionable gaps:
+6. Rank actionable gaps:
    - `P0 before launch`
    - `P1 before client handoff if possible`
    - `P2 after controlled rollout`
-6. Classify each actionable gap:
+7. Classify each actionable gap:
    - **execution-ready** — repo standards or existing repo shape already constrain the fix
    - **decision-required** — the capability gap is real, but the implementation path is not chosen
-7. Synthesize bounded issue candidates.
-8. Stop.
+8. Synthesize bounded issue candidates.
+9. Stop.
 
 ## Required coverage
 
@@ -67,6 +69,7 @@ Every assessment must include these checklist rows. Use only `PASS`, `FAIL`, or 
 - CI/test gates
 - Deploy/runtime config
 - Required production config/env
+- External production exposure (if configured)
 - Auth and access control
 - Security basics
 - Tenant isolation and cross-tenant data access
@@ -78,6 +81,8 @@ Every assessment must include these checklist rows. Use only `PASS`, `FAIL`, or 
 - Operational docs and handoff
 
 Security basics includes HTTPS/security headers where the app serves HTTP, dependency/security scan signals, input validation on external inputs, injection/XSS/CSRF-relevant controls where applicable, secret leakage checks, webhook signature validation where webhooks exist, abuse/rate-limit controls for exposed endpoints, and dangerous debug/admin surfaces.
+
+External production exposure covers the configured public URL only. It includes TLS/redirects, security/cache headers, public API auth gates, CORS, docs/debug endpoint exposure, version leakage, indexing files, health endpoints, and explicitly enabled login/session smoke checks. It is optional; if no external URL is configured, mark the checklist row `UNVERIFIED` with "no external URL configured for this audit" and do not treat that alone as launch-blocking.
 
 Tenant isolation includes tenant-scoped reads/writes, organization membership boundaries, cross-tenant query risk, invite/member flows, admin escalation paths, and service-role usage. A multi-tenant app with unverified tenant isolation is not launch-ready.
 
@@ -92,6 +97,18 @@ Performance coverage includes latency or capacity expectations when available, o
 - `UNVERIFIED` is mandatory when the item was not actually checked.
 - Failed or un-runnable tests are a release-confidence problem, not a side note.
 - A finding without evidence is a hypothesis, not an audit result.
+- External findings must name the method, path, status code, auth state, and why the probe was safe. Redact sensitive response values.
+
+## External exposure safety
+
+The external exposure step is a bounded smoke test, not a penetration test.
+
+- Default allowed methods are `GET`, `HEAD`, and `OPTIONS`.
+- `POST` is allowed only for a configured login endpoint and explicit auth smoke checks.
+- Never run `DELETE`, `PUT`, `PATCH`, file upload, password reset, email/SMS/webhook, fuzzing, injection, credential stuffing, or load-test probes during audit.
+- If a safe read proves a vulnerability, stop. Do not mutate the system to prove it harder.
+- Do not fetch or paste full sensitive records. Request the smallest response possible and redact.
+- Unsafe probes that would be useful become findings or blockers, not actions.
 
 ## Issue-candidate contract
 
@@ -117,7 +134,7 @@ The top-level `verdict` field on the assessment follows these rules:
 
 - **`do-not-ship`**
   - any `P0` finding exists, or
-  - launch-critical items are `UNVERIFIED` (build/release path, deploy path, required production config, auth/access control, security basics, tenant isolation for multi-tenant apps, data safety, rollback path, async processing for critical jobs/webhooks)
+  - launch-critical items are `UNVERIFIED` (build/release path, deploy path, required production config, external production exposure when enabled, auth/access control, security basics, tenant isolation for multi-tenant apps, data safety, rollback path, async processing for critical jobs/webhooks)
 
 - **`ship-with-caution`**
   - no `P0`, but at least one `P1`, or
@@ -139,3 +156,5 @@ If evidence does not clearly support `ship`, do not upgrade the verdict. Reviewe
 - Do not call something production-ready on optimism.
 - Do not collapse multiple unrelated fixes into one vague issue.
 - Do not treat `.env.example` as policy; it is evidence.
+- Do not run unsafe external probes during audit.
+- Do not make audit parallel by default at the agent level. One `audit-auditor` writes one assessment and one `audit-reviewer` judges it. The auditor may batch independent read-only repo or external checks, but must keep a single artifact and evidence trail.

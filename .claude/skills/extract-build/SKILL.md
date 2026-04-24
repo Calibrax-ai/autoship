@@ -1,13 +1,13 @@
 ---
-name: autoship-build
-description: Use during autoship's build track when accepted artifacts already exist and the next step is compiling an oracle bundle, iterating backend code, or regenerating the frontend against those artifacts. Covers the three build surfaces under one shared discipline about protected surfaces, mismatch handling, and escalation. Reach for this whenever the controller has placed a run in build mode and you're about to touch oracle, backend, or frontend files — do not reach for it for spec extraction or for blocker emission.
+name: extract-build
+description: Use during autoship's optional extract build track when accepted artifacts already exist and the next step touches oracle, backend, or frontend files derived from those artifacts.
 ---
 
-# Autoship Build
+# Extract Build
 
 ## Overview
 
-Autoship's build track operates against the accepted artifacts produced by the extract track. This skill covers the three surfaces the build track writes to:
+Autoship's optional extract build track operates against accepted artifacts produced by the extract track. This skill covers the three surfaces the build track writes to:
 
 - **Oracle bundle** — evaluative checks compiled from accepted artifacts, consumed by the implementation loops.
 - **Backend** — server code, migrations, runtime config, iterated against the oracle bundle.

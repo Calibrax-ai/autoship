@@ -1,5 +1,5 @@
 ---
-name: oracle-writer
+name: deliver-oracle-writer
 description: Writes the frozen oracle for a deliver issue inside a per-issue worktree. May modify tests and test harness only. Never modifies production source, never commits, never pushes.
 model: "claude-opus-4-7[1m]"
 effort: high

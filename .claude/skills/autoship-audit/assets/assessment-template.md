@@ -3,6 +3,8 @@ run: <run-id>
 audited-at: <ISO timestamp>
 target-context: <context>
 standards-path: <path or none>
+external-url: <url or none>
+external-exposure: enabled | disabled
 verdict: ship | ship-with-caution | do-not-ship
 ---
 
@@ -21,6 +23,12 @@ verdict: ship | ship-with-caution | do-not-ship
 # Decision-required gaps
 - <gap that cannot be safely converted into an execution issue yet>
 
+# External exposure findings
+- Scope: <disabled, or configured URL and safe methods used>
+- Unsafe probes skipped: <none, or named probes intentionally not run>
+- Findings:
+  - <finding with method/path/status/auth state, redacted as needed>
+
 # Issue candidates
 ## <candidate title>
 - Priority: P0 | P1 | P2
@@ -38,6 +46,7 @@ verdict: ship | ship-with-caution | do-not-ship
 - CI/test gates: PASS | FAIL | UNVERIFIED — <evidence or reason>
 - Deploy/runtime config: PASS | FAIL | UNVERIFIED — <evidence or reason>
 - Required production config/env: PASS | FAIL | UNVERIFIED — <evidence or reason>
+- External production exposure (if configured): PASS | FAIL | UNVERIFIED — <evidence or reason>
 - Auth and access control: PASS | FAIL | UNVERIFIED — <evidence or reason>
 - Security basics: PASS | FAIL | UNVERIFIED — <evidence or reason>
 - Tenant isolation and cross-tenant data access: PASS | FAIL | UNVERIFIED — <evidence or reason>

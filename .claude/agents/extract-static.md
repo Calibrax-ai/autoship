@@ -1,5 +1,5 @@
 ---
-name: static
+name: extract-static
 description: Static code analysis probe for reverse-spec-extraction Phase 1. Extracts declared API contract and data model from source code.
 model: "claude-opus-4-7[1m]"
 effort: high
@@ -25,7 +25,7 @@ SCOPE
 - Put WebSocket / SSE / streaming HTTP routes under a separate `streaming_endpoints` array — do NOT force them into HTTP request/response shape.
 
 UI HANDLERS — per-entry schema
-Each entry in `ui-handlers.declared.json` must carry enough for the reconciler to join the handler to a journey step. Minimum schema per handler:
+Each entry in `ui-handlers.declared.json` must carry enough for extract-reconciler to join the handler to a journey step. Minimum schema per handler:
 ```json
 {
   "element": {

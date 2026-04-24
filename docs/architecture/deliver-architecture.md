@@ -234,7 +234,7 @@ Autoship's own probe series already surfaced the failure shapes this architectur
 
 Probes 2.2 → 2.3 → 2.4 ran the same loop three times: observe failure → add a forcing-function gate → the controller absorbs the gate while reproducing the failure under a new label. The structural cause was that the author of the plan also discharged the gates judging it. Accumulating gates at the author boundary does not fix author-is-judge; it renames the failure.
 
-Probe 2.5 validated the structural fix. A fresh-context `plan-reviewer` with a calibration set caught four substantive failures on its first pass (one-journey-per-slice violation, deferred-action affordance, duplication across handoff artifacts, consistency drift). The build then shipped clean — 14/14 journey walks pass end-to-end on seeded data, 145/145 oracle green, zero operator intervention. Reviewer cost was under 2% of the probe total.
+Probe 2.5 validated the structural fix. A fresh-context `extract-plan-reviewer` with a calibration set caught four substantive failures on its first pass (one-journey-per-slice violation, deferred-action affordance, duplication across handoff artifacts, consistency drift). The build then shipped clean — 14/14 journey walks pass end-to-end on seeded data, 145/145 oracle green, zero operator intervention. Reviewer cost was under 2% of the probe total.
 
 `deliver` applies the same generator-evaluator pattern at a different stage. The planning-layer fix generalizes; the failure modes are structural, not probe-specific. See `docs/learnings.md` §"Generator-evaluator pattern: validated in probe-2.5" and `docs/harness-philosophy.md` for the full synthesis.
 
@@ -573,11 +573,11 @@ The review stage dispatches multiple parallel fresh-context reviewers with disti
 
 Aggregate verdict rule: any FAIL → `needs-remediation`. Each reviewer catches a different failure shape; a single monolithic reviewer tends to smooth over one kind of failure while fixating on another.
 
-Extends the same generator-evaluator pattern already validated for `plan-reviewer` to a later stage, with role-specialized reviewers.
+Extends the same generator-evaluator pattern already validated for `extract-plan-reviewer` to a later stage, with role-specialized reviewers.
 
 ### 8. Controller Support For Runtime Orchestration
 
-The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `controller` agent running in `deliver` mode now owns both halves of the workflow:
+The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
 - grooming path: claim → pre-groom → brief review → regroom → `Ready | needs-human-input`
 - build path: `Ready` (after human promotion to `Building`) → worktree + branch → Stage 1 → Stage 2 → validation → draft PR → `In Review`
@@ -586,7 +586,7 @@ Input is a thin `program.md` naming the testbed, issue source, regroom policy, w
 
 The controller reads two distinct instruction layers:
 
-- **`.claude/agents/controller.md`**
+- **`.claude/agents/autoship-controller.md`**
   Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself.
 
 - **`program.md`**
@@ -596,7 +596,7 @@ This split keeps stable framework knowledge from turning into a junk drawer for 
 
 These files are **controller-only**. Manual worker dispatch remains a fallback path; it does not require them.
 
-When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`pre-groomer`, `brief-reviewer`, later oracle/build/review workers) should:
+When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`deliver-pre-groomer`, `deliver-brief-reviewer`, later oracle/build/review workers) should:
 
 - write their own artifacts
 - return a structured result to the controller
@@ -637,7 +637,7 @@ The rule is: agents do execution work; humans or reviewer-agents approve transit
 
 Sub-decisions still deferred:
 
-- **Dispatch mechanism** — subprocess (`claude --agent X -p "..."`, matches extract's build-controller precedent) or Agent tool (in-session dispatch). Default to subprocess for consistency.
+- **Dispatch mechanism** — subprocess (`claude --agent X -p "..."`, matches extract's extract-build-controller precedent) or Agent tool (in-session dispatch). Default to subprocess for consistency.
 - **Issue intake breadth** — operator pre-populates `.autoship/issues/<id>/issue.md`, or controller pulls from tracker API. The current runtime supports both local folders and tracker pull; broader multi-source intake is later.
 - **Subdir organization** — when extract and deliver co-install in one repo, agents likely reorganize into `.claude/agents/extract/`, `.claude/agents/deliver/`, `.claude/agents/shared/`. Verify Claude Code's nested-path agent resolution before committing.
 
@@ -723,10 +723,10 @@ The first `deliver` probe stays narrow:
 ```mermaid
 flowchart LR
     Op([Operator]) -->|1. create| Iss[(issue.md)]
-    Op -->|2. dispatch| PG[pre-groomer]
+    Op -->|2. dispatch| PG[deliver-pre-groomer]
     Iss --> PG
     PG -->|writes| Brief[(brief.md)]
-    Op -->|3. dispatch| BR[brief-reviewer]
+    Op -->|3. dispatch| BR[deliver-brief-reviewer]
     Brief --> BR
     BR -->|writes| Rev[(review-NN.md)]
     Rev -->|APPROVE| Done([ready-for-oracle])
@@ -737,8 +737,8 @@ flowchart LR
 Five steps:
 
 1. Pull issue or local change request context (operator creates `.autoship/issues/<id>/issue.md`)
-2. Pre-groom a repo-local brief (`claude --agent pre-groomer -p "..."`)
-3. Run reviewer verdict (`claude --agent brief-reviewer -p "..."`)
+2. Pre-groom a repo-local brief (`claude --agent deliver-pre-groomer -p "..."`)
+3. Run reviewer verdict (`claude --agent deliver-brief-reviewer -p "..."`)
 4. Optionally regroom if REJECTED
 5. Stop at `ready-for-oracle`
 
@@ -765,7 +765,7 @@ Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) 
 Each graduates to a richer shape when observed need justifies it.
 
 - **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns claim → pre-groom → review → `Ready | needs-human-input`, then after human promotion to `Building`: worktree → Stage 1 → Stage 2 → validation → draft PR.
-- **Skills are inlined in the agent's system prompt.** `reproduce-api-bug`, `map-blast-radius`, and `write-brief` live as numbered procedure steps inside `pre-groomer.md` rather than separate `SKILL.md` files. Skills earn their own file the first time a second agent needs them.
+- **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The brief schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-brief-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The brief-specific reviewer checks live in `deliver-grooming/references/brief-review-rubric.md`.
 - **State derived from filesystem.** `brief.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-oracle`. No `state.json`.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
 - **Reproduction outcome is a brief field, not a separate artifact.** A bug that cannot be reproduced is a `brief.md` with `reproduction-status: cannot-reproduce`; the reviewer's groundedness check flags it.

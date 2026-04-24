@@ -1,5 +1,5 @@
 ---
-name: external
+name: extract-external
 description: External service enumeration probe for reverse-spec-extraction Phase 1. Catalogs all external dependencies from source analysis.
 model: "claude-opus-4-7[1m]"
 effort: high

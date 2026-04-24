@@ -8,7 +8,8 @@ function printHelp() {
 autoship — turn messy software work into reviewable, reliable delivery
 
 Usage:
-  autoship init      Install autoship agents into the current repo
+  autoship init                 Install core autoship agents into the current repo
+  autoship init --with-extract  Also install optional extract research agents
 
 Docs: https://github.com/Calibrax-ai/autoship
 `);
@@ -25,7 +26,7 @@ const handler = commands[command];
 
 if (handler) {
 	try {
-		await handler();
+		await handler(process.argv.slice(3));
 	} catch (err) {
 		console.error(`\n${err.message}\n`);
 		process.exit(1);

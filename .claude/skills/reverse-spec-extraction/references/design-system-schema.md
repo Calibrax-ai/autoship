@@ -1,6 +1,6 @@
 # design.md — Output Schema
 
-Reference format for the `design.md` artifact produced by ui-walker during Phase 1. Every section is required. Values are discovered from the running prototype — do not invent or assume.
+Reference format for the `design.md` artifact produced by extract-ui-walker during Phase 1. Every section is required. Values are discovered from the running prototype — do not invent or assume.
 
 ---
 

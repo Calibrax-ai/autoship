@@ -1,6 +1,6 @@
 ---
 name: deliver-grooming
-description: Use during autoship's deliver track when the goal is to turn a fuzzy Linear/GitHub issue into an executable brief — for a Bug (forensic reproduction), Feature (generative design from existing patterns), or Refactor (conservational behavior-preserving restructure). Reach for this skill from either side of the generator-evaluator pair: the pre-groomer writes the brief; the brief-reviewer judges it. Covers type postures, status enums, the brief schema, groundedness criteria, scope-sanity principles, and per-type anti-patterns.
+description: Use during autoship's deliver track when a Linear/GitHub issue must become a reviewed executable brief for a Bug, Feature, or Refactor.
 ---
 
 # Deliver Grooming
@@ -11,17 +11,17 @@ Deliver grooming is the step between "a human filed an issue" and "an executor h
 
 The skill is shared by a generator-evaluator pair:
 
-- **pre-groomer** — drafts the brief. Evidence-first across all types.
-- **brief-reviewer** — skeptical judge. Three checks: well-formedness, groundedness, scope sanity. Binding verdict.
+- **deliver-pre-groomer** — drafts the brief. Evidence-first across all types.
+- **deliver-brief-reviewer** — skeptical judge. Three checks: well-formedness, groundedness, scope sanity. Binding verdict.
 
-Agents cannot discharge their own work. A pre-groomer that both wrote and approved would drift into a lower-friction standard. That's why the pair is structural.
+Agents cannot discharge their own work. A deliver-pre-groomer that both wrote and approved would drift into a lower-friction standard. That's why the pair is structural.
 
 ## When to use
 
 Use this skill when:
 
 - The controller (or manual operator) has an incoming deliver-track issue and needs a reviewed brief before oracle assembly.
-- A prior review returned REJECTED and the pre-groomer is regrooming.
+- A prior review returned REJECTED and the deliver-pre-groomer is regrooming.
 
 Do not use when:
 
@@ -56,7 +56,7 @@ Do not invent `ready`, `proposed`, `in-progress`, `draft`, or any other label. I
 
 ## Brief schema
 
-The full brief template, including frontmatter, all universal sections, and type-specific sections, lives at `assets/brief-template.md`. The pre-groomer fills it; the reviewer checks conformance against it.
+The full brief template, including frontmatter, all universal sections, and type-specific sections, lives at `assets/brief-template.md`. The deliver-pre-groomer fills it; the reviewer checks conformance against it.
 
 Universal sections (all types): Outcome, Acceptance Criteria, Scope Fence, Rabbit-Hole Patches, Blast-Radius Manifest, Skeleton Position, Concrete Example. Optional: Failure Modes.
 
@@ -90,7 +90,7 @@ A brief is ungrounded if any claim lacks traceable evidence. These are the crite
 - Acceptance Criteria verifications are runnable commands (specific test names, specific curl calls) — not "run the relevant tests."
 - Blast-Radius → `Expected to change` is grep-verifiable as touched by the reported problem (imports, callers, or direct surface).
 - Never-touch list names specific files or clear glob patterns — not vague domains.
-- **Every file listed under "Expected to create" must actually not exist.** Co-located test files (e.g., `inbox.test.ts` next to `inbox.ts`) almost always already exist. Existing files labeled "new" is ungrounded about repo state. This is a file-existence check the pre-groomer runs during blast-radius mapping and the reviewer re-verifies.
+- **Every file listed under "Expected to create" must actually not exist.** Co-located test files (e.g., `inbox.test.ts` next to `inbox.ts`) almost always already exist. Existing files labeled "new" is ungrounded about repo state. This is a file-existence check the deliver-pre-groomer runs during blast-radius mapping and the reviewer re-verifies.
 
 ### Bug
 
@@ -118,7 +118,7 @@ A brief is ungrounded if any claim lacks traceable evidence. These are the crite
 
 - Always-touch list includes files unrelated to the reported symptom/request (widening).
 - Never-touch list is vague rather than specific.
-- Rabbit-Hole Patches punt decisions the pre-groomer should have made ("TBD — reviewer decides").
+- Rabbit-Hole Patches punt decisions the deliver-pre-groomer should have made ("TBD — reviewer decides").
 - Acceptance Criteria include targets beyond the issue ("while we're here, also fix X").
 
 ### Bug
@@ -142,7 +142,7 @@ A brief is ungrounded if any claim lacks traceable evidence. These are the crite
 
 ### Universal
 
-Other grooming systems produce briefs that look complete until the executor discovers they are half-specified or pointed at the wrong problem. The pre-groomer does not ship such a brief. The reviewer does not approve one.
+Other grooming systems produce briefs that look complete until the executor discovers they are half-specified or pointed at the wrong problem. The deliver-pre-groomer does not ship such a brief. The reviewer does not approve one.
 
 ### Bug
 
@@ -161,13 +161,13 @@ No brief that changes observable behavior, even in "harmless" ways. No partial r
 - Reproduction is a tool call that returns output, not a hypothesis.
 - Design is grounded in the codebase, not in general principles.
 - Coverage is grep-inventoried from tests that actually exist.
-- File-existence is verified with `Glob` or `ls`, not assumed.
+- File-existence is verified with an available file-listing tool (`Glob` for reviewers), not assumed.
 - The brief specifies WHAT must change and WHERE, never HOW.
 
 ## Hard rules
 
-- The pre-groomer writes exactly one file: the injected brief path. No source code, tests, migrations, or config changes.
-- The brief-reviewer writes exactly one file: its verdict at the injected review path. Read-only otherwise.
+- The deliver-pre-groomer writes exactly one file: the injected brief path. No source code, tests, migrations, or config changes.
+- The deliver-brief-reviewer writes exactly one file: its verdict at the injected review path. Read-only otherwise.
 - No destructive commands.
 - Reviewer verdicts are strictly binary: `APPROVED` or `REJECTED`. Blocking → REJECTED with specific objections. Non-blocking → APPROVED with observations in a `notes:` field. No intermediate labels.
 - Reviewer default is REJECT; approval requires positive evidence on every check.

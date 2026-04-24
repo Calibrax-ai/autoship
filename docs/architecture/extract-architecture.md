@@ -2,7 +2,9 @@
 title: "Extract"
 ---
 
-**Status:** v1 proposal (simplified from earlier exploration) · **Last updated:** 2026-04-14
+**Status:** optional legacy/research module · **Last updated:** 2026-04-24
+
+Extract is no longer the default autoship surface. Core autoship now installs audit + deliver; extract remains available with `autoship init --with-extract` for demo reconstruction and research runs.
 
 ## In plain English
 
@@ -255,7 +257,7 @@ project/
 
 **The principle:** everything outside `app/` is input or runtime state. `app/` is the output. The folder tree makes the guardrail visible — sessions write inside `app/` and update `.autoship/progress.txt`. Everything else is read-only for sessions unless the controller explicitly opens a revision step.
 
-**Controller protocol lives in code, not in files.** There is no per-run "dispatch plan" artifact. The controller's source encodes the default protocol (e.g., "ingest runs boot → fan-out → reconcile → critique"); runtime deviations from that default (e.g., "no frontend detected, skipped ui-walker") are appended to `decisions.log`. If you want to know what the controller *intends* to do, read the controller. If you want to know what it *did* this run, read the run folder's `prompts/` + `logs/` + `decisions.log`.
+**Controller protocol lives in code, not in files.** There is no per-run "dispatch plan" artifact. The controller's source encodes the default protocol (e.g., "ingest runs boot → fan-out → reconcile → critique"); runtime deviations from that default (e.g., "no frontend detected, skipped extract-ui-walker") are appended to `decisions.log`. If you want to know what the controller *intends* to do, read the controller. If you want to know what it *did* this run, read the run folder's `prompts/` + `logs/` + `decisions.log`.
 
 **`progress.txt` is the single human-readable status file across the whole lifecycle.** It answers "what's happening right now?" regardless of which step is active. Its shape and *role* adapt per step:
 
@@ -287,7 +289,7 @@ The controller is an **Agent SDK application** — a program that uses LLM calls
 
 **Artifact guardrail:** Claude Code sessions should not edit artifacts or tests unless the controller explicitly opens a revision step. The session writes application code and updates `progress.txt`. If the session encounters a problem that requires changing the spec or tests, it escalates — it does not silently revise the contract it's building against.
 
-**Skill assignment:** The controller assigns skills to each session based on the task. A build session gets the `autoship-build` skill plus an explicit active surface (`oracle`, `backend`, or `frontend`) so the session reads the right per-surface reference. Skills are reusable execution playbooks — they carry workflow logic, quality gates, and task-specific guidance that improves how the session performs.
+**Skill assignment:** The controller assigns skills to each session based on the task. An extract build session gets the `extract-build` skill plus an explicit active surface (`oracle`, `backend`, or `frontend`) so the session reads the right per-surface reference. Skills are reusable execution playbooks — they carry workflow logic, quality gates, and task-specific guidance that improves how the session performs.
 
 ## Agents in this module
 
@@ -299,12 +301,12 @@ Four probes run in parallel to describe the demo from different angles, then two
 
 | Agent | Role | Runs |
 |---|---|---|
-| **UI walker** | Drives the running demo in a browser. Discovers user journeys, observed API behavior, and design patterns that only surface under real interaction. | In parallel with the other probes |
-| **Static probe** | Extracts the declared API contract and data model from source code via static analysis. | In parallel with the other probes |
-| **Data probe** | Introspects the live database to describe actual state. Catches where the code's claims and the data's reality disagree. | In parallel with the other probes |
-| **External probe** | Catalogs external dependencies and third-party APIs from source analysis. | In parallel with the other probes |
-| **Reconciler** | Merges the four probe outputs into a unified specification (the `artifacts/` pack). Resolves conflicts explicitly. | After all four probes |
-| **Critic** | Judges whether the merged artifacts are sufficient, self-consistent, and usable for build. A fresh-context reviewer that didn't participate in ingest — no skin in the author's work. | After reconciler |
+| **extract-ui-walker** | Drives the running demo in a browser. Discovers user journeys, observed API behavior, and design patterns that only surface under real interaction. | In parallel with the other probes |
+| **extract-static** | Extracts the declared API contract and data model from source code via static analysis. | In parallel with the other probes |
+| **extract-data** | Introspects the live database to describe actual state. Catches where the code's claims and the data's reality disagree. | In parallel with the other probes |
+| **extract-external** | Catalogs external dependencies and third-party APIs from source analysis. | In parallel with the other probes |
+| **extract-reconciler** | Merges the four probe outputs into a unified specification (the `artifacts/` pack). Resolves conflicts explicitly. | After all four probes |
+| **extract-critic** | Judges whether the merged artifacts are sufficient, self-consistent, and usable for build. A fresh-context reviewer that didn't participate in ingest — no skin in the author's work. | After extract-reconciler |
 
 ### Build phase
 
@@ -312,14 +314,14 @@ Once ingest produces an approved spec, build decomposes it into vertical slices 
 
 | Agent | Role | Notes |
 |---|---|---|
-| **Build-controller** | Dispatches per-slice executors, runs feedback loops (types, tests, journey tests), and owns the commit cadence. | Transitional extract-specific orchestrator; will collapse into the top-level `controller` once observed value justifies it. |
-| **Plan-reviewer** | A fresh-context skeptic dispatched between the slice plan and the first line of code. Must approve before any slice's Stage 1 runs. | Introduced in probe 2.5 as the structural fix for the self-evaluation failure that recurred across probes 2.2–2.4. |
+| **extract-build-controller** | Dispatches per-slice executors, runs feedback loops (types, tests, journey tests), and owns the commit cadence. | Optional extract-specific orchestrator; not installed in the core package by default. |
+| **extract-plan-reviewer** | A fresh-context skeptic dispatched between the slice plan and the first line of code. Must approve before any slice's Stage 1 runs. | Introduced in probe 2.5 as the structural fix for the self-evaluation failure that recurred across probes 2.2–2.4. |
 
 ### Top-level orchestration
 
 | Agent | Role |
 |---|---|
-| **Controller** | Mode-aware top-level agent. Reads `program.md`, picks the right phase machine (extract-ingest vs deliver), and dispatches the appropriate phase-level agents. |
+| **autoship-controller** | Mode-aware top-level agent. Reads `program.md`, picks the right phase machine (extract-ingest, audit, or deliver), and dispatches the appropriate phase-level agents. |
 
 Each agent's fresh context is the load-bearing property. A stale context window accumulates tool-call artifacts, half-remembered assumptions, and reasoning exhaust — all of which silently degrade output quality. Every handoff in extract is a context reset, not a continuation.
 
@@ -392,15 +394,15 @@ One stack removes complexity in four places: scaffolding, test generation target
 
 ## Delivery Shape
 
-### Installation Modes
+### Planned Installation Modes
 
-autoship supports two install modes. The default transforms the current directory in place; the `--from` flag creates a new workspace from a demo elsewhere.
+The original extract product design assumed two workspace modes. Current CLI support is narrower: `autoship init --with-extract` installs the optional extract agents/skills into the current repo. The workspace-rewrite behavior below is retained as product design, not current CLI behavior.
 
 **Mode A — In place (default).** The demo repo is being replaced by the production candidate.
 
 ```bash
 $ cd ~/projects/my-demo-repo
-$ npx autoship init
+$ npx autoship init --with-extract
 ```
 
 What it does: detects existing files, moves them into `prototype/`, scaffolds `artifacts/`, `app/`, `.autoship/`, and commits the reorganization. Preserves git history, remote, and branches. Reversible with `git reset --hard HEAD~1` if the user bails.
@@ -409,7 +411,7 @@ What it does: detects existing files, moves them into `prototype/`, scaffolds `a
 
 ```bash
 $ cd ~/projects
-$ npx autoship init --from ./my-demo-repo ./my-production-app
+$ npx autoship init --with-extract --from ./my-demo-repo ./my-production-app
 ```
 
 What it does: creates a new workspace at `./my-production-app`, copies the demo into `prototype/` as a read-only snapshot, scaffolds the rest. Demo repo stays untouched.
@@ -438,7 +440,7 @@ $ npx autoship status                  # progress, blockers, report
 
 ### Re-initialization
 
-Running `npx autoship init` on a workspace that's already initialized fails with an explicit error. Use `npx autoship reingest` to refresh artifacts from an updated prototype — this regenerates the spec while preserving the current app and test work. Separate command, separate intent.
+Running `npx autoship init --with-extract` on a workspace that's already initialized fails with an explicit error. Use the extract-specific reingest path to refresh artifacts from an updated prototype once that command exists; until then, re-run extract in a fresh workspace. Separate command, separate intent.
 
 ## Why This Architecture
 

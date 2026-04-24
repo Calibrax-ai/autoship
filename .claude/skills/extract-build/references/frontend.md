@@ -1,6 +1,6 @@
 # Frontend Regeneration
 
-Rebuild the frontend from accepted artifacts, user journeys, and design direction rather than preserving prototype UI. This reference is for the `frontend` surface of `autoship-build`.
+Rebuild the frontend from accepted artifacts, user journeys, and design direction rather than preserving prototype UI. This reference is for the `frontend` surface of `extract-build`.
 
 ## Use when
 

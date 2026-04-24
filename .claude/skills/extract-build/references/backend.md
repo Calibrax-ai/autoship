@@ -1,6 +1,6 @@
 # Backend Rewrite Loop
 
-Implement backend code in bounded iterations against accepted artifacts and a protected oracle bundle. This reference is for the `backend` surface of `autoship-build`.
+Implement backend code in bounded iterations against accepted artifacts and a protected oracle bundle. This reference is for the `backend` surface of `extract-build`.
 
 ## Use when
 

@@ -1,6 +1,6 @@
 ---
 name: blocker-escalation
-description: Use when an autoship agent (extract probe, reconciler, critic, oracle assembler, backend or frontend executor) cannot safely continue and must stop guessing. Converts unresolved ambiguity, protected-surface conflicts, repeated-without-narrowing failures, or environment/setup failures into a structured blocker report that names the smallest concrete decision the controller or human must make. Reach for this whenever an iteration is about to silently invent intent, rewrite the judge, or loop in place without narrowing the failure class — do not use it for spec extraction or for writing implementation code.
+description: Use when an autoship agent (extract probe, extract-reconciler, extract-critic, deliver-oracle-writer, deliver-implementation, or extract build executor) cannot safely continue and must stop guessing. Converts unresolved ambiguity, protected-surface conflicts, repeated-without-narrowing failures, or environment/setup failures into a structured blocker report that names the smallest concrete decision the controller or human must make. Reach for this whenever an iteration is about to silently invent intent, rewrite the judge, or loop in place without narrowing the failure class — do not use it for spec extraction or for writing implementation code.
 ---
 
 # Blocker Escalation

@@ -1,6 +1,6 @@
 # Oracle Assembly
 
-Compile accepted artifacts into the protected oracle bundle that the build loop judges implementation against. This reference is for the `oracle` surface of `autoship-build`.
+Compile accepted artifacts into the protected oracle bundle that the build loop judges implementation against. This reference is for the `oracle` surface of `extract-build`.
 
 ## Use when
 
@@ -10,14 +10,14 @@ Compile accepted artifacts into the protected oracle bundle that the build loop 
 
 Do not use when:
 
-- Artifacts are still under dispute — the reconciler and critic have not converged.
+- Artifacts are still under dispute — extract-reconciler and extract-critic have not converged.
 - The goal is to patch backend or frontend code. Oracle assembly does not write product code.
 
 ## Protected surfaces during oracle assembly
 
 You read, you do not write:
 
-- **All accepted artifacts** — `api-spec.json`, `data-model.json`, `prd.md`, `user-journeys.json`, `external-contracts.json`, `design.md`, and anything else the reconciler accepted.
+- **All accepted artifacts** — `api-spec.json`, `data-model.json`, `prd.md`, `user-journeys.json`, `external-contracts.json`, `design.md`, and anything else extract-reconciler accepted.
 - **Policy defaults** — the cross-run rules (auth, tenancy, destructive-action guards) that the oracle must encode but not redefine.
 - **Backend application code** — not written during this phase.
 - **Frontend application code** — not written during this phase.

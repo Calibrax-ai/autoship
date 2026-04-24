@@ -14,8 +14,47 @@ import { createInterface } from 'node:readline/promises';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
 
-export async function init() {
+const CORE_AGENTS = [
+	'autoship-controller.md',
+	'audit-auditor.md',
+	'audit-reviewer.md',
+	'deliver-pre-groomer.md',
+	'deliver-brief-reviewer.md',
+	'deliver-oracle-writer.md',
+	'deliver-implementation.md',
+];
+
+const EXTRACT_AGENTS = [
+	'extract-ui-walker.md',
+	'extract-static.md',
+	'extract-data.md',
+	'extract-external.md',
+	'extract-reconciler.md',
+	'extract-critic.md',
+	'extract-build-controller.md',
+	'extract-plan-reviewer.md',
+];
+
+const CORE_SKILLS = [
+	'autoship-audit',
+	'deliver-grooming',
+	'reviewing',
+	'blocker-escalation',
+];
+
+const EXTRACT_SKILLS = [
+	'reverse-spec-extraction',
+	'extract-build',
+];
+
+export async function init(args = []) {
 	const cwd = process.cwd();
+	const withExtract = args.includes('--with-extract');
+	const unknownArgs = args.filter((arg) => arg !== '--with-extract');
+
+	if (unknownArgs.length) {
+		throw new Error(`Unknown init option: ${unknownArgs.join(', ')}`);
+	}
 
 	console.log('\nautoship init\n');
 
@@ -97,10 +136,19 @@ export async function init() {
 
 	console.log('\nInstalling autoship...');
 
-	// Copy agents + skills (everything under .claude/)
-	copyDir(join(PKG_ROOT, '.claude'), join(cwd, '.claude'));
-	console.log('  ✓ agents → .claude/agents/');
-	console.log('  ✓ skills → .claude/skills/');
+	// Copy core agents + skills. Extract is optional because it is a legacy
+	// research pack and should not dominate the default product surface.
+	copyAgentFiles(CORE_AGENTS, cwd);
+	copySkillDirs(CORE_SKILLS, cwd);
+	console.log('  ✓ core agents → .claude/agents/');
+	console.log('  ✓ core skills → .claude/skills/');
+
+	if (withExtract) {
+		copyAgentFiles(EXTRACT_AGENTS, cwd);
+		copySkillDirs(EXTRACT_SKILLS, cwd);
+		console.log('  ✓ extract agents → .claude/agents/');
+		console.log('  ✓ extract skills → .claude/skills/');
+	}
 
 	// Create .autoship/
 	const autoshipDir = join(cwd, '.autoship');
@@ -136,14 +184,36 @@ Done. Next steps:
   ${tracker === 'linear' ? 4 : 3}. If this repo uses environment variables, keep .env.example current — autoship treats it as evidence, not the policy source.
   ${tracker === 'linear' ? 5 : 4}. From this directory, run:
 
-       claude --agent controller -p "deliver"
+       claude --agent autoship-controller -p "deliver"
 
   Docs: https://github.com/Calibrax-ai/autoship
 `);
 }
 
+function copyAgentFiles(files, cwd) {
+	const srcDir = join(PKG_ROOT, '.claude', 'agents');
+	const destDir = join(cwd, '.claude', 'agents');
+	mkdirSync(destDir, { recursive: true });
+
+	for (const file of files) {
+		copyFileSync(join(srcDir, file), join(destDir, file));
+	}
+}
+
+function copySkillDirs(dirs, cwd) {
+	for (const dir of dirs) {
+		const src = join(PKG_ROOT, '.claude', 'skills', dir);
+		if (!existsSync(src)) {
+			throw new Error(`Packaged skill is missing: ${dir}`);
+		}
+		copyDir(
+			src,
+			join(cwd, '.claude', 'skills', dir)
+		);
+	}
+}
+
 function copyDir(src, dest) {
-	if (!existsSync(src)) return;
 	mkdirSync(dest, { recursive: true });
 	for (const entry of readdirSync(src)) {
 		const s = join(src, entry);

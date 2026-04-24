@@ -88,21 +88,21 @@ Dispatch four probes in parallel. Each probe has one evidence source, one output
 
 | Probe | Primary evidence | Output file |
 |---|---|---|
-| **ui-walker** | Agent-browser driving the live UI (with deterministic tool access to DOM, network, and screenshots underneath) | `artifacts/user-journeys.json`, `artifacts/api-spec.observed.json`, `artifacts/design.md`, optional evidence in `artifacts/screenshots/` |
-| **static** | Route definitions, handler signatures, ORM models, import graph, UI event handlers | `artifacts/api-spec.declared.json`, `artifacts/data-model.declared.json`, `artifacts/ui-handlers.declared.json` |
-| **data** | Live DB schema introspection + sample rows + alternative stores (SQLite, CSV) | `artifacts/data-model.actual.json`, `artifacts/sample-data/` (verbatim canonical input files — CSVs, PDFs, JSON fixtures the build uses to seed a populated tenant) |
-| **external** | Imports, env vars, outbound HTTP, SDK initializations | `artifacts/external-contracts.json` |
+| **extract-ui-walker** | Agent-browser driving the live UI (with deterministic tool access to DOM, network, and screenshots underneath) | `artifacts/user-journeys.json`, `artifacts/api-spec.observed.json`, `artifacts/design.md`, optional evidence in `artifacts/screenshots/` |
+| **extract-static** | Route definitions, handler signatures, ORM models, import graph, UI event handlers | `artifacts/api-spec.declared.json`, `artifacts/data-model.declared.json`, `artifacts/ui-handlers.declared.json` |
+| **extract-data** | Live DB schema introspection + sample rows + alternative stores (SQLite, CSV) | `artifacts/data-model.actual.json`, `artifacts/sample-data/` (verbatim canonical input files — CSVs, PDFs, JSON fixtures the build uses to seed a populated tenant) |
+| **extract-external** | Imports, env vars, outbound HTTP, SDK initializations | `artifacts/external-contracts.json` |
 
 Each probe writes only its assigned files. Probes must not co-write the same file.
 
-**Why four and not five.** Earlier versions of this skill defined `runtime` and `design` as separate probes. They share a browser driver, share traversal cost, and had a cross-probe dependency (design reads runtime's journey list). Merging them into `ui-walker` keeps the traversal cost at one pass and removes the cross-probe read. Validated by probe 01. If a future prototype has a visual-only concern that doesn't benefit from journey traversal (e.g., a design-system audit against a static style guide), re-introduce a dedicated design probe — but don't split by default.
+**Why four and not five.** Earlier versions of this skill defined `runtime` and `design` as separate probes. They share a browser driver, share traversal cost, and had a cross-probe dependency (design reads runtime's journey list). Merging them into `extract-ui-walker` keeps the traversal cost at one pass and removes the cross-probe read. Validated by probe 01. If a future prototype has a visual-only concern that doesn't benefit from journey traversal (e.g., a design-system audit against a static style guide), re-introduce a dedicated design probe — but don't split by default.
 
-**Ui-walker browser choice.** Default to an agent-browser (e.g., Browser Use, Stagehand, Claude Computer Use, or equivalent). Reason: higher-level navigation planning survives selector brittleness and dynamic SPAs that flat Playwright struggles with. The agent-browser **must** expose structural evidence underneath — DOM snapshots, network traffic interception, screenshots, URL, and an action log — because probe outputs are audited downstream and every journey claim must cite its evidence source. If the selected agent-browser cannot expose that evidence, fall back to direct Playwright MCP.
+**extract-ui-walker browser choice.** Default to an agent-browser (e.g., Browser Use, Stagehand, Claude Computer Use, or equivalent). Reason: higher-level navigation planning survives selector brittleness and dynamic SPAs that flat Playwright struggles with. The agent-browser **must** expose structural evidence underneath — DOM snapshots, network traffic interception, screenshots, URL, and an action log — because probe outputs are audited downstream and every journey claim must cite its evidence source. If the selected agent-browser cannot expose that evidence, fall back to direct Playwright MCP.
 
-**Failure-preservation rule for agent-browser.** Agent-browsers are helpful by default — they retry, they fall back to vision-based navigation when selectors fail, they smooth over flaky clicks. That helpfulness can mask real prototype bugs. Ui-walker must treat fallback paths as **findings**, not as silent recoveries:
+**Failure-preservation rule for agent-browser.** Agent-browsers are helpful by default — they retry, they fall back to vision-based navigation when selectors fail, they smooth over flaky clicks. That helpfulness can mask real prototype bugs. The extract-ui-walker role must treat fallback paths as **findings**, not as silent recoveries:
 - A journey is marked `"completed"` only if it succeeded on the first attempted path with no retry.
 - A journey that succeeded via fallback gets `"status": "completed-with-fallback"` and its `evidence.action_log` must list every failed attempt, what went wrong, and which fallback succeeded.
-- Vision-based fallback when a selector fails is evidence that the affordance the selector targeted is broken or missing — flag it for the reconciler.
+- Vision-based fallback when a selector fails is evidence that the affordance the selector targeted is broken or missing — flag it for the extract-reconciler.
 - An agent-browser that cannot emit an action log is not acceptable; the probe's audit trail depends on it.
 
 ### Output schemas (required depth floor)
@@ -138,7 +138,7 @@ All values must be extracted from the running prototype via browser inspection (
 
 ### Phase 2 — Reconciliation
 
-A single reconciler agent (fresh context, reads only probe outputs) produces the unified artifacts.
+A single extract-reconciler agent (fresh context, reads only probe outputs) produces the unified artifacts.
 
 **Merge preservation rule (applies to every merge).** Reconciliation is *additive*, not compressive:
 
@@ -151,11 +151,11 @@ A single reconciler agent (fresh context, reads only probe outputs) produces the
 - **Merge data model.** `data-model.declared.json` and `data-model.actual.json` → `artifacts/data-model.json`. Each entity has a `sources` array (postgres/sqlite/csv/declared-only), a `drift` array for per-source divergence, and an `authoritative_source` decision with reasoning. Top-level `drift_report` summarizes all divergences across stores.
 - **Check referential integrity.** Every endpoint in `user-journeys.json` must appear in `api-spec.json`. Every route in `api-spec.json` must touch entities in `data-model.json` or be explicitly marked stateless. Every external contract must be reachable from at least one route. Failures become `integrity-errors` in `artifacts/reconciliation-report.md`.
 - **Produce `prd.md`.** Synthesized from all four probe outputs. Structure: product purpose, primary journeys (cite `user-journeys.json`), data model summary (cite `data-model.json`), external dependencies (cite `external-contracts.json`), known gaps and mismatches, non-goals (inferred). ~800 words; the PRD is a lead-with document and structured artifacts carry the detail.
-- **Produce `reconciliation-report.md`.** Integrity-error list + cross-artifact conflicts + classification-confidence notes. This is the forensic handoff to the critic.
+- **Produce `reconciliation-report.md`.** Integrity-error list + cross-artifact conflicts + classification-confidence notes. This is the forensic handoff to the extract-critic.
 
 ### Phase 3 — Critic Pass
 
-A fresh agent reads only the merged artifacts (no prototype access). It answers three questions in writing:
+A fresh extract-critic agent reads only the merged artifacts (no prototype access). It answers three questions in writing:
 
 1. **Ambiguity:** what claims in the spec are underspecified to the point that two reasonable rewrites could diverge?
 2. **Contradictions:** what statements in one artifact contradict another?
@@ -187,22 +187,22 @@ State your per-output decision in the summary. When in doubt, `regenerate`.
 
 | Role | Owned outputs | Allowed evidence | Forbidden |
 |---|---|---|---|
-| **ui-walker** | `user-journeys.json`, `api-spec.observed.json`, `design.md`, best-effort evidence in `screenshots/` | Live prototype via browser + intercepted network | Source code, other probes' outputs, prose docs |
-| **static** | `api-spec.declared.json`, `data-model.declared.json`, `ui-handlers.declared.json` | Prototype source code | Live prototype, DB, other probes' outputs |
-| **data** | `data-model.actual.json`, `sample-data/` | Live DB + flat files (SQLite, CSV) | Source code, other probes' outputs |
-| **external** | `external-contracts.json` | Source imports, env vars, deps manifest, `.env` key list | Live prototype, other probes' outputs |
-| **reconciler** | `api-spec.json`, `data-model.json`, `prd.md`, `reconciliation-report.md`, `journey-interactions.json` | Phase 1 probe outputs only | Prototype, live systems |
-| **critic** | `critic-report.md` | Merged Phase 2 artifacts only | Phase 1 probe outputs, prototype, live systems |
+| **extract-ui-walker** | `user-journeys.json`, `api-spec.observed.json`, `design.md`, best-effort evidence in `screenshots/` | Live prototype via browser + intercepted network | Source code, other probes' outputs, prose docs |
+| **extract-static** | `api-spec.declared.json`, `data-model.declared.json`, `ui-handlers.declared.json` | Prototype source code | Live prototype, DB, other probes' outputs |
+| **extract-data** | `data-model.actual.json`, `sample-data/` | Live DB + flat files (SQLite, CSV) | Source code, other probes' outputs |
+| **extract-external** | `external-contracts.json` | Source imports, env vars, deps manifest, `.env` key list | Live prototype, other probes' outputs |
+| **extract-reconciler** | `api-spec.json`, `data-model.json`, `prd.md`, `reconciliation-report.md`, `journey-interactions.json` | Phase 1 probe outputs only | Prototype, live systems |
+| **extract-critic** | `critic-report.md` | Merged Phase 2 artifacts only | Phase 1 probe outputs, prototype, live systems |
 
 Output schemas are defined in the Phase 1/2/3 descriptions above — the contract here covers ownership and rerun behavior, not schema detail.
 
 ### Summary format
 
-Every role returns a summary ≤200 words (≤300 for reconciler and critic). It must include:
+Every role returns a summary ≤200 words (≤300 for extract-reconciler and extract-critic). It must include:
 1. Rerun decisions (if the role started with any owned outputs present): per-output `regenerate | continue | leave-as-is`.
 2. Headline findings or what was produced.
 3. Anything the next phase should watch for.
-4. For `ui-walker`, whether screenshots were captured. If not, state why not. Missing screenshots alone are not a phase blocker.
+4. For `extract-ui-walker`, whether screenshots were captured. If not, state why not. Missing screenshots alone are not a phase blocker.
 
 ## Rationalizations
 
@@ -215,7 +215,7 @@ Every role returns a summary ≤200 words (≤300 for reconciler and critic). It
 | "The README explains it, let me just use that" | The README is the answer key. Using it short-circuits the test of whether reverse-spec works from evidence. |
 | "Observed and declared disagree — I'll pick one" | The disagreement *is* the finding. Record it as a mismatch, do not silently merge. |
 | "I hit the reset button to see what happens" | Destructive endpoints are documented by their existence; the runtime probe does not execute them. The prototype's data state is evidence — mutating it corrupts other probes' findings. |
-| "I'll keep trying URL variants until I find the right one" | Two navigation attempts max per journey target. If both miss, mark the journey `blocked-other` with the attempted URLs. The reconciler cross-references declared routes to identify the correct URL; brute-forcing wastes probe budget. |
+| "I'll keep trying URL variants until I find the right one" | Two navigation attempts max per journey target. If both miss, mark the journey `blocked-other` with the attempted URLs. extract-reconciler cross-references declared routes to identify the correct URL; brute-forcing wastes probe budget. |
 | "The prototype needs `STRIPE_SECRET_KEY` — I'll put a realistic-looking value to get further" | Never synthesize real-looking credentials. Empty values let probes discover the service boundary naturally (auth fails at call time, which is itself evidence). Synthesized credentials that happen to be valid make the run dangerous; synthesized credentials that look valid but aren't make failures misleading. |
 | "The agent-browser recovered from the click failure, so the journey passed" | A recovery is a finding. Mark the journey `completed-with-fallback` and record every failed attempt in the action log. The original click-failure is the prototype bug the rewrite needs to fix; smoothing it over corrupts the spec. |
 
@@ -223,15 +223,15 @@ Every role returns a summary ≤200 words (≤300 for reconciler and critic). It
 
 - You are tempted to read `README.md` to "confirm" an inference.
 - A probe is silently falling back to another probe's evidence because its own failed.
-- Reconciler is resolving mismatches by picking a side instead of recording them.
-- The critic pass surfaces issues that should have been caught by referential integrity.
+- extract-reconciler is resolving mismatches by picking a side instead of recording them.
+- The extract-critic pass surfaces issues that should have been caught by referential integrity.
 - You are producing artifacts describing behavior that the running prototype does not exhibit.
 - You are about to click a button or call an endpoint whose name matches a destructive pattern.
 - Probe run completed but the prototype's data state is different from what Phase 0 observed.
 
 ## Verification
 
-- All four probe outputs exist and are non-empty (six core artifact files total: `user-journeys.json`, `api-spec.observed.json`, `api-spec.declared.json`, `data-model.declared.json`, `data-model.actual.json`, `external-contracts.json`, plus `design.md` from ui-walker), or `boot-failed` blocker is emitted. `screenshots/` are best-effort evidence and should be present when capture works, but absence alone is not a blocker.
+- All four probe outputs exist and are non-empty (six core artifact files total: `user-journeys.json`, `api-spec.observed.json`, `api-spec.declared.json`, `data-model.declared.json`, `data-model.actual.json`, `external-contracts.json`, plus `design.md` from extract-ui-walker), or `boot-failed` blocker is emitted. `screenshots/` are best-effort evidence and should be present when capture works, but absence alone is not a blocker.
 - Reconciled artifacts include explicit mismatch and integrity-error sections (empty is fine; absent is not).
 - `critic-report.md` exists with ambiguity/contradictions/gaps sections.
 - No file under `prototype/` has been modified.

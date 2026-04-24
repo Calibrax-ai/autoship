@@ -60,7 +60,7 @@ Status note: as of 2026-04-24, exactly one real blocker shape has been emitted b
 **Decision the controller is being asked to make:**
 
 - Pick between the ambiguous options (with the executor's reasoning attached), OR
-- Return the artifact to the reconciler for disambiguation, OR
+- Return the artifact to extract-reconciler for disambiguation, OR
 - Accept the ambiguity as a known underspec and document the executor's chosen interpretation as the fixed choice going forward.
 
 **Example — shape expected but not yet observed:**

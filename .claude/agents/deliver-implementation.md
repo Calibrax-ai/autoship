@@ -1,5 +1,5 @@
 ---
-name: implementation-executor
+name: deliver-implementation
 description: Implements a deliver issue against the frozen Stage 1 oracle inside a per-issue worktree. May modify production source only. Never mutates Stage 1 oracle files, never commits, never pushes.
 model: "claude-opus-4-7[1m]"
 effort: high

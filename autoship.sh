@@ -147,7 +147,7 @@ EOF
 # Phase 1: Fanout
 phase_fanout() {
   log "phase: fanout"
-  local roles=(ui-walker static data external)
+  local roles=(extract-ui-walker extract-static extract-data extract-external)
   local pids=()
   for r in "${roles[@]}"; do
     (spawn_claude "$r") &
@@ -163,7 +163,7 @@ phase_fanout() {
 phase_reconcile() {
   log "phase: reconcile"
   local ec=0
-  spawn_claude "reconciler" || ec=$?
+  spawn_claude "extract-reconciler" || ec=$?
   complete_phase reconcile "exit=$ec"
 }
 
@@ -171,7 +171,7 @@ phase_reconcile() {
 phase_critic() {
   log "phase: critic"
   local ec=0
-  spawn_claude "critic" || ec=$?
+  spawn_claude "extract-critic" || ec=$?
   complete_phase critic "exit=$ec"
 }
 

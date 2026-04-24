@@ -1,5 +1,5 @@
 ---
-name: data
+name: extract-data
 description: Live database introspection probe for reverse-spec-extraction Phase 1. Describes actual data state independent of code claims.
 model: "claude-opus-4-7[1m]"
 effort: high

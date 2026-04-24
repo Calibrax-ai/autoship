@@ -1,0 +1,84 @@
+# Brief Review Rubric
+
+Use this rubric when `deliver-brief-reviewer` judges `brief.md`.
+
+## Required inputs
+
+- `.claude/skills/reviewing/SKILL.md`
+- `.claude/skills/deliver-grooming/SKILL.md`
+- `.claude/skills/deliver-grooming/assets/brief-template.md`
+- injected `brief.md`
+- injected issue body/comments
+- injected testbed root
+
+## Checks
+
+### Check 1 - Well-formedness
+
+Does the brief conform to `assets/brief-template.md`?
+
+Verify all required frontmatter keys are present, including the type-specific status field. All seven universal sections must be populated with non-placeholder content. Blast-Radius must use four buckets. Outcome must be one line around 15 words. Type-specific sections required by `SKILL.md` Brief schema must be present and populated.
+
+For Feature, check conditional subsections required by blast-radius shape: migrations in blast-radius -> Migration Plan; db/schema changes -> Schema Diff; queue/worker files created -> Failure Modes; existing API routes changed -> Backward Compatibility; runtime risk -> Constraints.
+
+For Refactor, check all three Behavior Preservation subsections: What must be preserved, Preservation Proof, Structure Improvement.
+
+A missing or placeholder required field is `FAIL`. An invented status value outside `SKILL.md` Status enums is `FAIL`.
+
+### Check 2 - Groundedness
+
+Is every claim grounded in observed output, cited code, or cited issue content?
+
+Apply `SKILL.md` Groundedness criteria, universal plus the matching type section. The reviewer verifies, not re-derives:
+
+- Open cited files in Root Cause / Alternatives / Existing tests / Structure Improvement -> Before. Confirm quoted content matches.
+- For every file in Blast-Radius -> Expected to create, use `Glob` to confirm it does not already exist. Existing file labeled as new is `FAIL`.
+- For Feature Alternatives, confirm each cited `file:line` exists and roughly matches the claimed pattern. Strawman rejections with no cited counter-example are `FAIL`.
+- For Refactor Existing tests, confirm each listed test file exists and imports or calls the refactor target.
+
+Any unverifiable claim, mismatched citation, or hallucinated invariant is `FAIL`.
+
+### Check 3 - Scope sanity
+
+Does the brief's scope match what was asked, without widening, deferring, or over-engineering?
+
+Apply `SKILL.md` Scope sanity principles, universal plus the matching type section. Load-bearing checks:
+
+- Feature: grep for simpler existing patterns that could solve the stated problem. If one exists and Design Rationale did not consider it, `FAIL`.
+- Feature: if the brief is single-slice but the issue has multi-slice indicators, `FAIL`.
+- Refactor: any hint of observable behavior drift is `FAIL`.
+- Refactor: coverage-gap plan must name specific test files, test names, and behaviors.
+
+## Output format
+
+```markdown
+---
+issue: <id>
+review-of: brief.md
+reviewed-at: <ISO timestamp>
+reviewer-sha: <testbed SHA>
+verdict: APPROVED | REJECTED
+---
+
+# Brief Review NN - <ISO date>
+
+## VERDICT: APPROVED | REJECTED
+
+## Check 1 - Well-formedness: PASS | FAIL
+<one paragraph, citing specific sections or fields>
+
+## Check 2 - Groundedness: PASS | FAIL
+<one paragraph, citing specific claims and whether they verify>
+
+## Check 3 - Scope sanity: PASS | FAIL
+<one paragraph>
+
+## Notes (non-blocking observations)
+(none)
+
+## Specific objections (only if REJECTED)
+- <exact field/line and what must change>
+
+## What the deliver-pre-groomer must do next (only if REJECTED)
+- <specific regroom instruction>
+```

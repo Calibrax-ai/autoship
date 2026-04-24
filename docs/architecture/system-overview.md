@@ -24,43 +24,11 @@ Across all four, a human stays in the loop at the moments that matter — approv
 ```mermaid
 flowchart LR
     I[Intent] --> A[audit]
-    I --> X[extract]
     A --> D[deliver]
     D --> V[validate]
-    X --> V
+    I -. optional legacy research .-> X[extract]
+    X -. spec pack .-> D
 ```
-
-### Extract
-
-Handles the **unknown software** problem.
-
-**Input:**
-- prototype app
-- existing codebase with weak or missing product artifacts
-- screenshots, journeys, demo flows, sample data
-
-**Output:**
-- a readable specification of what the prototype was trying to do
-- a generated test suite (the "oracle" — the judge that says whether a rewrite matches the spec)
-- a production-candidate rebuild, verified against the tests
-
-Canonical doc: [extract-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/extract-architecture.md)
-
-### Deliver
-
-Handles the **known repo, bounded change** problem.
-
-**Input:**
-- approved issue or approved work item
-- existing codebase
-- current tests and local conventions
-
-**Output:**
-- a trustworthy brief (the plain-English plan for the change)
-- a handoff to the build stage (the brief + a frozen test suite the build must satisfy)
-- a validated code change, shipped as a draft pull request
-
-Canonical doc: [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md)
 
 ### Audit
 
@@ -80,6 +48,42 @@ For `audit-0.1`, the workflow stops at approved issue creation. It does not fix 
 
 When autoship audits a repo, `.autoship/standards.yaml` is the policy source for stack choices and release expectations. Repo artifacts such as `.env.example`, CI files, and deploy config are evidence sources. If standards are missing and the repo does not already constrain the choice, the right outcome is `decision-required`, not an invented platform decision.
 
+If the audit run declares an external URL, audit also performs a safe external exposure smoke test. That covers public-edge production/security readiness (TLS, headers, CORS, public API auth gates, cache behavior, docs/debug exposure) without running destructive probes or becoming a full pentest.
+
+### Deliver
+
+Handles the **known repo, bounded change** problem.
+
+**Input:**
+- approved issue or approved work item
+- existing codebase
+- current tests and local conventions
+
+**Output:**
+- a trustworthy brief (the plain-English plan for the change)
+- a handoff to the build stage (the brief + a frozen test suite the build must satisfy)
+- a validated code change, shipped as a draft pull request
+
+Canonical doc: [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md)
+
+### Extract
+
+Handles the **unknown software** problem.
+
+Extract is optional legacy/research machinery. It remains useful for demo reconstruction experiments, but it is not installed by default and should not shape the core product surface.
+
+**Input:**
+- prototype app
+- existing codebase with weak or missing product artifacts
+- screenshots, journeys, demo flows, sample data
+
+**Output:**
+- a readable specification of what the prototype was trying to do
+- a generated test suite (the "oracle" — the judge that says whether a rewrite matches the spec)
+- a production-candidate rebuild, verified against the tests
+
+Canonical doc: [extract-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/extract-architecture.md)
+
 ### Validate
 
 *Coming soon.*
@@ -92,7 +96,7 @@ One repo, from readiness audit to draft pull request. `Audit` is the upstream bo
 flowchart LR
     R["Repo / launch target"]
 
-    subgraph FUT1 ["Audit · coming soon"]
+    subgraph FUT1 ["Audit · scaffolded"]
       A["AI audits repo,<br/>writes findings,<br/>proposes issues"]
     end
 
@@ -137,27 +141,28 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 
 | Agent | Module | Role | Status |
 |---|---|---|---|
-| **Controller** | All | The conductor. Reads the run contract, dispatches each agent in order, owns all tracker mutations. | Operational |
-| **Auditor** | Audit | Inspects the repo against a fixed readiness lens and writes the audit artifact plus bounded issue candidates. | Scaffolded |
-| **Audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, and issue-candidate quality before any issues are created. | Scaffolded |
-| **Pre-groomer** | Deliver | Writes the *brief* (plain-English plan) from an approved issue. | Operational |
-| **Brief-reviewer** | Deliver | Judges the brief. Separate agent from the one that wrote it. | Operational |
-| **Oracle writer** | Deliver | Writes the *oracle* (tests) from the approved brief. This is the Stage 1 worker. | Operational |
-| **Implementation executor** | Deliver | Writes the code; forbidden from editing the oracle. This is the Stage 2 worker. | Operational |
-| **UI walker** | Extract · ingest | Drives the running demo in a browser to discover user journeys. | Operational |
-| **Static probe** | Extract · ingest | Extracts the API surface and data model from source code. | Operational |
-| **Data probe** | Extract · ingest | Introspects the live database to describe actual state. | Operational |
-| **External probe** | Extract · ingest | Catalogs external dependencies from source analysis. | Operational |
-| **Reconciler** | Extract · ingest | Merges the four probe outputs into a unified specification. | Operational |
-| **Critic** | Extract · ingest | Judges whether the spec is sufficient to build against. | Operational |
-| **Build-controller** | Extract · build | Dispatches per-slice build executors and runs the feedback loop. | Operational |
-| **Plan-reviewer** | Extract · build | Fresh-context skeptic between slice planning and the build. Must approve before code is written. | Operational |
+| **autoship-controller** | Core | The conductor. Reads the run contract, dispatches each agent in order, owns all tracker mutations. | Operational |
+| **audit-auditor** | Audit | Inspects the repo against a fixed readiness lens and writes the audit artifact plus bounded issue candidates. | Scaffolded |
+| **audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, and issue-candidate quality before any issues are created. | Scaffolded |
+| **deliver-pre-groomer** | Deliver | Writes the *brief* (plain-English plan) from an approved issue. | Operational |
+| **deliver-brief-reviewer** | Deliver | Judges the brief. Separate agent from the one that wrote it. | Operational |
+| **deliver-oracle-writer** | Deliver | Writes the *oracle* (tests) from the approved brief. This is the Stage 1 worker. | Operational |
+| **deliver-implementation** | Deliver | Writes the code; forbidden from editing the oracle. This is the Stage 2 worker. | Operational |
+| **extract-ui-walker** | Extract · ingest | Drives the running demo in a browser to discover user journeys. | Optional |
+| **extract-static** | Extract · ingest | Extracts the API surface and data model from source code. | Optional |
+| **extract-data** | Extract · ingest | Introspects the live database to describe actual state. | Optional |
+| **extract-external** | Extract · ingest | Catalogs external dependencies from source analysis. | Optional |
+| **extract-reconciler** | Extract · ingest | Merges the four probe outputs into a unified specification. | Optional |
+| **extract-critic** | Extract · ingest | Judges whether the spec is sufficient to build against. | Optional |
+| **extract-build-controller** | Extract · build | Dispatches per-slice build executors and runs the feedback loop. | Optional |
+| **extract-plan-reviewer** | Extract · build | Fresh-context skeptic between slice planning and the build. Must approve before code is written. | Optional |
 | **Validation agents** | Validate | Check security, code quality, and outcome against stated intent. | Coming soon |
 
 ### Design principles shared across all agents
 
 - **Fresh context window every time.** No long-running sessions.
 - **Generator-evaluator at every handoff.** The agent that writes an artifact never judges it.
+- **Shared reviewer discipline, separate rubrics.** Universal evaluator posture lives in `reviewing`; artifact-specific checks live beside the domain skill that owns the artifact.
 - **Strict ownership.** The controller never writes code. Workers never touch tracker state.
 
 ## Human vs Agent Boundary
@@ -191,7 +196,7 @@ Autoship should distinguish between:
 
 That split maps naturally to two artifacts:
 
-- **`.claude/agents/controller.md`**
+- **`.claude/agents/autoship-controller.md`**
   Stable framework knowledge plus per-mode procedure. Changes slowly. Holds the load-bearing discipline (workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) inline with each mode's loop. Collapsed here from the former `autoship-controller` skill because it had a single reader and the split was creating drift.
 
 - **`program.md`**
@@ -246,16 +251,16 @@ Instead:
 
 Examples:
 
-- `extract` owns its own probe/build workflow
+- optional `extract` owns its own probe/build workflow
 - `audit` will own a bounded audit workflow (`new -> audited -> approved-to-create -> issues-created`)
 - `deliver` owns the issue workflow that starts once a bounded issue exists and enters `Grooming`
 
 ## What Exists Today
 
-Today, autoship is strongest in the middle of the system:
+Today, autoship is strongest in the known-repo delivery path:
 
-- `extract` has validated the **generator-evaluator** pattern at the planning layer — the agent that *writes* a plan never grades its own plan; a separate reviewer agent does.
 - `deliver` has validated the same pattern at the grooming layer, plus the trustworthy-brief-to-build flow across Bug, Feature, and Refactor shapes
+- `extract` validated useful generator-evaluator patterns, but remains optional because demo reconstruction is not the primary product path
 
 What is still less mature:
 
@@ -274,14 +279,14 @@ The runtime shape is now:
 
 In other words:
 
-- `.claude/agents/controller.md` explains how autoship behaves (stable discipline + per-mode procedure)
+- `.claude/agents/autoship-controller.md` explains how autoship behaves (stable discipline + per-mode procedure)
 - `program.md` tells one controller run what to do
 
 That preserves the successful `extract` probe pattern without collapsing stable product knowledge and per-run policy into one file.
 
 Current implementation status:
 
-- `extract` controller mode is live for ingest
+- `extract` controller mode is live for ingest when the optional extract pack is installed
 - `deliver` controller mode is live through draft PR:
   - `claim -> pre-groom -> review -> Ready | needs-human-input`
   - after human promotion to `Building`: `worktree -> Stage 1 -> Stage 2 -> validation -> draft PR -> In Review`
@@ -306,8 +311,8 @@ These are placeholders, not locked commitments:
 Use the docs in this order:
 
 1. This file for the top-level system shape
-2. [extract-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/extract-architecture.md) for the `extract` module
+2. [audit-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/audit-architecture.md)
 3. [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for the `deliver` module
-4. [audit-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/audit-architecture.md)
+4. [extract-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/extract-architecture.md) for the optional `extract` module
 
 Do not duplicate detailed module mechanics here. This file stays intentionally light.

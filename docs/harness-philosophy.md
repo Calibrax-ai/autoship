@@ -89,7 +89,7 @@ Autoship should commit to:
 
 1. **Thin procedurally, dense on goal and context.** Match Karpathy's program.md shape — schemas, criteria, declarative goal states, anti-patterns stated as what-they-are (not as detection recipes). Keep depth; drop imperatives.
 
-2. **Separate the author from the judge — via a reviewer sub-agent, not a thicker prompt.** The build-controller cannot discharge its own gates. A fresh-context reviewer (separate `.claude/agents/plan-reviewer.md` or equivalent) reads the slice plan + `decisions.md` + the spec pack and must approve before Stage 1 dispatches. The reviewer is calibrated to be skeptical — exactly the "adversarial generator/evaluator" pattern Anthropic found tractable.
+2. **Separate the author from the judge — via a reviewer sub-agent, not a thicker prompt.** The extract-build-controller cannot discharge its own gates. A fresh-context reviewer (`.claude/agents/extract-plan-reviewer.md`) reads the slice plan + `decisions.md` + the spec pack and must approve before Stage 1 dispatches. The reviewer is calibrated to be skeptical — exactly the "adversarial generator/evaluator" pattern Anthropic found tractable.
 
 3. **Criteria over checklists where possible.** Where autoship has grep gates that encode a judgment (is the plan complete? is the oracle adequate? is the slice really done?), replace with 3–5 weighted criteria the reviewer scores. Keep grep gates only where the check is *mechanical* (tests compile; dev server boots; writes field respected).
 
@@ -196,7 +196,7 @@ Predicted outcome, played out:
 
 ## What to change in autoship, ranked
 
-1. **Introduce a `plan-reviewer` sub-agent** (`.claude/agents/plan-reviewer.md`, fresh-context, reads `progress.txt` + `decisions.md` + spec pack + `program.md`). Make it a mandatory step between slice-plan-written and Stage 1 dispatch. Highest leverage by a large margin — directly addresses the J13 class of failure.
+1. **Introduce an `extract-plan-reviewer` sub-agent** (`.claude/agents/extract-plan-reviewer.md`, fresh-context, reads `progress.txt` + `decisions.md` + spec pack + `program.md`). Make it a mandatory step between slice-plan-written and Stage 1 dispatch. Highest leverage by a large margin — directly addresses the J13 class of failure.
 
 2. **Build the reviewer calibration set.** Take every cut/merge/drop decision from probes 2.6, 2.7, 2.8. For each, write the spec-pack signal, the decision the controller made, and the decision the operator considers correct in retrospect. This is 10–20 examples. Put them in the reviewer's prompt as few-shot exemplars. Without this, the reviewer is just another Claude that will probably rubber-stamp.
 
