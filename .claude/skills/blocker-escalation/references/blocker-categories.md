@@ -2,7 +2,7 @@
 
 Four categories. The enum is closed so the lint script can check membership, but the taxonomy is provisional — it was drafted before most real blocker shapes had been observed. If your blocker doesn't cleanly fit, pick the closest and use the template's `## Category fit note` section to explain the mismatch. Honest misfits are how this reference improves.
 
-Status note: as of 2026-04-24, exactly one real blocker shape has been emitted by autoship's skills — `boot-failed` from `reverse-spec-extraction`'s Phase 0. It fits `implementation-failure` awkwardly (the "implementation" in that case is the act of running the prototype itself). The other three categories are expected shapes that have not yet been stressed by a probe. Treat the examples for those categories as illustrative rather than authoritative.
+Status note: as of 2026-04-27, this taxonomy is still provisional. Treat examples as illustrative rather than authoritative; honest category misfits are useful signal for improving the reference.
 
 ---
 
@@ -14,7 +14,7 @@ Status note: as of 2026-04-24, exactly one real blocker shape has been emitted b
 
 - An iteration loop has run N times without narrowing the failure class.
 - The implementation depends on something outside the executor's control (an external service is returning unexpected shapes; a binary the executor can't install is required; a port the executor can't rebind is already bound).
-- The prototype or build target fails to boot entirely (`boot-failed` in `reverse-spec-extraction`).
+- The build target fails to boot entirely.
 
 **Decision the controller is being asked to make (bounded):**
 
@@ -23,7 +23,7 @@ Status note: as of 2026-04-24, exactly one real blocker shape has been emitted b
 - Abort the slice and split it smaller, OR
 - Authorize a specific protected-surface change that would unblock (in which case the report should name the exact change, not "change the oracle somehow").
 
-**Example — real (boot-failed, drawn from `reverse-spec-extraction`):**
+**Example — boot failure shape:**
 
 > Category: implementation-failure
 >
@@ -60,7 +60,7 @@ Status note: as of 2026-04-24, exactly one real blocker shape has been emitted b
 **Decision the controller is being asked to make:**
 
 - Pick between the ambiguous options (with the executor's reasoning attached), OR
-- Return the artifact to extract-reconciler for disambiguation, OR
+- Return the artifact to the authoring worker for disambiguation, OR
 - Accept the ambiguity as a known underspec and document the executor's chosen interpretation as the fixed choice going forward.
 
 **Example — shape expected but not yet observed:**

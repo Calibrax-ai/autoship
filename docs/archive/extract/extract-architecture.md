@@ -2,9 +2,9 @@
 title: "Extract"
 ---
 
-**Status:** optional legacy/research module · **Last updated:** 2026-04-24
+**Status:** archived research module · **Last updated:** 2026-04-27
 
-Extract is no longer the default autoship surface. Core autoship now installs audit + deliver; extract remains available with `autoship init --with-extract` for demo reconstruction and research runs.
+> Archived: extract was retired from the live autoship product on 2026-04-27. This file preserves the old research architecture and may mention commands or agents that are no longer installed or packaged.
 
 ## In plain English
 

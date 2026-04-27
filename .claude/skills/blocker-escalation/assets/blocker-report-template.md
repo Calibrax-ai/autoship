@@ -6,10 +6,10 @@ completed file before filing. Delete this comment after filling out.
 -->
 
 **Run:** <run-id>
-**Stage:** <phase name — e.g., "extract-ingest phase 0", "build: backend iteration 4", "build: oracle assembly">
-**Surface:** <build surface if applicable: deliver stage 1 | deliver stage 2 | extract oracle | extract backend | extract frontend. Omit when not applicable.>
+**Stage:** <phase name — e.g., "audit review", "deliver oracle", "deliver implementation", "deliver verification">
+**Surface:** <build surface if applicable: deliver oracle | deliver implementation | deliver verification. Omit when not applicable.>
 **Timestamp:** <ISO-8601, e.g., 2026-04-24T14:22:00Z>
-**Filed by:** <role name — e.g., extract-ui-walker, deliver-implementation, extract-reconciler>
+**Filed by:** <role name — e.g., audit-auditor, audit-reviewer, deliver-oracle-writer, deliver-implementation>
 
 ## Category
 

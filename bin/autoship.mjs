@@ -9,7 +9,6 @@ autoship — turn messy software work into reviewable, reliable delivery
 
 Usage:
   autoship init                        Install core autoship agents into the current repo
-  autoship init --with-extract         Also install optional extract research agents
   autoship standards                   Print standards drafting guidance
   autoship audit                       Print audit invocation guidance
   autoship deliver                     Print deliver invocation guidance

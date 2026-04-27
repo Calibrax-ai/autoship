@@ -1,6 +1,6 @@
 ---
 name: blocker-escalation
-description: Use when an autoship agent (extract probe, extract-reconciler, extract-critic, deliver-oracle-writer, deliver-implementation, or extract build executor) cannot safely continue and must stop guessing. Converts unresolved ambiguity, protected-surface conflicts, repeated-without-narrowing failures, or environment/setup failures into a structured blocker report that names the smallest concrete decision the controller or human must make. Reach for this whenever an iteration is about to silently invent intent, rewrite the judge, or loop in place without narrowing the failure class — do not use it for spec extraction or for writing implementation code.
+description: Use when an autoship agent cannot safely continue and must stop guessing. Converts unresolved ambiguity, protected-surface conflicts, repeated-without-narrowing failures, or environment/setup failures into a structured blocker report that names the smallest concrete decision the controller or human must make. Reach for this whenever an iteration is about to silently invent intent, rewrite the judge, or loop in place without narrowing the failure class — do not use it for writing implementation code.
 ---
 
 # Blocker Escalation
@@ -18,7 +18,7 @@ Use when:
 - The execution loop cannot proceed safely.
 - A protected artifact, oracle file, or policy default appears wrong and no patch of the implementation alone can resolve it.
 - Repeated iterations are not narrowing the failure class — the same shape of failure keeps recurring, or each new attempt surfaces a different, unrelated failure.
-- The environment or prerequisites prevent progress (e.g., the `boot-failed` case in `reverse-spec-extraction`: missing env var, missing binary, port conflict).
+- The environment or prerequisites prevent progress (e.g., missing env var, missing binary, port conflict).
 - The task requires changing a protected surface the current agent is not allowed to touch.
 
 Do not use when:

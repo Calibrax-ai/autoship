@@ -26,7 +26,7 @@ Use this skill when:
 Do not use when:
 
 - The next step is grooming or building an already-approved issue. Use `deliver` workers instead.
-- The software itself is still unknown and needs reverse-spec extraction first.
+- The software itself is still unknown and needs product discovery before a readiness audit.
 - You are already in implementation mode. Audit does not fix code.
 
 ## Inputs and precedence
