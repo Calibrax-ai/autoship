@@ -22,11 +22,35 @@ Run from the root of a git repo. The CLI:
 
 After the repo evolves, re-run `autoship init` against the existing repo. It will print an advisory — what current evidence would fill into SET_ME slots, where existing values disagree with current evidence — without modifying `standards.yaml`. Copy any fills you want manually. autoship never silently overwrites the file once it exists.
 
-## Run
+## Run autoship
 
-Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
+Setup is one-time via `autoship init` (above). Runtime modes — `audit` and `deliver` — are driven through the `autoship-controller` agent that init scaffolds into `.claude/agents/`. Two ways to invoke it:
 
-The audit smoke test is zero-config:
+### Headless, one-shot (`-p`)
+
+Best for CI, scripts, or bounded runs that should exit when the controller stops.
+
+```bash
+claude --agent autoship-controller -p "audit --report-only"
+```
+
+The controller runs to a stop condition and exits. Disk-backed state under `.autoship/` means re-running picks up where it left off.
+
+### Interactive chat session
+
+Best when you want to watch the run unfold, review artifacts as they land, or push back on framing mid-flight.
+
+```bash
+claude --agent autoship-controller
+```
+
+Drops you into a chat with the controller loaded. Type `audit --report-only`, `deliver FRD-162`, or any natural-language prompt the controller accepts. Same RunRequest contract as headless mode.
+
+> Already in an existing Claude Code session in the same repo? You can also dispatch the autoship-controller as a subagent from there — see [Claude Code's subagent docs](https://code.claude.com/docs/en/sub-agents.md).
+
+## What to run
+
+Audit is zero-config:
 
 ```bash
 claude --agent autoship-controller -p "audit --report-only"
@@ -45,6 +69,8 @@ claude --agent autoship-controller -p "deliver build FRD-162 --dry-run"  # plan,
 The controller resolves a `RunRequest`, writes `invocation.txt` + `run.json` to the run dir for reproducibility, and drives the issue through grooming → human approval → build → draft pull request.
 
 Per-repo sticky defaults go in optional `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies.
+
+Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
 
 ## Requires
 
