@@ -46,21 +46,8 @@ export default defineConfig({
                   label: 'Learnings',
                   items: [
                       { label: 'Cross-track', slug: 'learnings' },
-                      { label: 'Extract', slug: 'extract-learnings' },
                       { label: 'Deliver', slug: 'deliver-learnings' },
                   ],
-              },
-              {
-                  label: 'Guides',
-                  items: [
-                      { label: 'Harness Philosophy', slug: 'harness-philosophy' },
-                      { label: 'Plan Reviewer Calibration', slug: 'plan-reviewer-calibration' },
-                      { label: 'Program Template', slug: 'architecture/deliver-program-template' },
-                  ],
-              },
-              {
-                  label: 'Probes',
-                  slug: 'probe-summary',
               },
               {
                   label: 'Archive',

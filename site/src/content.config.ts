@@ -8,8 +8,9 @@ import { docsSchema } from '@astrojs/starlight/schema';
 // Starlight docs collection to avoid double-routing.
 const LONGFORM_ARCHITECTURE = [
 	'architecture/system-overview.md',
+	'architecture/audit-architecture.md',
+	'architecture/audit-tracker-sync.md',
 	'architecture/deliver-architecture.md',
-	'architecture/extract-architecture.md',
 ];
 
 export const collections = {
@@ -18,6 +19,7 @@ export const collections = {
 			pattern: [
 				'**/*.{md,mdx,mdoc}',
 				'!_assets/**',
+				'!**/archive/extract/implementation/**/*',
 				...LONGFORM_ARCHITECTURE.map((p) => `!${p}`),
 			],
 		}),
@@ -25,7 +27,7 @@ export const collections = {
 	}),
 	architecture: defineCollection({
 		loader: glob({
-			pattern: '{system-overview,deliver-architecture,extract-architecture}.md',
+			pattern: '{system-overview,audit-architecture,audit-tracker-sync,deliver-architecture}.md',
 			base: '../docs/architecture',
 		}),
 		schema: z.object({

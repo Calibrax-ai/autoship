@@ -5,25 +5,25 @@ description: Turns messy software work into reliable delivery — humans approve
 
 Autoship turns messy software work into reliable delivery.
 
-A half-built prototype that needs to become a real product. An approved ticket that needs to become a shipped change. A shared intent that needs to become a tested feature. All of these share the same pain: most of the effort isn't writing code — it's producing a trustworthy plan the code can be written against.
+A repo that needs a launch-readiness answer. An approved ticket that needs to become a shipped change. A shared intent that needs to become a tested feature. All of these share the same pain: most of the effort isn't writing code — it's producing a trustworthy plan the code can be written against.
 
 Autoship does the grinding. Humans approve at the moments that matter: *is this what we want?* and *is this safe to ship?*
 
 [→ See how it works](/architecture/system-overview/) · [GitHub ↗](https://github.com/Calibrax-ai/autoship)
 
-## Four modules, one runtime
+## Standards, audit, deliver
 
-**Operational today**
+**Live product path**
 
-- **Extract** — take an unknown prototype, produce a trustworthy specification and a working build.
+- **Standards** — draft or review repo policy so audits and delivery do not invent platform decisions.
+- **Audit** — inspect a real repo against a fixed readiness lens, produce evidence-backed findings, and create bounded Linear issue candidates.
 - **Deliver** — take an approved issue, produce a reviewed code change through a draft pull request.
 
 **Coming soon**
 
-- **Audit** — inspect a real repo against a fixed readiness lens, produce evidence-backed findings, and create bounded issue candidates for downstream delivery.
 - **Validate** — take a shipped change and produce outcome truth: did this actually move the thing it claimed to?
 
-One runtime drives all four. Different internal shapes, the same discipline — described below.
+The retired extract research track is archived under `/archive/extract/`; it is not part of the live install or runtime.
 
 ## Start here
 

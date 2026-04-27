@@ -1,170 +1,116 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with this repository.
 
 ## Repository Nature
 
-autoship v0.1 is a **core audit + deliver agent framework** for turning repo evidence and approved work into reviewed, executable delivery artifacts. The extract ingest/build machinery still exists as an optional legacy research pack, but it is no longer the default installed product surface.
+autoship v0.1 is a **standards + audit + deliver agent framework** for turning repo evidence and approved work into reviewed, executable delivery artifacts.
+
+Extract has been retired from the live product. Its old implementation and research notes are archived under `docs/archive/extract/`; do not treat them as runnable product guidance.
 
 ## Start Here
 
-Use autoship in the core path. Invocation is trigger-first — pass flags or a natural-language prompt. No run-config file authoring required. Core audit/deliver do not read `.autoship/program.md`; that file is extract-only legacy.
+Use autoship through the core controller. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
 
-- **`deliver` today** — after configuring an issue source + validation command, use `claude --agent autoship-controller -p "deliver"` (resume) or `-p "deliver FRD-162"` / `-p "deliver groom FRD-162"` / `-p "deliver build FRD-162 --dry-run"` from the testbed root
-- **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-brief-reviewer` directly
-- **`audit`** — `claude --agent autoship-controller -p "audit --report-only"` or `-p "audit --tracker=linear --approve"` or NL prompt (`"audit this repo, report-only, no tracker writes"`). Stops at reviewed findings plus approved issue creation in `Backlog`.
+- **`standards`** — `claude --agent autoship-controller -p "draft standards from this repo"`
+- **`audit`** — `claude --agent autoship-controller -p "audit --report-only"` or `-p "audit --tracker=linear --approve"`
+- **`deliver`** — after configuring an issue source + validation command, use `claude --agent autoship-controller -p "deliver"` or `-p "deliver FRD-162"` / `-p "deliver groom FRD-162"` / `-p "deliver build FRD-162 --dry-run"`
+- **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-brief-reviewer` directly when you only need a brief and review.
 
-Optional research pack:
+Important boundaries:
 
-- **`extract` optional** — operational via `autoship.sh ingest ...` or `autoship-controller` in extract-ingest mode, but only installed by `autoship init --with-extract`. Keep it available for demo reconstruction research; do not let it dominate the default product surface. Extract retains its own `program.md` mechanics; the trigger-first refactor only covers audit + deliver.
-
-Important boundary:
-
-- **`.claude/agents/autoship-controller.md`** holds the stable operating discipline (§ How I Receive Work defines the RunRequest contract, plus workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) plus per-mode procedure. The separate `autoship-controller` skill was collapsed into the agent on 2026-04-24 because it had exactly one reader and the split was creating drift between two files.
-- **`.autoship/standards.yaml`** is the repo-local **policy** file. Use it for stack standards; use `.env.example` as evidence of current repo shape, not as the source of truth for policy. Never put trigger/run config here.
-- **`.autoship/defaults.yaml`** (optional) — per-repo sticky run defaults (e.g., `audit.tracker: linear`). Flags on the invocation always win; `--report-only` and `--tracker=none` override stickies.
-- **No core `.autoship/program.md`** — audit/deliver use triggers, defaults, and standards. If a prompt asks core audit/deliver to use `program.md`, treat it as unsupported legacy.
-- You do **not** need any of these for the manual `deliver` fallback.
-- The checked-in `.claude/agents/autoship-controller.md` is mode-aware for optional `extract ingest`, `audit`, and `deliver` through draft PR.
+- **No `.autoship/program.md`** — live autoship uses triggers, defaults, and standards. If a prompt asks autoship to use `program.md`, treat it as unsupported.
+- **`.autoship/standards.yaml`** is repo-local policy: hosting, CI, observability, secrets, release expectations. Use `.env.example` as evidence of current repo shape, not as policy.
+- **`.autoship/defaults.yaml`** is optional per-repo run defaults: tracker, validation command, branch prefix. Flags always win; `--report-only` and `--tracker=none` override stickies.
+- **`.claude/agents/autoship-controller.md`** holds the stable operating discipline, RunRequest contract, workflow-surface ownership, generator-evaluator separation, disk-backed state, and per-mode procedure.
 
 ## Key Files
 
-- `autoship.sh` — legacy extract-ingest controller (single-file state machine, ~240 lines). Optional pack only.
-- `.claude/agents/` — agent definitions:
-  - **Core orchestration**: autoship-controller — one top-level controller role. Supports audit and deliver by default; optional extract-ingest when the extract pack is installed.
-  - **Audit**: audit-auditor, audit-reviewer — generator-evaluator pair for readiness assessment and issue-candidate review. Controller owns issue creation; workers own only artifacts.
-  - **Deliver grooming**: deliver-pre-groomer, deliver-brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `autoship-controller` in deliver mode.
-  - **Deliver build**: deliver-oracle-writer, deliver-implementation — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/verification/PR; workers own only code/test writes plus oracle and implementation artifacts.
-  - **Optional extract**: extract-ui-walker, extract-static, extract-data, extract-external, extract-reconciler, extract-critic, extract-build-controller, extract-plan-reviewer.
-- `.claude/skills/reviewing/SKILL.md` — shared reviewer discipline. Reviewer agents stay separate; per-domain rubrics live beside the domain skills that own the artifact semantics.
-- `.claude/skills/autoship-audit/references/external-exposure.md` — optional safe black-box production exposure checks for audit. GET/HEAD/OPTIONS by default; no destructive probes.
-- `.claude/skills/reverse-spec-extraction/SKILL.md` — optional extract protocol, output schemas, role contracts
-- `cli/init.mjs` — scaffolds `.autoship/standards.yaml` + a commented `.autoship/defaults.yaml` template into a target repo. Agents + skills ship under `.claude/` via npm and auto-discover.
-- `docs/architecture/extract-architecture.md` — canonical architecture for the `extract` track.
-- `docs/architecture/audit-architecture.md` — scaffolded architecture for the `audit` track (markdown-first path).
-- `docs/architecture/audit-tracker-sync.md` — opt-in tracker integration for `audit` (Linear sync, dedup, regression detection). Only relevant when `tracker != none`.
-- `docs/architecture/deliver-architecture.md` — canonical architecture for the `deliver` track.
-- `docs/architecture/system-overview.md` — top-level concern map above the `extract` / `deliver` modules.
-- `docs/learnings.md` — cross-track synthesis. Updated after each probe completes.
-- `docs/extract-learnings.md` — detailed learnings for the `extract` track.
-- `docs/deliver-learnings.md` — detailed learnings for the `deliver` track.
-- `docs/harness-philosophy.md` — synthesis on prompt + tools + artifacts design. Reads Anthropic's harness-design article and applies to autoship. Source of the generator-evaluator pattern + mechanical-vs-judgment dividing rule.
-- `docs/plan-reviewer-calibration.md` — labeled few-shot cases the extract-plan-reviewer scores against. Operator overrides become new cases; calibration grows over time.
-- `docs/archive/agent-prompt-review.md` — superseded review (kept as institutional memory of the "add more grep gates" wrong turn). The supersede note at the top explains why; the body explains what.
-- `.claude/skills/` — autoship-specific skill packs that the product ships. Core install includes `autoship-audit`, `deliver-grooming`, `reviewing`, and `blocker-escalation`. Optional extract install adds `reverse-spec-extraction` and `extract-build`. The former build-track skills (`backend-rewrite-loop`, `frontend-regeneration`, `oracle-assembly`) were consolidated into `extract-build` on 2026-04-24 because their shared discipline was ~80% overlapping and the boundaries were surface-of-output, not workflow. `deliver-grooming` was extracted from `deliver-pre-groomer`/`deliver-brief-reviewer` on 2026-04-24 because the brief schema, type postures, status enums, and anti-patterns were duplicated verbatim across both agents. `reviewing` now holds shared evaluator discipline, while per-domain rubrics live beside their domain skills.
-- `site/` — Starlight (Astro) documentation site. Content is sourced from `docs/` via symlink `site/src/content/docs -> ../../../docs`. Canonical MDs stay at `docs/…`. Build: `cd site && bun install && bun run build`. No hand-crafted HTML — everything renders from MD.
+- `bin/autoship.mjs` — native CLI guidance stub.
+- `cli/init.mjs` — scaffolds live core agents/skills, `.autoship/standards.yaml`, and commented `.autoship/defaults.yaml`.
+- `.claude/agents/autoship-controller.md` — controller for standards, audit, and deliver.
+- `.claude/agents/audit-auditor.md`, `.claude/agents/audit-reviewer.md` — generator-evaluator pair for readiness assessment and issue-candidate review.
+- `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-brief-reviewer.md` — generator-evaluator pair for issue grooming.
+- `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-implementation.md` — frozen-oracle and implementation workers for deliver.
+- `.claude/skills/autoship-audit/` — audit protocol, assessment template, review rubric, and safe external exposure reference.
+- `.claude/skills/deliver-grooming/` — deliver brief schema and review rubric.
+- `.claude/skills/reviewing/` — shared reviewer discipline.
+- `.claude/skills/blocker-escalation/` — blocker report template, category enum, and lint script.
+- `docs/architecture/audit-architecture.md` — audit lifecycle and handoff boundary.
+- `docs/architecture/audit-tracker-sync.md` — opt-in Linear audit issue sync, dedup, and regression detection.
+- `docs/architecture/deliver-architecture.md` — deliver phase machine, state transitions, and approval boundaries.
+- `docs/architecture/system-overview.md` — top-level live system shape.
+- `docs/learnings.md`, `docs/deliver-learnings.md` — current learnings.
+- `docs/archive/extract/` — retired extract implementation and research archive.
+- `site/` — Starlight documentation site. Content is sourced from `docs/` via symlink `site/src/content/docs -> ../../../docs`.
 
-## Optional Extract Ingest
+## Operating Model
 
-Extract is optional legacy research machinery. Install it only with `autoship init --with-extract`.
+Autoship keeps a clear split between outer workflow surfaces and inner execution artifacts.
 
-The ingest (`autoship.sh ingest <project-dir>`) takes 30-60 minutes (4 parallel agent spawns + reconciler + critic). The Bash tool has a **hard 10-minute timeout cap** — you cannot run ingest in foreground.
+- **Outer workflow surface**: Linear/GitHub/Slack/future UI for human-visible state, approval, comments, priority, and lineage.
+- **Inner execution contract**: repo-local briefs, oracle artifacts, reviews, evidence, run-local state, and validation outputs.
 
-**Method:**
-1. Start ingest with `run_in_background: true` (bypasses the 10-min cap):
-   ```
-   Bash(command: "./autoship.sh ingest /path/to/project 2>&1", run_in_background: true)
-   ```
-2. Read the run ID: `cat <project>/.autoship/current-run`
-3. Monitor progress with the Monitor tool watching `decisions.log`:
-   ```
-   Monitor(
-     command: 'DECISIONS="<project>/.autoship/runs/<run-id>/decisions.log"; tail -F "$DECISIONS" 2>/dev/null | grep -E --line-buffered "phase=|role=|ERROR|exit="',
-     timeout_ms: 3000000,
-     persistent: false
-   )
-   ```
-4. After completion, check artifacts and `progress.txt` for results.
+Workers produce artifacts and structured results. The controller owns tracker mutations and state transitions. Workers do not write to Linear or GitHub directly.
 
-**Do NOT** run ingest in foreground Bash — it will be killed at 10 minutes mid-fanout.
+Generator-evaluator separation is load-bearing:
 
-### Track 2: autoship-controller Agent (interactive/autonomous)
+- audit-auditor writes; audit-reviewer judges.
+- deliver-pre-groomer writes; deliver-brief-reviewer judges.
+- deliver-oracle-writer writes the frozen test contract; deliver-implementation must satisfy it without mutating it.
+- controller-owned verification checks the final implementation before PR creation.
 
-The controller agent IS the orchestrator — no bash wrapper. It follows the thin-instruction pattern: the trigger supplies intent, repo policy lives in standards, and the agent figures out mechanics.
+Mechanical checks belong in the controller. Judgment belongs in reviewers.
 
-```
-claude --agent autoship-controller --add-dir /path/to/project -p "ingest /path/to/project"
+## Common Commands
+
+Framework checks:
+
+```bash
+node --check cli/init.mjs
+node --check bin/autoship.mjs
+npm pack --dry-run --json
 ```
 
-Same state model as Track 1 (marker files, artifacts, agent definitions). Both tracks coexist — use Track 1 for CI/headless, Track 2 for interactive/autonomous runs.
+Installer smoke:
 
-### Deliver runtime
-
-The controller drives deliver work from backlog to draft PR. Triggers are flag- or NL-based (see `.claude/agents/autoship-controller.md § How I Receive Work`). Per-repo stickies live in `.autoship/defaults.yaml`.
-
-From the testbed root:
-
-```
-claude --agent autoship-controller -p "deliver"                          # resume whatever's in flight
-claude --agent autoship-controller -p "deliver FRD-162"                  # restrict to one issue
-claude --agent autoship-controller -p "deliver groom FRD-162"            # force groom phase
-claude --agent autoship-controller -p "deliver build FRD-162 --dry-run"  # plan the build, no push/PR
-```
-
-Before running deliver, configure `.autoship/defaults.yaml` with an issue source and validation command, or create `.autoship/issues/<id>/issue.md` for folder/local mode.
-
-The controller resolves the RunRequest, finds eligible work, and drives each issue through groom → review → `Ready` → (human promotes to `Building`) → oracle → implementation → verification → commit → push → draft PR → `In Review`.
-
-Current scope is intentionally narrow: Linear-first backlog + build pickup from `Building`, local runtime mirror under `.autoship/issues/<id>/`, serial only, draft PR yes (merge no).
-
-## Optional Extract Build (probe-2.5 onward)
-
-The extract-build-controller dispatches the per-slice executors. Per-probe directories live one level up at `/Users/shyangcalibrax/Documents/Projects/autoship-probe-<N.M>/`. Each probe carries its own `program.md`, `decisions.md`, `progress.txt`, `artifacts/`, and per-slice `app/` + `oracle/`.
-
-```
-claude --agent extract-build-controller \
-  --add-dir /path/to/probe-N.M \
-  --add-dir /Users/shyangcalibrax/Documents/Projects/autoship \
-  -p "build /path/to/probe-N.M"
+```bash
+rm -rf /tmp/autoship-smoke
+mkdir /tmp/autoship-smoke
+cd /tmp/autoship-smoke
+git init
+node /Users/shyangcalibrax/Documents/Projects/autoship/bin/autoship.mjs init
+find .claude/agents -maxdepth 1 -name '*.md' | wc -l
+find .claude/skills -mindepth 1 -maxdepth 1 -type d | wc -l
+test -f .autoship/standards.yaml
+test -f .autoship/defaults.yaml
+test ! -e .autoship/program.md
 ```
 
-The second `--add-dir` to the autoship repo is required so the extract-build-controller can dispatch the `extract-plan-reviewer` agent with access to `docs/plan-reviewer-calibration.md`.
+Expected default install: 7 agents, 4 skills, standards/defaults present, no `program.md`.
 
-**Conflict warning:** all probes share the same Postgres container (`autoship-pg` on `:5432`), the same dev-server ports (3001, 5173), and the same `/tmp/oracle-prompt.txt`. Do not run two probes simultaneously without isolating ports + DB + Docker container name.
+Controller smoke:
 
-## Probe renaming (2026-04-18)
-
-Probes were renamed from 2.5/2.6/2.7/2.8/2.9 → 2.1/2.2/2.3/2.4/2.5 for consistency. Git commit messages reference the old numbers and are not rewritten. Mapping:
-
-| Old | New | What it tested |
-|---|---|---|
-| probe-2.5 | probe-2.1 | Build-controller + stronger oracle + vertical slices |
-| probe-2.6 | probe-2.2 | Playwright journey tests added to oracle |
-| probe-2.7 | probe-2.3 | Journey-based slicing + atomic-task verification |
-| probe-2.8 | probe-2.4 | Sample-data + screenshot-as-layout-contract + forcing-function gates |
-| probe-2.9 | probe-2.5 | extract-plan-reviewer agent (generator-evaluator pattern) |
-
-Claude Code session history for the old probe dirs lives under `~/.claude/projects/-Users-shyangcalibrax-Documents-Projects-autoship-probe-2-{5,6,7,8,9}/` — these are not renamed; they remain as historical reference.
-
-## Project Philosophy
-
-- **The hard part is artifact extraction, not code generation.** The product value is in turning a messy demo into a reliable spec, not in writing code. Claude Code is already strong at implementation.
-- **Don't add structure before the experiment proves it's needed.** The architecture has been simplified from an over-engineered earlier version. Resist reintroducing stage vocabularies, skill tier taxonomies, routing state machines, or other formalism unless a concrete observed problem demands it.
-- **Every additional file is a surface for inconsistency — earn your separation.** Artifacts get their own file only when the structured format produces measurably better code generation AND inlining would make the PRD too long.
-- **The Ralph loop's power is simplicity — resist complicating the execution plane.** The controller is where complexity lives. Sessions should see a focused PRD + progress.txt + their specific artifacts.
-- **Controller is independent from the writing session**, not "unbiased" in an absolute sense. It shares blind spots with the system that generated the tests — honest framing matters.
-- **Don't accumulate gates as the default fix-for-failures.** Probes 2.6 → 2.7 → 2.8 ran the same loop three times: observe failure → add forcing-function gate → controller absorbs the gate (passes its letter while reproducing the failure under a more creative label) → new failure shape. The structural fix is to separate the author from the judge (generator-evaluator pattern, `extract-plan-reviewer` agent, calibration set), not to add more gates. When you observe a failure mode, first ask: *is this caused by gate coverage, or by self-evaluation?* If the controller authored AND discharged the gate, the answer is usually self-evaluation. See `docs/harness-philosophy.md`.
-- **Mechanical → grep; judgment → reviewer.** The dividing rule for what kind of check belongs where. If the rule sounds the same when the tools change ("journey works end-to-end on seeded data = slice done"), it's a criterion the reviewer judges. If it's written in terms of specific tool invocations (`grep -rE 'preventDefault\(\)\s*;[^{}]*closeDialog\(\)' app/`), it's a recipe the controller runs. Default to judgment via reviewer; allow recipes only when the check is purely pattern-matching with no contextual evidence-weighing required.
+```bash
+claude --agent autoship-controller -p "draft standards from this repo"
+claude --agent autoship-controller -p "audit --report-only"
+```
 
 ## Editing Conventions
 
-- **The `Considered and Deferred` appendix is institutional memory.** When a new direction is rejected or simplified, document it there with a `Cut because:` reason. Do not remove existing entries — they prevent future instances from re-proposing cut ideas.
-- **Executor Mode Options (A–D) are a roadmap, not alternatives.** Each option solves a failure mode of the one before it (A: converge → B: critic → C: parallel → D: self-correct). Don't promote later options without a concrete reason.
-- **Options sections belong at the architectural level, not the tactical level.** Surface trade-off analysis for agent topology, decomposition strategy, executor modes. For stack picks (framework, ORM, runtime), a one-line pick list is enough — no comparison table.
-- **When editing the extract architecture doc, update the HTML proposal in the same pass.** They drift quickly otherwise.
+- Keep the live product surface small. New behavior should strengthen standards, audit, or deliver.
+- Do not reintroduce `program.md` as live config. Use prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
+- Keep stable framework knowledge in agent/skill files; keep per-run intent in `RunRequest` and run artifacts.
+- Add files only when they remove real ambiguity or preserve evidence that would otherwise be lost.
+- Update docs and CLI guidance together when changing invocation shape.
+- Archived extract material is historical. Move useful lessons into live docs only when they directly improve audit or deliver.
 
-## Key References Already Reviewed
+## References Already Reviewed
 
-These shaped the design — future instances can assume these are known, don't re-fetch unless verifying specifics.
+These shaped the design. Future instances can assume they are known unless verifying specifics.
 
-**The external-state convergence loop** — autoship's execution pattern is an instance of a structural pattern that independently emerged in two fields (coding and ML research). The convergence itself is evidence the pattern is sound, which is why autoship frames it as "the pattern" and Ralph as "coding's instantiation":
-- [ghuntley.com/loop/](https://ghuntley.com/loop/) — Ralph loop, coined by Geoffrey Huntley
-- [snarktank/ralph](https://github.com/snarktank/ralph) — reference implementation for coding
-- [karpathy/autoresearch](https://github.com/karpathy/autoresearch) — same structure, derived independently for ML research
-- Shared structural traits: fresh context per iteration, declarative goal state, external state persistence, deterministic feedback, single-writer single-process. Multi-agent fan-out is rejected by both precedents.
-
-**Ralph practical setup** — [aihero.dev/getting-started-with-ralph](https://www.aihero.dev/getting-started-with-ralph) and [aihero.dev/tips-for-ai-coding-with-ralph-wiggum](https://www.aihero.dev/tips-for-ai-coding-with-ralph-wiggum) cover feedback loops (typecheck, tests, lint, Playwright, pre-commit hooks), progress file contents, stop mechanics (`<promise>COMPLETE</promise>` signal, iteration caps, stall detection, escalation), HITL vs AFK modes, and priority ordering (architectural decisions first, polish last).
-
-**Tracer bullets decomposition** — [skills.sh/oakoss/agent-skills/tracer-bullets](https://skills.sh/oakoss/agent-skills/tracer-bullets). Vertical slices through all layers, first slice sets conventions. Baked into PRD task ordering, not formal infrastructure.
-
-**Engineering skill library** — [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills). 20 general-purpose skills across DEFINE/PLAN/BUILD/VERIFY/REVIEW/SHIP phases — the vocabulary convergence is not accidental. These are the "Tier 2" engineering skills that would attach under autoship's domain skills.
+- [ghuntley.com/loop/](https://ghuntley.com/loop/) — Ralph loop, coined by Geoffrey Huntley.
+- [snarktank/ralph](https://github.com/snarktank/ralph) — reference implementation for coding.
+- [karpathy/autoresearch](https://github.com/karpathy/autoresearch) — same external-state convergence loop, independently derived for ML research.
+- [skills.sh/oakoss/agent-skills/tracer-bullets](https://skills.sh/oakoss/agent-skills/tracer-bullets) — vertical slices through all layers.
+- [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) — general-purpose engineering skill vocabulary.

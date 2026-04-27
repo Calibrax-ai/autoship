@@ -20,14 +20,6 @@ Run from the root of a git repo. The CLI:
 - Writes an optional commented `.autoship/defaults.yaml` template for per-repo run defaults
 - Adds autoship runtime state to `.gitignore`
 
-The legacy extract research pack is optional:
-
-```bash
-npx @cs-calibrax/autoship init --with-extract
-```
-
-That additionally installs the extract probe/build agents and extract-specific skills.
-
 ## Run
 
 Optionally draft repo policy from codebase evidence first:
@@ -38,7 +30,7 @@ claude --agent autoship-controller -p "draft standards from this repo"
 
 The controller fills high-confidence values in `.autoship/standards.yaml`, leaves ambiguous policy as `SET_ME`, and does not create a separate evidence artifact.
 
-Core audit/deliver do not require or read `.autoship/program.md`. The optional extract research pack keeps its legacy `program.md` mechanics; the core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
+Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
 
 The audit smoke test is zero-config:
 

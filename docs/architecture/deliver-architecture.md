@@ -23,7 +23,7 @@ A human promotes the brief to "Building" only when it's trustworthy. Everything 
 
 ## Problem
 
-`extract` and `build` solve the *"unknown prototype"* problem well enough to justify a separate track. They do not yet solve the *"known repo, known issue, controlled change"* problem.
+The retired extract research track explored the *"unknown prototype"* problem. `deliver` solves a different problem: *"known repo, known issue, controlled change."*
 
 For an existing project, the challenge is different:
 
@@ -232,11 +232,11 @@ Explicitly not handled by this module:
 
 Autoship's own probe series already surfaced the failure shapes this architecture must handle.
 
-Probes 2.2 → 2.3 → 2.4 ran the same loop three times: observe failure → add a forcing-function gate → the controller absorbs the gate while reproducing the failure under a new label. The structural cause was that the author of the plan also discharged the gates judging it. Accumulating gates at the author boundary does not fix author-is-judge; it renames the failure.
+Historical extract probes 2.2 → 2.3 → 2.4 ran the same loop three times: observe failure → add a forcing-function gate → the controller absorbs the gate while reproducing the failure under a new label. The structural cause was that the author of the plan also discharged the gates judging it. Accumulating gates at the author boundary does not fix author-is-judge; it renames the failure.
 
-Probe 2.5 validated the structural fix. A fresh-context `extract-plan-reviewer` with a calibration set caught four substantive failures on its first pass (one-journey-per-slice violation, deferred-action affordance, duplication across handoff artifacts, consistency drift). The build then shipped clean — 14/14 journey walks pass end-to-end on seeded data, 145/145 oracle green, zero operator intervention. Reviewer cost was under 2% of the probe total.
+Historical extract probe 2.5 validated the structural fix. A fresh-context plan reviewer with a calibration set caught four substantive failures on its first pass (one-journey-per-slice violation, deferred-action affordance, duplication across handoff artifacts, consistency drift). The build then shipped clean — 14/14 journey walks pass end-to-end on seeded data, 145/145 oracle green, zero operator intervention. Reviewer cost was under 2% of the probe total.
 
-`deliver` applies the same generator-evaluator pattern at a different stage. The planning-layer fix generalizes; the failure modes are structural, not probe-specific. See `docs/learnings.md` §"Generator-evaluator pattern: validated in probe-2.5" and `docs/harness-philosophy.md` for the full synthesis.
+`deliver` applies the same generator-evaluator pattern at a different stage. The planning-layer fix generalizes; the failure modes are structural, not probe-specific. See `docs/learnings.md` for the live synthesis; archived extract detail lives under `docs/archive/extract/`.
 
 ## Foundations
 
@@ -573,7 +573,7 @@ The review stage dispatches multiple parallel fresh-context reviewers with disti
 
 Aggregate verdict rule: any FAIL → `needs-remediation`. Each reviewer catches a different failure shape; a single monolithic reviewer tends to smooth over one kind of failure while fixating on another.
 
-Extends the same generator-evaluator pattern already validated for `extract-plan-reviewer` to a later stage, with role-specialized reviewers.
+Extends the same generator-evaluator pattern validated in the archived extract research track to a later stage, with role-specialized reviewers.
 
 ### 8. Controller Support For Runtime Orchestration
 
@@ -637,11 +637,10 @@ The rule is: agents do execution work; humans or reviewer-agents approve transit
 
 Sub-decisions still deferred:
 
-- **Dispatch mechanism** — subprocess (`claude --agent X -p "..."`, matches extract's extract-build-controller precedent) or Agent tool (in-session dispatch). Default to subprocess for consistency.
+- **Dispatch mechanism** — subprocess (`claude --agent X -p "..."`) or Agent tool (in-session dispatch). Default to subprocess until the native controller wrapper exists.
 - **Issue intake breadth** — operator pre-populates `.autoship/issues/<id>/issue.md`, or controller pulls from tracker API. The current runtime supports both local folders and tracker pull; broader multi-source intake is later.
-- **Subdir organization** — when extract and deliver co-install in one repo, agents likely reorganize into `.claude/agents/extract/`, `.claude/agents/deliver/`, `.claude/agents/shared/`. Verify Claude Code's nested-path agent resolution before committing.
 
-Ralph-loop (external bash driver) stays as the CI/headless option (extract's Track 1 already is this). GSD-style supervisor accumulation stays rejected — see Anti-Pattern 5.
+GSD-style supervisor accumulation stays rejected — see Anti-Pattern 5.
 
 ### Current runtime and next candidates
 
@@ -684,7 +683,7 @@ Patterns `deliver` explicitly does NOT adopt.
 
 Autoship's differentiator is evidence-first reasoning.
 
-For `extract`, truth comes from: journeys, screenshots, sample data, observed behavior, oracle coverage.
+For the retired extract research track, truth came from journeys, screenshots, sample data, observed behavior, and oracle coverage.
 
 For `deliver`, truth comes from: current codebase reality, baseline snapshot, change brief, oracle draft, reviewer-approved decisions.
 
@@ -708,13 +707,13 @@ Fresh-context reviewers are only useful when their rubric adapts from observed c
 
 A static list of questions ("does this handle failure cases?", "is this secure?") with no override-feedback loop drifts from actual failure modes over time. The reviewer degrades into a checkbox machine that satisfies its rubric while missing the failure shape that matters.
 
-Autoship's calibration methodology — operator overrides become new labeled cases, calibration grows over time — is load-bearing. It is what makes the reviewer's judgment transferable across probes and durable across time. See `docs/plan-reviewer-calibration.md`.
+Autoship's calibration methodology — operator overrides become new labeled cases, calibration grows over time — is load-bearing. It is what makes the reviewer's judgment transferable across probes and durable across time. The archived extract calibration set under `docs/archive/extract/plan-reviewer-calibration.md` is historical evidence for the pattern, not a live deliver rubric.
 
 ### 5. Accumulating Supervisor Modules
 
 When a new failure mode appears, the fix is structural — move the check to the reviewer boundary — not a new supervisor module for every symptom (stuck-detection, timeout-recovery, verification-guard, ...).
 
-Probes 2.2 → 2.4 demonstrated that each new gate layered on the author gets absorbed by the author. The reviewer is the fixed point against which structural fixes are made; supervisors are not. See `docs/learnings.md` §"The accumulated-gates pattern, and why it loops" and `docs/harness-philosophy.md`.
+Historical extract probes 2.2 → 2.4 demonstrated that each new gate layered on the author gets absorbed by the author. The reviewer is the fixed point against which structural fixes are made; supervisors are not. See `docs/learnings.md` for the live synthesis and `docs/archive/extract/harness-philosophy.md` for the archived research detail.
 
 ## Recommended 0.1 Shape
 

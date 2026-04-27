@@ -23,17 +23,6 @@ const CORE_AGENTS = [
 	'deliver-implementation.md',
 ];
 
-const EXTRACT_AGENTS = [
-	'extract-ui-walker.md',
-	'extract-static.md',
-	'extract-data.md',
-	'extract-external.md',
-	'extract-reconciler.md',
-	'extract-critic.md',
-	'extract-build-controller.md',
-	'extract-plan-reviewer.md',
-];
-
 const CORE_SKILLS = [
 	'autoship-audit',
 	'deliver-grooming',
@@ -41,15 +30,16 @@ const CORE_SKILLS = [
 	'blocker-escalation',
 ];
 
-const EXTRACT_SKILLS = [
-	'reverse-spec-extraction',
-	'extract-build',
-];
-
 export async function init(args = []) {
 	const cwd = process.cwd();
-	const withExtract = args.includes('--with-extract');
-	const unknownArgs = args.filter((arg) => arg !== '--with-extract');
+
+	if (args.includes('--with-extract')) {
+		throw new Error(
+			'extract has been retired from the live autoship product. Archived research lives under docs/archive/extract/.'
+		);
+	}
+
+	const unknownArgs = args;
 
 	if (unknownArgs.length) {
 		throw new Error(`Unknown init option: ${unknownArgs.join(', ')}`);
@@ -71,19 +61,11 @@ export async function init(args = []) {
 
 	console.log('Installing autoship...');
 
-	// Copy core agents + skills. Extract is optional because it is a legacy
-	// research pack and should not dominate the default product surface.
+	// Copy core agents + skills.
 	copyAgentFiles(CORE_AGENTS, cwd);
 	copySkillDirs(CORE_SKILLS, cwd);
 	console.log('  ✓ core agents → .claude/agents/');
 	console.log('  ✓ core skills → .claude/skills/');
-
-	if (withExtract) {
-		copyAgentFiles(EXTRACT_AGENTS, cwd);
-		copySkillDirs(EXTRACT_SKILLS, cwd);
-		console.log('  ✓ extract agents → .claude/agents/');
-		console.log('  ✓ extract skills → .claude/skills/');
-	}
 
 	// Create .autoship/
 	const autoshipDir = join(cwd, '.autoship');
