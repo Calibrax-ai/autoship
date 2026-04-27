@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { spawn, execSync } from 'node:child_process';
+
 import { init } from '../cli/init.mjs';
 
 const command = process.argv[2];
@@ -8,88 +10,107 @@ function printHelp() {
 autoship — turn messy software work into reviewable, reliable delivery
 
 Usage:
-  autoship init                        Install core autoship agents into the current repo
-                                       (interactive wizard in a TTY; --no-interactive skips it
-                                        and writes the commented template;
-                                        re-run on existing .autoship/ prints an advisory only)
-  autoship audit                       Print audit invocation guidance
-  autoship deliver                     Print deliver invocation guidance
+  autoship init                        Install + interactively configure autoship in this repo
+  autoship init --no-interactive       Skip the wizard; writes the commented template
+  autoship audit [args...]             Run audit via the controller (e.g. --report-only, --approve)
+  autoship deliver [args...]           Run deliver via the controller (e.g. FRD-162, "groom FRD-162")
+  autoship interactive                 Open an interactive controller chat session
 
-Running autoship (until v0.3.0 lands a native CLI, use the controller agent directly):
+All audit/deliver commands forward args to the controller verbatim.
+Set AUTOSHIP_PRINT=1 to see the underlying \`claude\` invocation without running it.
 
-  claude --agent autoship-controller -p "audit --report-only"
-
-Deliver needs an issue source plus validation.commands first:
-
-  claude --agent autoship-controller -p "deliver FRD-162"
+Examples:
+  autoship audit --report-only
+  autoship audit --tracker=linear --approve
+  autoship deliver
+  autoship deliver FRD-162
+  autoship deliver groom FRD-162
+  autoship deliver build FRD-162 --dry-run
 
 Docs: https://github.com/Calibrax-ai/autoship
 `);
 }
 
-function printAuditGuidance() {
-	console.log(`
-'autoship audit' is a CLI stub. A native wrapper is scheduled for v0.3.0.
-Until then, invoke the controller agent directly:
-
-  # report-only, no tracker writes
-  claude --agent autoship-controller -p "audit --report-only"
-
-  # write approved issues to Linear
-  claude --agent autoship-controller -p "audit --tracker=linear --approve"
-
-  # natural-language prompt
-  claude --agent autoship-controller -p "audit this repo, report-only"
-
-Accepted flags (resolved by the controller into a RunRequest):
-  --report-only              No tracker writes (overrides defaults.yaml)
-  --tracker=<source>         linear | none
-  --approve                  Create approved issue candidates in Backlog
-  --external-url=<url>       Enable safe black-box probes against this URL
-
-Precedence: flags > .autoship/defaults.yaml > framework defaults.
-Framework defaults are conservative: tracker=none, create_issues=false, external_exposure=false.
-
-See .claude/agents/autoship-controller.md § How I Receive Work for the full contract.
-`);
+function which(bin) {
+	try {
+		const path = execSync(`command -v ${bin}`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+		return path || null;
+	} catch {
+		return null;
+	}
 }
 
-function printDeliverGuidance() {
-	console.log(`
-'autoship deliver' is a CLI stub. A native wrapper is scheduled for v0.3.0.
-Until then, invoke the controller agent directly:
+function buildPrompt(mode, args) {
+	if (!args.length) return mode;
+	return `${mode} ${args.join(' ')}`;
+}
 
-  # first configure an issue source + validation command:
-  #   - uncomment deliver.tracker + deliver.validation in .autoship/defaults.yaml, or
-  #   - create .autoship/issues/<id>/issue.md for folder/local mode and uncomment deliver.validation
-  #
-  # resume any in-flight work
-  claude --agent autoship-controller -p "deliver"
+function fallbackGuidance(mode, prompt) {
+	const cmd = `claude --agent autoship-controller -p "${prompt}"`;
+	console.log(`\n\`claude\` is not on your PATH, so autoship can't run the controller for you.\n`);
+	console.log(`Install Claude Code (https://claude.com/claude-code), then run:\n`);
+	console.log(`  ${cmd}\n`);
+	console.log(`(Set AUTOSHIP_PRINT=1 to print this command without trying to run it.)\n`);
+	process.exit(1);
+}
 
-  # one issue
-  claude --agent autoship-controller -p "deliver FRD-162"
+async function spawnController({ prompt, interactive = false }) {
+	const claudePath = which('claude');
+	if (!claudePath) {
+		fallbackGuidance(prompt.split(' ', 1)[0], prompt);
+		return;
+	}
 
-  # force groom phase
-  claude --agent autoship-controller -p "deliver groom FRD-162"
+	const argv = ['--agent', 'autoship-controller'];
+	if (!interactive) argv.push('-p', prompt);
 
-  # plan the build but don't push or open a PR
-  claude --agent autoship-controller -p "deliver build FRD-162 --dry-run"
+	if (process.env.AUTOSHIP_PRINT === '1') {
+		const display = argv.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ');
+		console.log(`${claudePath} ${display}`);
+		return;
+	}
 
-  # natural-language prompt
-  claude --agent autoship-controller -p "groom FRD-162"
+	const child = spawn(claudePath, argv, { stdio: 'inherit' });
+	await new Promise((resolve, reject) => {
+		child.on('exit', (code) => {
+			if (code === 0 || code === null) resolve();
+			else process.exit(code);
+		});
+		child.on('error', reject);
+	});
+}
 
-Precedence: flags > .autoship/defaults.yaml > framework defaults.
-Framework defaults: tracker=folder, folder.path=.autoship/issues, worktree.root=.autoship/worktrees, branch_prefix=autoship/, draft PR to origin/main, dry_run=false, approval_mode=supervised.
-Build requires validation.commands; Linear requires team/project.
+async function runAudit(args = []) {
+	const prompt = buildPrompt('audit', args);
+	await spawnController({ prompt });
+}
 
-See .claude/agents/autoship-controller.md § How I Receive Work for the full contract.
-`);
+async function runDeliver(args = []) {
+	const prompt = buildPrompt('deliver', args);
+	await spawnController({ prompt });
+}
+
+async function runInteractive() {
+	const claudePath = which('claude');
+	if (!claudePath) {
+		console.log('\n`claude` is not on your PATH. Install Claude Code: https://claude.com/claude-code\n');
+		process.exit(1);
+	}
+	const child = spawn(claudePath, ['--agent', 'autoship-controller'], { stdio: 'inherit' });
+	await new Promise((resolve, reject) => {
+		child.on('exit', (code) => {
+			if (code === 0 || code === null) resolve();
+			else process.exit(code);
+		});
+		child.on('error', reject);
+	});
 }
 
 const commands = {
 	init,
-	audit: printAuditGuidance,
-	deliver: printDeliverGuidance,
+	audit: runAudit,
+	deliver: runDeliver,
+	interactive: runInteractive,
 	help: printHelp,
 	'--help': printHelp,
 	'-h': printHelp,

@@ -472,15 +472,18 @@ function printNextSteps(answers) {
 	}
 
 	lines.push('');
-	lines.push('  Smoke tests:');
+	lines.push('  Run autoship:');
 	lines.push('');
-	lines.push('       claude --agent autoship-controller -p "audit --report-only"');
+	lines.push('       autoship audit --report-only      # zero-config, no tracker writes');
 	if (answers && answers.tracker === 'linear') {
-		lines.push('       claude --agent autoship-controller -p "deliver"   # picks up labeled/assigned Linear issues');
+		lines.push('       autoship deliver                  # picks up Linear issues per your claim convention');
 	} else if (answers && answers.tracker === 'folder') {
-		lines.push('       # For deliver, drop a brief at .autoship/issues/<id>/issue.md and run:');
-		lines.push('       claude --agent autoship-controller -p "deliver"');
+		lines.push('       autoship deliver                  # picks up issues from .autoship/issues/<id>/');
 	}
+	lines.push('       autoship interactive              # open a chat session with the controller');
+	lines.push('');
+	lines.push('  If you ran via `npx`, install globally to drop the prefix:');
+	lines.push('       npm install -g @cs-calibrax/autoship');
 	lines.push('');
 	lines.push('  Docs: https://github.com/Calibrax-ai/autoship');
 	lines.push('');

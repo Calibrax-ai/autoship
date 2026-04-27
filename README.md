@@ -24,27 +24,33 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 ## Run autoship
 
-Setup is one-time via `autoship init` (above). Runtime modes — `audit` and `deliver` — are driven through the `autoship-controller` agent that init scaffolds into `.claude/agents/`. Two ways to invoke it:
+Setup is one-time via `autoship init` (above). Runtime modes — `audit` and `deliver` — run through the autoship CLI directly. The CLI spawns Claude Code under the hood with the right agent + prompt.
 
-### Headless, one-shot (`-p`)
-
-Best for CI, scripts, or bounded runs that should exit when the controller stops.
+### One-shot (default)
 
 ```bash
-claude --agent autoship-controller -p "audit --report-only"
+autoship audit --report-only           # zero-config, no tracker writes
+autoship audit --tracker=linear --approve
+
+autoship deliver                       # claim next eligible issue per defaults.yaml
+autoship deliver FRD-162               # work a specific issue
+autoship deliver groom FRD-162         # force the groom phase
+autoship deliver build FRD-162 --dry-run
 ```
 
-The controller runs to a stop condition and exits. Disk-backed state under `.autoship/` means re-running picks up where it left off.
+The CLI runs the controller, streams its output to your terminal, exits when the controller stops. Disk-backed state under `.autoship/` means re-running picks up where it left off.
 
 ### Interactive chat session
 
 Best when you want to watch the run unfold, review artifacts as they land, or push back on framing mid-flight.
 
 ```bash
-claude --agent autoship-controller
+autoship interactive
 ```
 
-Drops you into a chat with the controller loaded. Type `audit --report-only`, `deliver FRD-162`, or any natural-language prompt the controller accepts. Same RunRequest contract as headless mode.
+Drops you into a chat with the controller loaded. Type `audit --report-only`, `deliver FRD-162`, or any natural-language prompt.
+
+> Set `AUTOSHIP_PRINT=1` to see the underlying `claude --agent autoship-controller -p "..."` command without running it. Useful when wiring autoship into CI.
 
 > Already in an existing Claude Code session in the same repo? You can also dispatch the autoship-controller as a subagent from there — see [Claude Code's subagent docs](https://code.claude.com/docs/en/sub-agents.md).
 
@@ -53,22 +59,22 @@ Drops you into a chat with the controller loaded. Type `audit --report-only`, `d
 Audit is zero-config:
 
 ```bash
-claude --agent autoship-controller -p "audit --report-only"
-claude --agent autoship-controller -p "audit --tracker=linear --approve"
+autoship audit --report-only
+autoship audit --tracker=linear --approve
 ```
 
-Deliver needs an issue source and a validation command first. Configure `.autoship/defaults.yaml`, or create a local `.autoship/issues/<id>/issue.md` for folder mode and set `deliver.validation.commands`, then pass flags or a natural-language prompt to the controller:
+Deliver needs an issue source and a validation command first. The wizard in `autoship init` collects both; otherwise edit `.autoship/defaults.yaml` and set `deliver.tracker`, `deliver.linear.*` (if tracker=linear), and `deliver.validation.commands`. Then:
 
 ```bash
-claude --agent autoship-controller -p "deliver"                          # resume in-flight
-claude --agent autoship-controller -p "deliver FRD-162"                  # one issue
-claude --agent autoship-controller -p "deliver groom FRD-162"            # force groom phase
-claude --agent autoship-controller -p "deliver build FRD-162 --dry-run"  # plan, no push/PR
+autoship deliver                       # resume in-flight or claim next eligible
+autoship deliver FRD-162               # one issue
+autoship deliver groom FRD-162         # force groom phase
+autoship deliver build FRD-162 --dry-run   # plan, no push/PR
 ```
 
-The controller resolves a `RunRequest`, writes `invocation.txt` + `run.json` to the run dir for reproducibility, and drives the issue through grooming → human approval → build → draft pull request.
+The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility, and drives each issue through grooming → human approval → build → draft pull request.
 
-Per-repo sticky defaults go in optional `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies.
+Per-repo sticky defaults live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies.
 
 Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
 
