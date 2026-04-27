@@ -48,6 +48,7 @@ Apply `SKILL.md` Scope sanity principles, universal plus the matching type secti
 - Feature: if the brief is single-slice but the issue has multi-slice indicators, `FAIL`.
 - Refactor: any hint of observable behavior drift is `FAIL`.
 - Refactor: coverage-gap plan must name specific test files, test names, and behaviors.
+- Hidden product judgment is a scope failure. If the body shows the groomer made a product call that a human might reasonably override (e.g. picked one of multiple plausible interpretations of user intent, decided who should have access, set a cap or threshold) and that call is not surfaced in `Assumptions`, `FAIL`. An empty `Assumptions` section on a Feature touching auth, money, customer data, or external egress is suspicious and warrants a closer read.
 
 ## Output format
 

@@ -58,7 +58,7 @@ Do not invent `ready`, `proposed`, `in-progress`, `draft`, or any other label. I
 
 The full brief template, including frontmatter, all universal sections, and type-specific sections, lives at `assets/brief-template.md`. The deliver-pre-groomer fills it; the reviewer checks conformance against it.
 
-Universal sections (all types): Outcome, Acceptance Criteria, Scope Fence, Rabbit-Hole Patches, Blast-Radius Manifest, Skeleton Position, Concrete Example. Optional: Failure Modes.
+Universal sections (all types): Outcome, Acceptance Criteria, Scope Fence, Rabbit-Hole Patches, Blast-Radius Manifest, Skeleton Position, Concrete Example. Optional: Failure Modes, Assumptions. `Assumptions` exists to surface product judgment the groomer made on its own — auth scope, thresholds, intent calls — so the human gate at Ready→Building can override. Hidden product judgment (made silently in body text instead of called out here) is a scope failure.
 
 Type-specific sections:
 

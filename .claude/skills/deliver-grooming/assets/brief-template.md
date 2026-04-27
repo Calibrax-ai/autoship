@@ -29,6 +29,10 @@ Never-touch:   <specific files or patterns>
 # Rabbit-Hole Patches
 - "<question an executor would otherwise guess>" — <answer with reason>
 
+# Assumptions                       [optional — omit if none]
+- <product / business judgment the groomer made on its own that a human might want to override at the Ready→Building gate>
+- ...
+
 # Blast-Radius Manifest
 Expected to create:  <new files>
 Expected to change:  <existing files>
