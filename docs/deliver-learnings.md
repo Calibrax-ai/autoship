@@ -8,7 +8,7 @@ Five probes, `probe 0.1` through `probe 0.5`. The headline: **deliver's grooming
 
 Three findings shaped the track:
 
-1. **Generator-evaluator generalizes.** The "author writes, separate reviewer judges" pattern that worked at extract's planning layer worked again at deliver's grooming layer (probe 0.1), and again at the building layer where Stage 1 writes the tests and Stage 2 writes the code without being allowed to edit them (probes 0.2–0.5).
+1. **Generator-evaluator generalizes.** The "author writes, separate reviewer judges" pattern that worked at extract's planning layer worked again at deliver's grooming layer (probe 0.1), and again at the building layer where a separate oracle writer creates the tests and the implementation executor writes the code without being allowed to edit them (probes 0.2–0.5).
 2. **Build validation holds across all four shapes.** Bug (FRD-157, 6/6 tests green), Feature (FRD-122, 20/20), Refactor (REF-001, 12/12 with zero test mutations), and UI build (FRD-162, 12/12 first-run). No test-gaming, no scope creep, no rewrites.
 3. **Invented status values are a recurring signal.** Multiple probes surfaced agents emitting values that weren't in the enumeration (e.g., `drafted` instead of one of `drafted-with-gaps` / `need-info` / `ready`). A candidate for systemic frontmatter-value validation rather than per-probe triage.
 
@@ -107,8 +107,8 @@ FRD-157 is the strongest result in the deliver line so far.
 
 The flow was intentionally split:
 
-- **Stage 1** wrote only the oracle tests
-- **Stage 2** modified only the implementation against frozen tests
+- **Oracle writer** wrote only the oracle tests
+- **Implementation executor** modified only the implementation against frozen tests
 
 Result:
 
@@ -122,15 +122,15 @@ The implementation matched the brief's Skeleton Position closely and only made o
 
 **Implication:** a reviewer-approved brief can be a real execution contract, not just a planning artifact, at least for a narrow bug-shaped issue.
 
-## Stage 1 / Stage 2 discipline is load-bearing here too
+## Oracle / implementation discipline is load-bearing here too
 
 An initial collapsed dispatch would have let one executor write both the tests and the fix. That would have reproduced the same author-judge failure seen elsewhere in autoship.
 
 The split matters because it makes test mutation itself a signal:
 
-- if Stage 2 needs to change Stage 1's tests, something upstream is wrong
+- if the implementation executor needs to change the oracle writer's tests, something upstream is wrong
 
-**Implication:** the `deliver` controller enforces this split mechanically. Stage 1 records sha256 hashes of oracle files in `stage1.md`; the controller verifies those hashes before committing or opening a PR and parks the issue at `needs-human-input` on any mismatch.
+**Implication:** the `deliver` controller enforces this split mechanically. The oracle writer records sha256 hashes of oracle files in `oracle/result.md`; the controller verifies those hashes in `verification/result.md` before committing or opening a PR and parks the issue at `needs-human-input` on any mismatch.
 
 ## Early calibration candidates are already visible
 
@@ -201,7 +201,7 @@ FRD-143 regroom under the 0.2-revised spec empirically tested the decomposition 
 
 **Implication:** deliver now has three branch states for approved briefs:
 
-- `verdict: APPROVED` + implementable brief → proceed to Stage 1.
+- `verdict: APPROVED` + implementable brief → proceed to oracle writing.
 - `verdict: APPROVED` + `design-status: need-info` → operator splits the issue per proposed decomposition, re-dispatches pre-groomer on each sub-issue; do NOT execute from the parent brief.
 - `verdict: REJECTED` → pre-groomer regrooms.
 

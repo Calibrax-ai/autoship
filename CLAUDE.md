@@ -8,21 +8,23 @@ autoship v0.1 is a **core audit + deliver agent framework** for turning repo evi
 
 ## Start Here
 
-Use autoship in the core path:
+Use autoship in the core path. Invocation is trigger-first — pass flags or a natural-language prompt. No run-config file authoring required. Core audit/deliver do not read `.autoship/program.md`; that file is extract-only legacy.
 
-- **`deliver` today** — controller-backed runtime through draft PR: `claude --agent autoship-controller -p "deliver"` from the testbed root (reads `.autoship/program.md`)
+- **`deliver` today** — after configuring an issue source + validation command, use `claude --agent autoship-controller -p "deliver"` (resume) or `-p "deliver FRD-162"` / `-p "deliver groom FRD-162"` / `-p "deliver build FRD-162 --dry-run"` from the testbed root
 - **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-brief-reviewer` directly
-- **`audit` scaffolded** — controller-backed readiness audit that stops at reviewed findings plus approved issue creation in `Backlog`
+- **`audit`** — `claude --agent autoship-controller -p "audit --report-only"` or `-p "audit --tracker=linear --approve"` or NL prompt (`"audit this repo, report-only, no tracker writes"`). Stops at reviewed findings plus approved issue creation in `Backlog`.
 
 Optional research pack:
 
-- **`extract` optional** — operational via `autoship.sh ingest ...` or `autoship-controller` in extract-ingest mode, but only installed by `autoship init --with-extract`. Keep it available for demo reconstruction research; do not let it dominate the default product surface.
+- **`extract` optional** — operational via `autoship.sh ingest ...` or `autoship-controller` in extract-ingest mode, but only installed by `autoship init --with-extract`. Keep it available for demo reconstruction research; do not let it dominate the default product surface. Extract retains its own `program.md` mechanics; the trigger-first refactor only covers audit + deliver.
 
 Important boundary:
 
-- **`.claude/agents/autoship-controller.md`** and **`program.md`** are **controller-only** — manual worker dispatch (`deliver-pre-groomer`, `deliver-brief-reviewer` run directly) does not read them. The controller agent file now holds the stable operating discipline (workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) plus per-mode procedure — the separate `autoship-controller` skill was collapsed into the agent on 2026-04-24 because it had exactly one reader and the split was creating drift between two files.
-- **`.autoship/standards.yaml`** is the repo-local policy file. Use it for stack standards; use `.env.example` as evidence of current repo shape, not as the source of truth for policy.
-- You do **not** need them for the manual `deliver` fallback.
+- **`.claude/agents/autoship-controller.md`** holds the stable operating discipline (§ How I Receive Work defines the RunRequest contract, plus workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) plus per-mode procedure. The separate `autoship-controller` skill was collapsed into the agent on 2026-04-24 because it had exactly one reader and the split was creating drift between two files.
+- **`.autoship/standards.yaml`** is the repo-local **policy** file. Use it for stack standards; use `.env.example` as evidence of current repo shape, not as the source of truth for policy. Never put trigger/run config here.
+- **`.autoship/defaults.yaml`** (optional) — per-repo sticky run defaults (e.g., `audit.tracker: linear`). Flags on the invocation always win; `--report-only` and `--tracker=none` override stickies.
+- **No core `.autoship/program.md`** — audit/deliver use triggers, defaults, and standards. If a prompt asks core audit/deliver to use `program.md`, treat it as unsupported legacy.
+- You do **not** need any of these for the manual `deliver` fallback.
 - The checked-in `.claude/agents/autoship-controller.md` is mode-aware for optional `extract ingest`, `audit`, and `deliver` through draft PR.
 
 ## Key Files
@@ -32,16 +34,15 @@ Important boundary:
   - **Core orchestration**: autoship-controller — one top-level controller role. Supports audit and deliver by default; optional extract-ingest when the extract pack is installed.
   - **Audit**: audit-auditor, audit-reviewer — generator-evaluator pair for readiness assessment and issue-candidate review. Controller owns issue creation; workers own only artifacts.
   - **Deliver grooming**: deliver-pre-groomer, deliver-brief-reviewer — generator-evaluator pair for issue grooming (probes 0.1 onward). Used directly in manual fallback and dispatched by `autoship-controller` in deliver mode.
-  - **Deliver build**: deliver-oracle-writer, deliver-implementation — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/PR; workers own only code/test writes plus stage artifacts.
+  - **Deliver build**: deliver-oracle-writer, deliver-implementation — frozen-oracle and implementation workers for deliver. Controller owns worktree/branch/verification/PR; workers own only code/test writes plus oracle and implementation artifacts.
   - **Optional extract**: extract-ui-walker, extract-static, extract-data, extract-external, extract-reconciler, extract-critic, extract-build-controller, extract-plan-reviewer.
 - `.claude/skills/reviewing/SKILL.md` — shared reviewer discipline. Reviewer agents stay separate; per-domain rubrics live beside the domain skills that own the artifact semantics.
 - `.claude/skills/autoship-audit/references/external-exposure.md` — optional safe black-box production exposure checks for audit. GET/HEAD/OPTIONS by default; no destructive probes.
 - `.claude/skills/reverse-spec-extraction/SKILL.md` — optional extract protocol, output schemas, role contracts
-- `docs/architecture/audit-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in audit mode.
-- `docs/architecture/deliver-program-template.md` — reference shape for the per-repo `.autoship/program.md` the controller reads in deliver mode. Commit one to each testbed; manual fallback does not need it.
-- `cli/init.mjs` — scaffolds `.autoship/program.md` and `.autoship/standards.yaml` into a target repo. Agents + skills ship under `.claude/` via npm and auto-discover.
+- `cli/init.mjs` — scaffolds `.autoship/standards.yaml` + a commented `.autoship/defaults.yaml` template into a target repo. Agents + skills ship under `.claude/` via npm and auto-discover.
 - `docs/architecture/extract-architecture.md` — canonical architecture for the `extract` track.
-- `docs/architecture/audit-architecture.md` — scaffolded architecture for the `audit` track.
+- `docs/architecture/audit-architecture.md` — scaffolded architecture for the `audit` track (markdown-first path).
+- `docs/architecture/audit-tracker-sync.md` — opt-in tracker integration for `audit` (Linear sync, dedup, regression detection). Only relevant when `tracker != none`.
 - `docs/architecture/deliver-architecture.md` — canonical architecture for the `deliver` track.
 - `docs/architecture/system-overview.md` — top-level concern map above the `extract` / `deliver` modules.
 - `docs/learnings.md` — cross-track synthesis. Updated after each probe completes.
@@ -79,7 +80,7 @@ The ingest (`autoship.sh ingest <project-dir>`) takes 30-60 minutes (4 parallel 
 
 ### Track 2: autoship-controller Agent (interactive/autonomous)
 
-The controller agent IS the orchestrator — no bash wrapper. Follows karpathy/autoresearch's program.md pattern: thin instructions, the agent figures out mechanics.
+The controller agent IS the orchestrator — no bash wrapper. It follows the thin-instruction pattern: the trigger supplies intent, repo policy lives in standards, and the agent figures out mechanics.
 
 ```
 claude --agent autoship-controller --add-dir /path/to/project -p "ingest /path/to/project"
@@ -89,20 +90,22 @@ Same state model as Track 1 (marker files, artifacts, agent definitions). Both t
 
 ### Deliver runtime
 
-The controller drives deliver work from backlog to draft PR. The whole contract lives in `.autoship/program.md` at the testbed root — one checked-in file per repo.
+The controller drives deliver work from backlog to draft PR. Triggers are flag- or NL-based (see `.claude/agents/autoship-controller.md § How I Receive Work`). Per-repo stickies live in `.autoship/defaults.yaml`.
 
 From the testbed root:
 
 ```
-claude --agent autoship-controller -p "deliver"              # resume whatever's in flight
-claude --agent autoship-controller -p "deliver FRD-162"      # restrict this run to one issue
+claude --agent autoship-controller -p "deliver"                          # resume whatever's in flight
+claude --agent autoship-controller -p "deliver FRD-162"                  # restrict to one issue
+claude --agent autoship-controller -p "deliver groom FRD-162"            # force groom phase
+claude --agent autoship-controller -p "deliver build FRD-162 --dry-run"  # plan the build, no push/PR
 ```
 
-The controller reads `program.md`, finds eligible work, and drives each issue through groom → review → `Ready` → (human promotes to `Building`) → Stage 1 → Stage 2 → validate → commit → push → draft PR → `In Review`.
+Before running deliver, configure `.autoship/defaults.yaml` with an issue source and validation command, or create `.autoship/issues/<id>/issue.md` for folder/local mode.
+
+The controller resolves the RunRequest, finds eligible work, and drives each issue through groom → review → `Ready` → (human promotes to `Building`) → oracle → implementation → verification → commit → push → draft PR → `In Review`.
 
 Current scope is intentionally narrow: Linear-first backlog + build pickup from `Building`, local runtime mirror under `.autoship/issues/<id>/`, serial only, draft PR yes (merge no).
-
-See `docs/architecture/deliver-program-template.md` for the `program.md` shape.
 
 ## Optional Extract Build (probe-2.5 onward)
 

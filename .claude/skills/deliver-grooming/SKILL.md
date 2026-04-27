@@ -26,7 +26,7 @@ Use this skill when:
 Do not use when:
 
 - The issue is still being triaged for type/scope (pre-pre-groom triage is an operator decision).
-- The brief has been approved and Stage 1 oracle assembly is now in progress. Different skill territory.
+- The brief has been approved and oracle assembly is now in progress. Different skill territory.
 
 ## Type postures
 

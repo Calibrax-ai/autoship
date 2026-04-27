@@ -2,7 +2,7 @@
 title: "Audit Architecture"
 ---
 
-**Status:** scaffolded · **Last updated:** 2026-04-24
+**Status:** scaffolded · **Last updated:** 2026-04-27
 
 ## Purpose
 
@@ -24,7 +24,7 @@ It answers:
 flowchart LR
     A["new"] --> B["audited"]
     B --> C["approved-to-create"]
-    C --> D["issues-created"]
+    C --> D["tracker-synced"]
 ```
 
 This is a bounded loop, not a continuous crawler.
@@ -33,9 +33,22 @@ This is a bounded loop, not a continuous crawler.
 
 All state lives under `.autoship/audits/<run-id>/`:
 
+**Canonical (every run):**
+
+- `invocation.txt` — raw trigger string
+- `run.json` — normalized RunRequest
+- `standards.yaml` — snapshot of repo policy when present
 - `assessment.md` — auditor output
 - `review.md` — audit-reviewer verdict
-- `created-issues.json` — tracker issues materialized by the controller
+
+**Tracker layer (only when `tracker != none`):**
+
+- `prior-issues.json` — open project issues + closed audit-sourced issues (180-day window) at run start
+- `tracker-sync.json` — per-candidate action log (`created` / `linked-existing` / `commented-existing` / `planned` / `failed`)
+
+When the tracker layer is active, candidates in `assessment.md` carry `prior-issue-status` + `prior-issue-reasoning`, and `review.md` includes Check 6 (tracker-sync annotation correctness). See [`audit-tracker-sync.md`](./audit-tracker-sync.md).
+
+The active audit pointer, if needed for resume, is `.autoship/audits/current`.
 
 ## Agents
 
@@ -59,7 +72,7 @@ If policy and evidence do not constrain the implementation path, the finding sho
 
 ## External exposure
 
-Audit can optionally run a black-box external production exposure smoke test against the URL declared in `.autoship/program.md`.
+Audit can optionally run a black-box external production exposure smoke test against the URL declared in the trigger (flag `--external-url=<url>` or per-repo sticky in `.autoship/defaults.yaml`). Disabled by default.
 
 This is not a UI walker and not a pentest. It checks public-edge readiness signals such as TLS, redirects, security and cache headers, CORS, public API auth gates, version leakage, robots/indexing, health/docs/debug endpoints, and explicitly configured login/session smoke checks.
 
@@ -77,9 +90,17 @@ Audit is serial by default at the agent boundary: one auditor writes `assessment
 
 Inside the auditor, independent read-only checks can be batched or run concurrently when that does not blur evidence ownership. The output remains one assessment with one severity model.
 
+## Tracker sync (opt-in)
+
+The default `audit` path is markdown-first: `assessment.md` and `review.md` are the canonical artifacts. No tracker writes, no prior-issue annotations on candidates, no Linear MCP calls.
+
+When an operator configures `tracker: linear` (with or without `create_issues: true`), the controller runs an additional reconciliation pass: prior-context fetch, candidate annotations, reviewer Check 6, and per-candidate mechanical dispatch into Linear. That layer is documented separately in [`audit-tracker-sync.md`](./audit-tracker-sync.md) so the markdown-first reader isn't bombarded with mechanics they don't need.
+
+Refresh of artifacts when this layer is active: `prior-issues.json` (input cache) and `tracker-sync.json` (per-candidate action log) appear under `<run-dir>/` alongside the canonical artifacts.
+
 ## Handoff to deliver
 
-The controller may create approved issue candidates in Linear or GitHub, but the default created state is `Backlog`.
+The controller may create approved issue candidates in Linear, with default created state `Backlog`.
 
 That keeps the boundary clean:
 

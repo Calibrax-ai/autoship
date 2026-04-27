@@ -19,7 +19,7 @@ A human promotes the brief to "Building" only when it's trustworthy. Everything 
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
 >
-> **Key terms used below.** **Brief** — the plain-English plan for the change. **Oracle** — the test suite that judges whether the code is done; the author of the code cannot edit it. **Stage 1 / Stage 2** — two separate agent sessions: Stage 1 writes the oracle, Stage 2 writes the code. **Pre-groomer / Brief-reviewer** — the two agents that write and judge the brief respectively.
+> **Key terms used below.** **Brief** — the plain-English plan for the change. **Oracle** — the test suite that judges whether the code is done; the author of the code cannot edit it. **Oracle writer / Implementation executor** — two separate agent sessions: one writes the oracle, the other writes the code. **Pre-groomer / Brief-reviewer** — the two agents that write and judge the brief respectively.
 
 ## Problem
 
@@ -63,8 +63,8 @@ flowchart LR
 
     subgraph BUILD ["Build · oracle frozen"]
       direction TB
-      S1["Stage 1<br/>writes the tests<br/>(the oracle)"]
-      S2["Stage 2<br/>writes the code<br/>— cannot edit tests"]
+      S1["Oracle writer<br/>writes the tests"]
+      S2["Implementation executor<br/>writes code<br/>— cannot edit tests"]
       S1 --> S2
     end
 
@@ -92,11 +92,11 @@ flowchart LR
 The same structural discipline shows up at both stages:
 
 - **Grooming** — one AI writes the brief, a *separate* AI judges it. The author never grades its own homework.
-- **Building** — Stage 1 writes the tests (the oracle). Stage 2 writes the code, and it is **forbidden** from modifying the tests. The oracle-freeze plays the role of the separate reviewer; test mutation becomes a visible signal that something's wrong.
+- **Building** — the oracle writer creates the tests. The implementation executor writes the code, and it is **forbidden** from modifying the tests. The oracle-freeze plays the role of the separate reviewer; test mutation becomes a visible signal that something's wrong.
 
-When review rejects, work loops back: Brief-reviewer REJECT sends the pre-groomer back to rewrite the brief; a Verify failure sends Stage 2 back to fix the code. Merge, deploy, and outcome verification sit **outside** deliver's scope — they belong to the system-level flow and (when they land) the `validate` module.
+When review rejects, work loops back: Brief-reviewer REJECT sends the pre-groomer back to rewrite the brief; a Verify failure sends the implementation executor back to fix the code. Merge, deploy, and outcome verification sit **outside** deliver's scope — they belong to the system-level flow and (when they land) the `validate` module.
 
-**Current probe scope.** Probe 0.1 proved the grooming half (Pre-groomer + Brief-reviewer). Probes 0.2–0.5 extended through the building half (Stage 1 + Stage 2 + Verify) and across Bug, Feature, Refactor, and UI-build shapes. Draft-PR handoff is operational today.
+**Current probe scope.** Probe 0.1 proved the grooming half (Pre-groomer + Brief-reviewer). Probes 0.2–0.5 extended through the building half (oracle + implementation + verification) and across Bug, Feature, Refactor, and UI-build shapes. Draft-PR handoff is operational today.
 
 ### Load-bearing architectural choices
 
@@ -424,13 +424,13 @@ Five specialized agents participate in a deliver run. The controller dispatches 
 
 | Agent | Role | Owns | Judged by |
 |---|---|---|---|
-| **Controller** (deliver mode) | Orchestrator. Reads `program.md`, claims an eligible issue, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
+| **Controller** (deliver mode) | Orchestrator. Resolves the RunRequest from flags or NL prompt (with per-repo stickies from `.autoship/defaults.yaml`), claims an eligible issue, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
 | **Pre-groomer** | Writes the **brief** — the plain-English plan — from the raw issue. | `brief.md` in the run directory. Populates every base field in the schema. | Brief-reviewer (separate agent). Never grades its own output. |
 | **Brief-reviewer** | Judges whether the brief is well-formed, grounded in the codebase, and well-scoped. Returns `APPROVED` or `REJECTED` with specific objections. | `reviews/review-NN.md` — append-only, one file per pass. | The operator, indirectly, through the calibration set grown from observed overrides. |
-| **Oracle writer** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. This is the Stage 1 worker. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. | Stage 2 (tests pass once code is written, or don't) and the human reviewer on the PR. |
-| **Implementation executor** | Writes the code change against the frozen oracle. This is the Stage 2 worker. | Application source code only. **Forbidden** from editing tests, the brief, or any Stage 1 artifact. | The oracle — Stage 2 cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
+| **Oracle writer** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. Owns `oracle/result.md`. | Implementation executor (tests pass once code is written, or don't) and the human reviewer on the PR. |
+| **Implementation executor** | Writes the code change against the frozen oracle. | Application source code only. **Forbidden** from editing tests, the brief, or any oracle artifact. Owns `implementation/result.md`. | The oracle — implementation cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
 
-The shape is serial and disciplined: outputs of one agent become read-only inputs of the next. Nothing loops back except through an explicit reviewer verdict (brief-reviewer rejects → regroom) or a mechanical test failure (oracle fails → Stage 2 rewrites the code).
+The shape is serial and disciplined: outputs of one agent become read-only inputs of the next. Nothing loops back except through an explicit reviewer verdict (brief-reviewer rejects → regroom) or a mechanical test failure (oracle fails → implementation rewrites the code).
 
 ## Agent Contract
 
@@ -580,19 +580,19 @@ Extends the same generator-evaluator pattern already validated for `extract-plan
 The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
 - grooming path: claim → pre-groom → brief review → regroom → `Ready | needs-human-input`
-- build path: `Ready` (after human promotion to `Building`) → worktree + branch → Stage 1 → Stage 2 → validation → draft PR → `In Review`
+- build path: `Ready` (after human promotion to `Building`) → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
 
-Input is a thin `program.md` naming the testbed, issue source, regroom policy, worktree/branch policy, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
+Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, regroom policy, worktree/branch policy, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
 The controller reads two distinct instruction layers:
 
 - **`.claude/agents/autoship-controller.md`**
-  Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself.
+  Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself. Also hosts § How I Receive Work, which defines the RunRequest contract and configuration precedence.
 
-- **`program.md`**
-  Run-scoped contract: which repo/testbed to operate on, which tracker/project or issue source to pull from, approval mode (`supervised` vs `auto`), which states are eligible, whether merge is allowed, and what "do not stop" means for this specific run.
+- **RunRequest** (in-memory per run, snapshotted to `<run-dir>/run.json`)
+  Run-scoped contract: which repo/testbed to operate on, which tracker/project or issue source to pull from, approval mode (`supervised` vs `auto`), which states are eligible, whether merge is allowed, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → framework defaults.
 
-This split keeps stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy. (The framework knowledge previously lived in a separate `autoship-controller` skill; it was folded into the agent file on 2026-04-24 because the skill had a single reader and the split was creating drift between two files.)
+This split keeps stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy. (The framework knowledge previously lived in a separate `autoship-controller` skill; it was folded into the agent file on 2026-04-24 because the skill had a single reader and the split was creating drift between two files. Historical note: the trigger contract was originally a committed `.autoship/program.md` file; current deliver does not read it and uses flag/NL triggers instead.)
 
 These files are **controller-only**. Manual worker dispatch remains a fallback path; it does not require them.
 
@@ -653,8 +653,8 @@ Current implemented runtime:
 - regroom up to limit
 - park at `Ready | needs-human-input`
 - after human promotion to `Building`: worktree + branch
-- Stage 1 oracle
-- Stage 2 implementation
+- oracle result
+- implementation result
 - controller reruns validation
 - controller commits, pushes, and opens a draft PR
 - issue moves to `In Review`
@@ -758,15 +758,15 @@ autoship-deliver-0.1/
           review-02.md   # after regroom (if any)
 ```
 
-Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) — the production shape where `deliver` gets installed into a repo the way `.github/` or `.claude/` does. If/when controller-backed `deliver` arrives, its run-scoped `program.md` lives one level up so it does not contaminate the testbed's git history.
+Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) — the production shape where `deliver` gets installed into a repo the way `.github/` or `.claude/` does. Run-scoped state (`run.json`, `invocation.txt`, snapshotted `standards.yaml`, logs) lives under `app/.autoship/runs/<run-id>/`; the optional active deliver pointer is `app/.autoship/runs/current`.
 
 ### 0.1-specific simplifications
 
 Each graduates to a richer shape when observed need justifies it.
 
-- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns claim → pre-groom → review → `Ready | needs-human-input`, then after human promotion to `Building`: worktree → Stage 1 → Stage 2 → validation → draft PR.
+- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns claim → pre-groom → review → `Ready | needs-human-input`, then after human promotion to `Building`: worktree → oracle → implementation → verification → draft PR.
 - **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The brief schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-brief-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The brief-specific reviewer checks live in `deliver-grooming/references/brief-review-rubric.md`.
-- **State derived from filesystem.** `brief.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-oracle`. No `state.json`.
+- **State derived from filesystem.** `brief.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. No `state.json`.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
 - **Reproduction outcome is a brief field, not a separate artifact.** A bug that cannot be reproduced is a `brief.md` with `reproduction-status: cannot-reproduce`; the reviewer's groundedness check flags it.
 - **Non-functional type deferred.** Only Bug, Feature, and Refactor are designed; Non-functional grooming is implemented when probe-0.2+ has real data to inform it.

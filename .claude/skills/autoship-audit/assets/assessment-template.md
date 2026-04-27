@@ -41,6 +41,11 @@ verdict: ship | ship-with-caution | do-not-ship
 - Verification: ...
 - Scope notes: ...
 
+<!-- The two fields below appear ONLY when prior-issues.json was injected (tracker configured). Omit entirely for markdown-first audits. -->
+- Prior-issue-status: new | duplicate-of-open: <identifier> | related-to: <identifier> | closed-match: <identifier>
+- Prior-issue-reasoning: <required for any non-`new` status; quote concrete evidence from both the candidate and the cited prior issue's body_summary; for `closed-match`, state the regression hypothesis and current evidence>
+
+
 # Checklist status summary
 - Build/release path: PASS | FAIL | UNVERIFIED — <evidence or reason>
 - CI/test gates: PASS | FAIL | UNVERIFIED — <evidence or reason>

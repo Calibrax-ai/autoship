@@ -36,7 +36,7 @@ Probes are not benchmarks. They're where we go looking for failure modes, so the
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here.
 >
-> **Key terms used below.** **Artifacts** — the bundle of outputs from grooming or extraction (brief, spec, tests, evidence). **Oracle** — the generated test suite that judges whether code matches the spec. **Brief** — the plain-English plan for a single change. **Stage 1 / Stage 2** — two separate agent sessions: Stage 1 writes the oracle (the tests), Stage 2 writes the code and cannot edit the oracle.
+> **Key terms used below.** **Artifacts** — the bundle of outputs from grooming or extraction (brief, spec, tests, evidence). **Oracle** — the generated test suite that judges whether code matches the spec. **Brief** — the plain-English plan for a single change. **Oracle writer / implementation executor** — two separate agent sessions: one writes the oracle, the other writes the code and cannot edit the oracle.
 
 ## The pipeline works when artifacts are strong
 
@@ -61,7 +61,7 @@ In `deliver`, the same pattern appears one layer earlier: the downstream builder
 **Implication:** the load-bearing document is the executable contract:
 
 - `extract`: oracle + slice plan
-- `deliver`: approved brief + Stage 1 oracle
+- `deliver`: approved brief + frozen oracle
 
 ## Generator-evaluator separation is a structural fix, not a local trick
 
@@ -80,7 +80,7 @@ Validated at three layers now:
 
 - `extract`: plan-reviewer in probe-2.5 — planning layer
 - `deliver`: brief-reviewer in probe-0.1 — grooming layer
-- `deliver`: frozen Stage 1 oracle in probe-0.3 — preservation-proof layer. The author-judge separation here is reflected in artifacts rather than agents: Stage 1 writes the invariants, Stage 2 is forbidden from modifying them. Test mutation becomes the signal. On a Refactor where the executor had full opportunity to weaken tests to shortcut the structural change, it did not — because the separation made that move visible.
+- `deliver`: frozen oracle in probe-0.3 — preservation-proof layer. The author-judge separation here is reflected in artifacts rather than agents: the oracle writer writes the invariants, and the implementation executor is forbidden from modifying them. Test mutation becomes the signal. On a Refactor where the executor had full opportunity to weaken tests to shortcut the structural change, it did not — because the separation made that move visible.
 
 This pattern should be the default answer whenever a stage starts confidently approving mediocre output or shortcutting its own checks.
 
@@ -104,13 +104,13 @@ This happened most clearly in `extract`, but the lesson generalizes. A rationale
 
 If the rule depends on interpretation, it belongs with a reviewer, not a grep.
 
-## Stage separation is load-bearing
+## Oracle separation is load-bearing
 
-The Stage 1 / Stage 2 split is not an implementation detail. It is another form of author-judge separation.
+The oracle / implementation split is not an implementation detail. It is another form of author-judge separation.
 
-- Stage 1 writes the oracle
-- Stage 2 writes the implementation
-- Stage 2 does not get to rewrite Stage 1's tests silently
+- the oracle writer writes the oracle
+- the implementation executor writes the implementation
+- the implementation executor does not get to rewrite the oracle writer's tests silently
 
 If one executor writes both the tests and the fix, the result is ambiguous. You learn only that one agent can co-adapt its own checks, not that the contract was trustworthy.
 

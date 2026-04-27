@@ -59,7 +59,8 @@ If policy and repo evidence do not constrain the choice, return `decision-requir
    - **execution-ready** — repo standards or existing repo shape already constrain the fix
    - **decision-required** — the capability gap is real, but the implementation path is not chosen
 8. Synthesize bounded issue candidates.
-9. Stop.
+9. **If `prior-issues.json` was injected:** annotate every candidate per §Prior-issue annotation. **Else:** skip — the markdown-first path doesn't write annotation fields.
+10. Stop.
 
 ## Required coverage
 
@@ -112,7 +113,7 @@ The external exposure step is a bounded smoke test, not a penetration test.
 
 ## Issue-candidate contract
 
-Each issue candidate must include:
+Each issue candidate must include nine canonical fields:
 
 - `title`
 - `priority`
@@ -123,6 +124,49 @@ Each issue candidate must include:
 - `acceptance criteria`
 - `verification`
 - `scope notes`
+
+Two additional fields are required **only when `prior-issues.json` is present** (tracker configured):
+
+- `prior-issue-status` (one of `new`, `duplicate-of-open: <identifier>`, `related-to: <identifier>`, `closed-match: <identifier>`)
+- `prior-issue-reasoning` (required for every non-`new` status)
+
+When the dispatch did not inject `prior-issues.json` (no tracker configured), omit both fields. The markdown-first audit path is the default and does not need them.
+
+## Prior-issue annotation (tracker-only)
+
+This section only applies when `prior-issues.json` was injected into your dispatch. If absent, skip — go straight to "Stop" in the workflow.
+
+Each candidate's `prior-issue-status` plus `prior-issue-reasoning` lets the controller drive duplicate-aware tracker writes. The annotation does **not** suppress the finding — every gap still appears in `assessment.md` with full evidence, severity, and verdict impact. It only controls downstream tracker behavior.
+
+### Inputs
+
+When injected, `prior-issues.json` contains:
+
+- `open[]` — every open issue in the configured team/project (lightweight fields: `id`, `identifier`, `url`, `title`, `labels`, `state`, `body_summary`, `created_at`). NOT just audit-sourced issues — humans may have already filed the same gap, and you must catch those too.
+- `closed[]` — closed issues labeled `source:autoship-audit` from the last 180 days.
+
+### Annotation vocabulary
+
+- `new` — no semantic match against any prior issue.
+- `duplicate-of-open: <identifier>` — same gap as an open issue. Cite the human identifier (`LIN-142`), not the opaque id.
+- `related-to: <identifier>` — connected but distinct (e.g., adding HSTS is related to a broader "security headers" issue). Single primary identifier in v1; mention any additional relations in reasoning prose.
+- `closed-match: <identifier>` — same gap as a closed audit-sourced issue within the 180-day window, AND current repo evidence shows the gap is present. Use this when prior remediation did not land or was reverted.
+
+`duplicate-of-open` is reserved for OPEN issues. Closed matches go to `closed-match` instead — they carry a regression signal that an open dup does not.
+
+### Reasoning requirements
+
+`prior-issue-reasoning` is required for every non-`new` annotation and must:
+
+- Quote concrete evidence from both sides — the candidate's cited evidence and the prior issue's `body_summary`.
+- Explain why the match is the same gap, not just a shared word or subsystem.
+- For `closed-match`, explicitly state the regression hypothesis (gap reappeared; prior fix did not land or was reverted) and cite current evidence proving the gap is present now.
+
+Vague reasoning ("similar topic", "related area", "same general space") fails Check 6 in review.
+
+### False-`new` discipline
+
+Before finalizing the assessment, sweep `prior-issues.json` once more for every candidate marked `new`. The reviewer's Check 6 explicitly looks for missed duplicates — it is cheaper to catch them during authoring than to regroom after a REJECTED review.
 
 ## Assessment artifact shape
 

@@ -46,7 +46,7 @@ Handles the **known repo, unclear readiness / unclear work queue** problem.
 
 For `audit-0.1`, the workflow stops at approved issue creation. It does not fix code in the same run.
 
-When autoship audits a repo, `.autoship/standards.yaml` is the policy source for stack choices and release expectations. Repo artifacts such as `.env.example`, CI files, and deploy config are evidence sources. If standards are missing and the repo does not already constrain the choice, the right outcome is `decision-required`, not an invented platform decision.
+When autoship audits a repo, `.autoship/standards.yaml` is the policy source for stack choices and release expectations. Repo artifacts such as `.env.example`, CI files, and deploy config are evidence sources. The controller can draft standards from repo evidence, but it only fills high-confidence values and leaves ambiguous policy as `SET_ME`; no separate evidence artifact is created. If standards are missing and the repo does not already constrain the choice, the right outcome is `decision-required`, not an invented platform decision.
 
 If the audit run declares an external URL, audit also performs a safe external exposure smoke test. That covers public-edge production/security readiness (TLS, headers, CORS, public API auth gates, cache behavior, docs/debug exposure) without running destructive probes or becoming a full pentest.
 
@@ -141,13 +141,13 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 
 | Agent | Module | Role | Status |
 |---|---|---|---|
-| **autoship-controller** | Core | The conductor. Reads the run contract, dispatches each agent in order, owns all tracker mutations. | Operational |
+| **autoship-controller** | Core | The conductor. Resolves the trigger into a RunRequest, dispatches each agent in order, owns all tracker mutations. | Operational |
 | **audit-auditor** | Audit | Inspects the repo against a fixed readiness lens and writes the audit artifact plus bounded issue candidates. | Scaffolded |
 | **audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, and issue-candidate quality before any issues are created. | Scaffolded |
 | **deliver-pre-groomer** | Deliver | Writes the *brief* (plain-English plan) from an approved issue. | Operational |
 | **deliver-brief-reviewer** | Deliver | Judges the brief. Separate agent from the one that wrote it. | Operational |
-| **deliver-oracle-writer** | Deliver | Writes the *oracle* (tests) from the approved brief. This is the Stage 1 worker. | Operational |
-| **deliver-implementation** | Deliver | Writes the code; forbidden from editing the oracle. This is the Stage 2 worker. | Operational |
+| **deliver-oracle-writer** | Deliver | Writes the *oracle* (tests) from the approved brief. | Operational |
+| **deliver-implementation** | Deliver | Writes the code; forbidden from editing the oracle. | Operational |
 | **extract-ui-walker** | Extract · ingest | Drives the running demo in a browser to discover user journeys. | Optional |
 | **extract-static** | Extract · ingest | Extracts the API surface and data model from source code. | Optional |
 | **extract-data** | Extract · ingest | Introspects the live database to describe actual state. | Optional |
@@ -182,7 +182,7 @@ That creates a deliberate split:
 The outer surface is for coordination.
 The inner contract is for reliable execution.
 
-For `audit`, the controller is also the only actor allowed to create tracker issues. Workers may propose issue candidates inside the audit artifact; only the controller materializes approved ones in Linear or GitHub.
+For `audit`, the controller is also the only actor allowed to create tracker issues. Workers may propose issue candidates inside the audit artifact; only the controller materializes approved ones in Linear. GitHub audit sync is not implemented in v1.
 
 ### Stable knowledge vs run contract
 
@@ -194,16 +194,16 @@ Autoship should distinguish between:
 - **Run-specific contract**
   What one active loop should do right now: which repo, which tracker/project, which issues are eligible, whether approval mode is supervised or auto, whether merge is allowed, and what "do not stop" means for this run.
 
-That split maps naturally to two artifacts:
+That split maps naturally to these artifacts:
 
 - **`.claude/agents/autoship-controller.md`**
   Stable framework knowledge plus per-mode procedure. Changes slowly. Holds the load-bearing discipline (workflow-surface ownership, generator-evaluator separation, disk-backed state, NEVER STOP) inline with each mode's loop. Collapsed here from the former `autoship-controller` skill because it had a single reader and the split was creating drift.
 
-- **`program.md`**
-  Run-scoped marching orders for one controller loop. Changes per repo, environment, or operating mode.
+- **RunRequest**
+  Run-scoped marching orders for one audit or deliver loop. Resolved from trigger flags or natural-language prompt, optional `.autoship/defaults.yaml`, and framework defaults. Snapshotted to `run.json` under the run directory.
 
 - **`.autoship/standards.yaml`**
-  Repo-local policy. Captures the standards autoship should assume for hosting, CI, observability, secrets, and release expectations.
+  Repo-local policy. Captures the standards autoship should assume for hosting, CI, observability, secrets, and release expectations. It can be manually edited or drafted by the controller from repo evidence; ambiguous policy remains `SET_ME`.
 
 Skills can teach the stable layer, but the active "non-stop" contract belongs to the run layer, not to a timeless teaching document.
 
@@ -280,16 +280,16 @@ The runtime shape is now:
 In other words:
 
 - `.claude/agents/autoship-controller.md` explains how autoship behaves (stable discipline + per-mode procedure)
-- `program.md` tells one controller run what to do
+- `RunRequest` tells one audit or deliver run what to do
 
-That preserves the successful `extract` probe pattern without collapsing stable product knowledge and per-run policy into one file.
+That preserves the successful artifact-backed pattern without collapsing stable product knowledge and per-run policy into one file. Core audit/deliver do not read `.autoship/program.md`; extract keeps its own `program.md` mechanics while it remains an optional research track.
 
 Current implementation status:
 
 - `extract` controller mode is live for ingest when the optional extract pack is installed
 - `deliver` controller mode is live through draft PR:
   - `claim -> pre-groom -> review -> Ready | needs-human-input`
-  - after human promotion to `Building`: `worktree -> Stage 1 -> Stage 2 -> validation -> draft PR -> In Review`
+  - after human promotion to `Building`: `worktree -> oracle -> implementation -> verification -> draft PR -> In Review`
 - `audit` now has scaffolded controller + worker contracts:
   - `assess repo -> review findings -> create approved issues in Backlog -> stop`
   - the shape exists, but it is not yet probe-validated the way `extract` and `deliver` are

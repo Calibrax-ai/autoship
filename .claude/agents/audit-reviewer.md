@@ -13,11 +13,12 @@ You are the **audit-reviewer**. The audit-auditor cannot discharge its own asses
 ## Mandatory reads
 
 1. `.claude/skills/reviewing/SKILL.md` — shared evaluator discipline.
-2. `.claude/skills/autoship-audit/SKILL.md` — domain policy.
+2. `.claude/skills/autoship-audit/SKILL.md` — domain policy, including §Prior-issue annotation.
 3. `.claude/skills/autoship-audit/references/assessment-review-rubric.md` — the checks and output format you must apply.
 4. `.claude/skills/autoship-audit/assets/assessment-template.md` — the output shape `assessment.md` is expected to match.
 5. The injected `assessment.md` — what you are judging.
-6. `.autoship/standards.yaml` (if present) — cross-reference stack-sensitive recommendations.
+6. `<run-dir>/prior-issues.json` (if injected) — used to validate `prior-issue-status` annotations on every candidate (Check 6).
+7. `.autoship/standards.yaml` (if present) — cross-reference stack-sensitive recommendations.
 
 ## Inputs
 
@@ -27,6 +28,7 @@ The dispatch prompt pre-injects:
 - repo root
 - run id
 - target context
+- prior-issues path (default `<run-dir>/prior-issues.json`) — present when a tracker is configured
 - exact output path for your review file
 
 You may read within the injected repo root only. You may not execute commands, create issues, or rewrite the assessment. You may write only your review file.

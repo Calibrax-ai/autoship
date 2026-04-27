@@ -9,7 +9,6 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createInterface } from 'node:readline/promises';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -70,71 +69,7 @@ export async function init(args = []) {
 		);
 	}
 
-	const rl = createInterface({
-		input: process.stdin,
-		output: process.stdout,
-		terminal: false,
-	});
-
-	// Persistent line buffer — captures lines as they arrive even when
-	// no question is pending. Required for piped stdin (heredoc, CI).
-	const lineQueue = [];
-	const waiters = [];
-	let stdinClosed = false;
-
-	rl.on('line', (line) => {
-		const next = waiters.shift();
-		if (next) next(line);
-		else lineQueue.push(line);
-	});
-	rl.on('close', () => {
-		stdinClosed = true;
-		while (waiters.length) waiters.shift()('');
-	});
-
-	const readLine = () =>
-		new Promise((resolve) => {
-			if (lineQueue.length) return resolve(lineQueue.shift());
-			if (stdinClosed) return resolve('');
-			waiters.push(resolve);
-		});
-
-	const ask = async (q, defaultVal) => {
-		const prompt = defaultVal ? `${q} [${defaultVal}]: ` : `${q}: `;
-		process.stdout.write(prompt);
-		const answer = await readLine();
-		const trimmed = (answer || '').trim();
-		if (trimmed) process.stdout.write('\n');
-		return trimmed || defaultVal || '';
-	};
-
-	// Prompts
-	const tracker = (
-		await ask('Tracker? (linear / github / none)', 'linear')
-	).toLowerCase();
-
-	const trackerConfig = {};
-	if (tracker === 'linear') {
-		trackerConfig.team = await ask('Linear team name (e.g., "Delivery")');
-		trackerConfig.project = await ask(
-			'Linear project name (e.g., "Gridfin")'
-		);
-	} else if (tracker === 'github') {
-		trackerConfig.repo = await ask('GitHub repo (owner/name)');
-	}
-
-	const approvalMode = (
-		await ask('Approval mode? (supervised / auto)', 'supervised')
-	).toLowerCase();
-
-	const validationCmd = await ask(
-		'Validation command after Stage 2 (e.g., "bun test && bun run typecheck")',
-		'bun test'
-	);
-
-	rl.close();
-
-	console.log('\nInstalling autoship...');
+	console.log('Installing autoship...');
 
 	// Copy core agents + skills. Extract is optional because it is a legacy
 	// research pack and should not dominate the default product surface.
@@ -154,19 +89,14 @@ export async function init(args = []) {
 	const autoshipDir = join(cwd, '.autoship');
 	mkdirSync(autoshipDir, { recursive: true });
 
-	// Write program.md
-	const programContent = renderProgram({
-		tracker,
-		trackerConfig,
-		approvalMode,
-		validationCmd,
-	});
-	writeFileSync(join(autoshipDir, 'program.md'), programContent);
-	console.log('  ✓ program.md → .autoship/');
-
-	// Write standards.yaml
+	// Write standards.yaml (repo policy — always scaffolded)
 	writeFileSync(join(autoshipDir, 'standards.yaml'), renderStandards());
 	console.log('  ✓ standards.yaml → .autoship/');
+
+	// Write defaults.yaml (optional per-repo stickies — commented template,
+	// inert until the operator uncomments fields)
+	writeFileSync(join(autoshipDir, 'defaults.yaml'), renderDefaults());
+	console.log('  ✓ defaults.yaml → .autoship/  (commented template)');
 
 	// Update .gitignore
 	updateGitignore(cwd);
@@ -175,16 +105,27 @@ export async function init(args = []) {
 	console.log(`
 Done. Next steps:
 
-  1. Review .autoship/program.md and adjust any details.
-  2. Review .autoship/standards.yaml and set your repo standards (hosting, CI, observability, secrets).${
-		tracker === 'linear'
-			? '\n  3. Install the Linear MCP: https://docs.anthropic.com/en/docs/mcp'
-			: ''
-	}
-  ${tracker === 'linear' ? 4 : 3}. If this repo uses environment variables, keep .env.example current — autoship treats it as evidence, not the policy source.
-  ${tracker === 'linear' ? 5 : 4}. From this directory, run:
+  1. Review or draft .autoship/standards.yaml — hosting, CI, observability, secrets. autoship treats SET_ME values as decision-required.
+
+       claude --agent autoship-controller -p "draft standards from this repo"
+
+  2. (Optional) Uncomment per-repo stickies in .autoship/defaults.yaml — tracker, validation command, branch prefix. Flags on the invocation always win.
+  3. If using Linear: install the Linear MCP — https://docs.anthropic.com/en/docs/mcp
+  4. If this repo uses environment variables, keep .env.example current — autoship treats it as evidence, not the policy source.
+  5. Try the zero-config audit smoke test:
+
+       claude --agent autoship-controller -p "audit --report-only"
+
+  6. Before deliver, configure an issue source and validation command:
+
+       # Option A: uncomment deliver.tracker + deliver.validation in .autoship/defaults.yaml
+       # Option B: create .autoship/issues/<id>/issue.md for folder/local mode and uncomment deliver.validation
+
+     Then run:
 
        claude --agent autoship-controller -p "deliver"
+
+       claude --agent autoship-controller -p "deliver FRD-162"
 
   Docs: https://github.com/Calibrax-ai/autoship
 `);
@@ -228,103 +169,63 @@ function copyDir(src, dest) {
 
 function updateGitignore(cwd) {
 	const gitignorePath = join(cwd, '.gitignore');
-	const autoshipBlock = `
-# autoship runtime state
-.autoship/runs/
-.autoship/issues/
-.autoship/worktrees/
-.autoship/local.md
-`;
+	const autoshipLines = [
+		'# autoship runtime state',
+		'.autoship/audits/',
+		'.autoship/runs/',
+		'.autoship/issues/',
+		'.autoship/worktrees/',
+		'.autoship/local.md',
+	];
 
 	if (existsSync(gitignorePath)) {
 		const existing = readFileSync(gitignorePath, 'utf-8');
-		if (!existing.includes('.autoship/runs/')) {
-			writeFileSync(gitignorePath, existing.trimEnd() + '\n' + autoshipBlock);
+		const missing = autoshipLines.filter((line) => !existing.includes(line));
+		if (missing.length) {
+			writeFileSync(
+				gitignorePath,
+				existing.trimEnd() + '\n\n' + missing.join('\n') + '\n'
+			);
 		}
 	} else {
-		writeFileSync(gitignorePath, autoshipBlock.trimStart());
+		writeFileSync(gitignorePath, autoshipLines.join('\n') + '\n');
 	}
 }
 
-function renderProgram({ tracker, trackerConfig, approvalMode, validationCmd }) {
-	const validationLines = validationCmd
-		.split('&&')
-		.map((c) => c.trim())
-		.filter(Boolean)
-		.map((c) => `    - "${c}"`)
-		.join('\n');
+function renderDefaults() {
+	return `# autoship defaults.yaml — optional per-repo sticky run defaults
+# Uncomment and fill in values you want autoship to assume when you don't
+# pass them as flags. Flags on the invocation always win. --report-only
+# and --tracker=none are always respected even if defaults say otherwise.
+#
+# Safety note: keep create_issues: false unless you actually want every
+# audit run to write into the tracker. Use --approve to opt in per-run.
 
-	let issueSourceBlock;
-	if (tracker === 'linear') {
-		issueSourceBlock = `issue_source: linear
+# audit:
+#   tracker: linear            # linear | none (GitHub audit sync is not implemented in v1)
+#   create_issues: false       # override per-run with --approve
+#   external_exposure: false   # override per-run with --external-url=<url>
 
-linear:
-  team: "${trackerConfig.team || 'SET_ME'}"
-  project: "${trackerConfig.project || 'SET_ME'}"
-  grooming_states: [Backlog, Todo]
-  build_states: [Building]
-  eligible_labels: []
-  max_concurrent: 1
+# deliver:
+#   tracker: folder            # folder | linear | github
+#   folder:
+#     path: .autoship/issues
+#   linear:
+#     team: "Delivery"
+#     project: "MyProject"
+#   worktree:
+#     root: .autoship/worktrees
+#     branch_prefix: "autoship/"
+#   validation:
+#     commands:
+#       - "bun test"
+#   pr:
+#     remote: origin
+#     draft: true
+#     base_branch: main
+#   approval_mode: supervised   # supervised | auto
+#   max_regroom_cycles: 3
 `;
-	} else if (tracker === 'github') {
-		issueSourceBlock = `issue_source: github
-
-github:
-  repo: "${trackerConfig.repo || 'SET_ME/SET_ME'}"
-  eligible_labels: [ready-for-autoship]
-  max_concurrent: 1
-`;
-	} else {
-		issueSourceBlock = `issue_source: folder
-
-folder:
-  path: .autoship/issues/
-`;
-	}
-
-	const linearWritesBlock =
-		tracker === 'linear'
-			? `
-linear_writes:
-  state_transitions: true
-  comments: true
-  labels: false
-  sub_issue_creation: false
-
-state_map:
-  on_claim: "Grooming"
-  on_ready: "Ready"
-  on_build_start: "Building"
-  on_draft_pr: "In Review"
-  on_needs_human_input: "needs-human-input"
-`
-			: '';
-
-	return `# autoship program.md — deliver run contract
-# Generated by \`autoship init\`. Commit this file — the whole team shares the run contract.
-# Reference: https://github.com/Calibrax-ai/autoship/blob/main/docs/architecture/deliver-program-template.md
-
-mode: deliver
-
-# Approval mode: supervised (human promotes to Building) or auto (reviewer-agent promotes).
-approval_mode: ${approvalMode}
-
-${issueSourceBlock}
-max_regroom_cycles: 3
-
-worktree:
-  root: .autoship/worktrees
-  branch_prefix: "autoship/"
-
-validation:
-  commands:
-${validationLines}
-
-pr:
-  remote: origin
-  draft: true
-  base_branch: main
-${linearWritesBlock}`;
 }
 
 function renderStandards() {

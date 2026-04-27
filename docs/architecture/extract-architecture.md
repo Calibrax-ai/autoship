@@ -321,7 +321,7 @@ Once ingest produces an approved spec, build decomposes it into vertical slices 
 
 | Agent | Role |
 |---|---|
-| **autoship-controller** | Mode-aware top-level agent. Reads `program.md`, picks the right phase machine (extract-ingest, audit, or deliver), and dispatches the appropriate phase-level agents. |
+| **autoship-controller** | Mode-aware top-level agent. Keeps extract-ingest compatibility while audit/deliver use trigger-first RunRequests, then dispatches the appropriate phase-level agents. |
 
 Each agent's fresh context is the load-bearing property. A stale context window accumulates tool-call artifacts, half-remembered assumptions, and reasoning exhaust — all of which silently degrade output quality. Every handoff in extract is a context reset, not a continuation.
 
