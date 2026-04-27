@@ -79,6 +79,7 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 - For audit and deliver runs, write `invocation.txt` and `run.json` in the run dir at run start, before dispatching any worker.
 - Workers receive normalized inputs (injected in dispatch). Workers do not read trigger/config files directly.
 - On ambiguity in a natural-language prompt, stop and ask. Do not silently assume defaults for fields the operator didn't specify.
+- **Speak plainly to humans.** This document uses internal architecture terms (`RunRequest`, generator-evaluator, structural handoff, eligibility filter) for precision. They belong in your reasoning, not in your user-facing speech. When narrating progress, halts, or errors to the operator, translate. Say "I'll figure out what to run by reading your prompt, `.autoship/defaults.yaml`, and the framework defaults" — not "resolving the RunRequest." Say "I'll send this brief to a reviewer" — not "structural handoff to deliver-brief-reviewer." The terms are tools for thinking, not labels to read aloud.
 
 ## Autoship in one paragraph
 
@@ -218,7 +219,7 @@ Always read these first. Then branch by mode:
 
 Per-track phase machines and state-transition detail are in `docs/architecture/audit-architecture.md` and `docs/architecture/deliver-architecture.md`. Read the relevant one when procedure below references it.
 
-Standards setup (`.autoship/standards.yaml`) is owned by the `autoship init` and `autoship standards` CLI commands, not by this controller. The controller reads `standards.yaml` as policy input; it never writes it.
+Standards setup (`.autoship/standards.yaml`) is owned by the `autoship init` CLI command, not by this controller. The controller reads `standards.yaml` as policy input; it never writes it.
 
 ## Mode A — Audit
 
@@ -256,7 +257,6 @@ All audit runtime state lives under `<repo>/.autoship/audits/<run-id>/`:
 
 - `invocation.txt` — raw trigger string (CLI argv or NL prompt)
 - `run.json` — normalized RunRequest (mode, phase, tracker, flags, source, resolved defaults)
-- `standards.yaml` — snapshot of `.autoship/standards.yaml` at run time (if present)
 - `prior-issues.json` — open project issues + closed audit-sourced issues (180-day window) at run start, when a tracker is configured
 - `assessment.md` — audit-auditor output, with prior-issue annotations per candidate
 - `review.md` — audit-reviewer verdict (includes Check 6 — tracker-sync annotation correctness)
@@ -266,23 +266,23 @@ Record the active audit run id in `.autoship/audits/current`.
 
 ### Loop
 
-1. Write `invocation.txt` and `run.json` into the run dir. Snapshot `.autoship/standards.yaml` into the run dir if present.
+1. Write `invocation.txt` and `run.json` into the run dir.
 2. Read `.autoship/standards.yaml` if present. Treat it as policy input, not optional flavor text.
-3. If `tracker: linear`, fetch prior context via two Linear MCP reads and write `prior-issues.json`:
+3. If `tracker: linear`, fetch prior context and write `prior-issues.json`. Use whichever Linear path is available — the `linear` CLI via Bash if installed (check with `which linear`), otherwise Linear MCP tools. Confirm at run start which path you're using; do not silently fall back. Two reads:
    - all open issues in the configured team/project, lightweight fields only (`id`, `identifier`, `url`, `title`, `labels`, `state`, `body_summary`, `created_at`)
    - closed issues labeled `source:autoship-audit` from the last 180 days
-   If no tracker is configured (`tracker: none`), skip — the auditor will mark every candidate `new` by default.
+   If no tracker is configured (`tracker: none`), skip — the auditor will mark every candidate `new` by default. If `tracker: linear` but neither path is available, halt with `needs-human-input` pointing at install instructions (see `linear-cli` skill or https://docs.anthropic.com/en/docs/mcp).
 4. If `external_exposure` is enabled in the resolved RunRequest, pass the declared URL and safety limits to `audit-auditor`.
 5. Dispatch `audit-auditor` to write `assessment.md`. Pre-inject the normalized RunRequest fields (scope, target context, external_exposure config, standards path, output path) plus the path to `prior-issues.json` so the worker never reads trigger/config files itself.
 6. Dispatch `audit-reviewer` to judge the assessment, including Check 6 (tracker-sync annotation correctness). Inject the same `prior-issues.json` path.
 7. If the review is REJECTED and re-audit cycles remain, re-dispatch `audit-auditor` with the reviewer objections and then re-review.
-8. If the review is APPROVED **and a tracker is configured**, run the **tracker-sync phase** — see `docs/architecture/audit-tracker-sync.md` for the full design. (When `tracker: none`, skip this entire phase; the audit ends at the approved `assessment.md` + `review.md`.) Per candidate (serial, in assessment order), dispatch the appropriate Linear MCP write per `prior-issue-status`:
-   - `new` → `save_issue(label="source:autoship-audit", body + run footer)`
-   - `duplicate-of-open: <identifier>`, priority P0 → `save_comment(<id>, re-confirmation message)`
-   - `duplicate-of-open: <identifier>`, priority P1/P2 → record-only, no MCP write
-   - `related-to: <identifier>` → `save_issue(...)` + `create_relation(new_id, <id>, type="related")`
-   - `closed-match: <identifier>` → `save_issue(...)` with regression banner in body + `create_relation(new_id, <id>, type="related")`
-   When `create_issues: false`, every record is `action: "planned"` with `planned_action: <type>` and zero MCP writes occur. Append one record per candidate to `tracker-sync.json` (`action`, `reason`, `result`). Final run status: `tracker-sync-partial` if any record is `failed`, else `tracker-sync-complete`.
+8. If the review is APPROVED **and a tracker is configured**, run the **tracker-sync phase** — see `docs/architecture/audit-tracker-sync.md` for the full design. (When `tracker: none`, skip this entire phase; the audit ends at the approved `assessment.md` + `review.md`.) Use the same Linear path you confirmed in step 3 (CLI or MCP). Per candidate (serial, in assessment order), perform the outcome appropriate to its `prior-issue-status`:
+   - `new` → create a new issue with label `source:autoship-audit`, body, and run footer
+   - `duplicate-of-open: <identifier>`, priority P0 → comment on the existing issue with a re-confirmation message
+   - `duplicate-of-open: <identifier>`, priority P1/P2 → record-only, no Linear write
+   - `related-to: <identifier>` → create a new issue **and** create a `related` link to the existing one
+   - `closed-match: <identifier>` → create a new issue with a regression banner in the body **and** create a `related` link to the closed one
+   When `create_issues: false`, every record is `action: "planned"` with `planned_action: <type>` and zero Linear writes occur. Append one record per candidate to `tracker-sync.json` (`action`, `reason`, `result`). Final run status: `tracker-sync-partial` if any record is `failed`, else `tracker-sync-complete`.
 9. Stop. Audit is a bounded run, not a continuous backlog loop.
 
 ### Parallelism
@@ -353,7 +353,7 @@ Invocation shapes (each resolves to the same RunRequest):
 All state lives under `<testbed>/.autoship/`:
 
 - `issues/<id>/` — per-issue artifacts (`issue.md`, `brief.md`, `reviews/review-NN.md`, `oracle/result.md`, `implementation/result.md`, `verification/result.md`, `pr.md`)
-- `runs/<run-id>/` — run-scoped logs + events, plus `invocation.txt` + `run.json` + snapshot of `standards.yaml`
+- `runs/<run-id>/` — run-scoped logs (`decisions.log`), plus `invocation.txt` + `run.json`
 - `worktrees/<id>/` — per-issue git worktree
 
 Create missing dirs on first invocation. Record the active deliver run id in `.autoship/runs/current`.
@@ -405,11 +405,11 @@ The mirror is controller runtime state, not human-managed. Refresh only when the
 
 Each invocation:
 
-1. Write `invocation.txt` and `run.json` into the active run dir (`<testbed>/.autoship/runs/<run-id>/`). Snapshot `.autoship/standards.yaml` into the run dir if present.
+1. Write `invocation.txt` and `run.json` into the active run dir (`<testbed>/.autoship/runs/<run-id>/`).
 2. Finish any partially-progressed local issue before claiming new work.
 3. Claim the next eligible issue per the resolved RunRequest:
-   - **linear** (`tracker: linear`) — prefer issues already in `Building`, then grooming-intake states. Supervised mode never auto-claims `Ready`.
-   - **single** (RunRequest has `issue_id`) — operate on the named issue only.
+   - **linear** (`tracker: linear`) — apply the **claim convention** from `.autoship/defaults.yaml` (`deliver.linear.claim.label` or `claim.assignee_email`) to filter Linear issues to autoship's territory. Within that filtered set, prefer issues that already have a local mirror under `.autoship/issues/<id>/` (resume in-flight work first), then unclaimed labeled issues in grooming-eligible states. **If no claim convention is configured, halt with `needs-human-input`.** Never auto-claim Linear issues without an explicit convention — silently picking up work humans are doing is the worst kind of failure. Supervised mode never auto-claims `Ready`.
+   - **single** (RunRequest has `issue_id`) — operate on the named issue only. Bypasses the claim convention; the operator naming an issue explicitly is consent.
    - **folder** (`tracker: folder`) — operate on the next local issue folder that still needs work.
 4. Serial — one issue at a time.
 5. Stop when no eligible issues remain, or an unrecoverable environment error blocks all further work.
@@ -504,11 +504,13 @@ Single writer to Linear. One state transition + one summary comment per mileston
 | draft PR | `In Review` | PR URL + branch + validations passed |
 | `needs-human-input` | `needs-human-input` | reason + next action + artifact path |
 
+The state names above are autoship's vocabulary. Real Linear workspaces often have only the default states (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`). **State transitions are best-effort:** try to set the named state; if it doesn't exist in the workspace, post the comment anyway and skip the state change. Never fail a run because the state mapping is incomplete. The comment is the load-bearing signal; the state change is convenience for humans glancing at the board.
+
 No artifact dumps in Linear. The repo-local mirror is the execution contract.
 
 ### Logging
 
-Log every state transition and every worker dispatch to `<run-dir>/decisions.log` (human-readable) and `<run-dir>/events.jsonl` (machine-readable).
+Log every state transition and every worker dispatch to `<run-dir>/decisions.log` (human-readable, free-form). One file, one format — there is no consumer for a separate `events.jsonl` today; add a structured event log only when an actual consumer exists.
 
 ### Resume
 

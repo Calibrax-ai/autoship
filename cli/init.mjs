@@ -9,6 +9,9 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline/promises';
+import { stdin, stdout } from 'node:process';
+import { execSync } from 'node:child_process';
 
 import { inferStandards, applyInferences } from './infer-standards.mjs';
 
@@ -41,8 +44,10 @@ export async function init(args = []) {
 		);
 	}
 
-	if (args.length) {
-		throw new Error(`Unknown init option: ${args.join(', ')}`);
+	const noInteractive = args.includes('--no-interactive');
+	const unknown = args.filter((a) => a !== '--no-interactive');
+	if (unknown.length) {
+		throw new Error(`Unknown init option: ${unknown.join(', ')}`);
 	}
 
 	// If .autoship/ already exists, init becomes advisory: print what current
@@ -60,6 +65,19 @@ export async function init(args = []) {
 		console.warn(
 			'Warning: this directory does not look like a git repo. autoship expects a git repo.\n'
 		);
+	}
+
+	// Run the setup wizard if we're in a TTY and the user didn't opt out.
+	// Non-TTY (CI, piped invocations) writes the all-commented template.
+	const interactive = !noInteractive && stdin.isTTY && stdout.isTTY;
+	let answers = null;
+	if (interactive) {
+		try {
+			answers = await runWizard(cwd);
+		} catch (err) {
+			console.warn(`\nWizard skipped (${err.message}). Falling back to commented template.\n`);
+			answers = null;
+		}
 	}
 
 	console.log('Installing autoship...');
@@ -86,40 +104,20 @@ export async function init(args = []) {
 		`  ✓ standards.yaml → .autoship/  (filled ${filled.length} from evidence; ${setMeCount} still SET_ME)`
 	);
 
-	// Write defaults.yaml (optional per-repo stickies — commented template,
-	// inert until the operator uncomments fields)
-	writeFileSync(join(autoshipDir, 'defaults.yaml'), renderDefaults());
-	console.log('  ✓ defaults.yaml → .autoship/  (commented template)');
+	// Write defaults.yaml. With wizard answers, write a populated config;
+	// without (CI / non-TTY / wizard skipped), write the all-commented template.
+	writeFileSync(join(autoshipDir, 'defaults.yaml'), renderDefaults(answers));
+	console.log(
+		answers
+			? `  ✓ defaults.yaml → .autoship/  (${describeAnswers(answers)})`
+			: '  ✓ defaults.yaml → .autoship/  (commented template)'
+	);
 
 	// Update .gitignore
 	updateGitignore(cwd);
 	console.log('  ✓ .gitignore updated');
 
-	console.log(`
-Done. Next steps:
-
-  1. Review .autoship/standards.yaml. Inferred fields are commented with their evidence; SET_ME fields are your call. Edit the file directly to update policy — autoship does not modify it once it exists. Re-run \`autoship init\` later to see an advisory if repo evidence has changed.
-
-  2. (Optional) Uncomment per-repo stickies in .autoship/defaults.yaml — tracker, validation command, branch prefix. Flags on the invocation always win.
-  3. If using Linear: install the Linear MCP — https://docs.anthropic.com/en/docs/mcp
-  4. If this repo uses environment variables, keep .env.example current — autoship treats it as evidence, not the policy source.
-  5. Try the zero-config audit smoke test:
-
-       claude --agent autoship-controller -p "audit --report-only"
-
-  6. Before deliver, configure an issue source and validation command:
-
-       # Option A: uncomment deliver.tracker + deliver.validation in .autoship/defaults.yaml
-       # Option B: create .autoship/issues/<id>/issue.md for folder/local mode and uncomment deliver.validation
-
-     Then run:
-
-       claude --agent autoship-controller -p "deliver"
-
-       claude --agent autoship-controller -p "deliver FRD-162"
-
-  Docs: https://github.com/Calibrax-ai/autoship
-`);
+	printNextSteps(answers);
 }
 
 // Re-running `autoship init` on an existing .autoship/ prints an advisory:
@@ -178,6 +176,212 @@ function formatYAMLValue(value) {
 	if (Array.isArray(value)) return '[' + value.map((v) => JSON.stringify(v)).join(', ') + ']';
 	if (typeof value === 'string') return JSON.stringify(value);
 	return String(value);
+}
+
+// ---- Wizard ----
+//
+// Interactive setup that runs at install time when stdin is a TTY. Collects
+// the minimum answers needed to write a populated defaults.yaml: tracker
+// choice, Linear team/project + claim convention, and the validation command.
+// Skips entirely in CI / non-TTY contexts; falls back to the all-commented
+// template (preserves the headless `npx ... init` story).
+async function runWizard(cwd) {
+	const rl = createInterface({ input: stdin, output: stdout });
+	try {
+		// Show what we detected as context for the operator.
+		const inferences = inferStandards(cwd);
+		const detected = describeDetectedStack(inferences);
+		console.log(`Detecting repo evidence... ${detected || '(no specific framework markers)'}`);
+		console.log('');
+
+		// Tracker choice.
+		const tracker = await promptChoice(
+			rl,
+			'Issue tracker?',
+			[
+				{ id: '1', label: 'Linear  (requires `linear` CLI on PATH or Linear MCP configured)', value: 'linear' },
+				{ id: '2', label: 'Local folder  (.autoship/issues/<id>/issue.md)', value: 'folder' },
+				{ id: '3', label: 'Skip — configure later', value: 'skip' },
+			],
+			'2'
+		);
+
+		let linear = null;
+		if (tracker === 'linear') {
+			// Quick environment check, advisory only.
+			const linearCli = checkLinearCli();
+			if (linearCli) {
+				console.log(`  ✓ \`linear\` CLI found at ${linearCli}`);
+			} else {
+				console.log('  ⚠ `linear` CLI not found on PATH');
+				console.log('    Install: brew install linear-cli  (or wire up Linear MCP — https://docs.anthropic.com/en/docs/mcp)');
+			}
+			console.log('');
+
+			const team = (await rl.question('Linear team name (e.g. Engineering, Delivery): ')).trim();
+			const project = (await rl.question('Linear project name (e.g. MyProject): ')).trim();
+
+			console.log('');
+			console.log('Claim convention — autoship needs a way to know which Linear issues are');
+			console.log("its territory vs which belong to humans. Without one, bare `deliver` halts");
+			console.log('rather than risk hijacking human-owned work.');
+			console.log('');
+			const claimType = await promptChoice(
+				rl,
+				'Pick one:',
+				[
+					{ id: '1', label: 'Label-based  (autoship claims issues with a given label)', value: 'label' },
+					{ id: '2', label: 'Assignee-based  (autoship claims issues assigned to a service-account user)', value: 'assignee' },
+				],
+				'1'
+			);
+
+			let claim;
+			if (claimType === 'label') {
+				const label = (await rl.question('Label name [autoship]: ')).trim() || 'autoship';
+				claim = { kind: 'label', value: label };
+			} else {
+				const email = (await rl.question('Assignee email (e.g. autoship-bot@your-org.com): ')).trim();
+				claim = { kind: 'assignee_email', value: email };
+			}
+
+			linear = { team, project, claim };
+		}
+
+		// Validation command — autoship runs this after each implementation.
+		// Suggest a candidate from package.json scripts when available.
+		let validation = null;
+		if (tracker !== 'skip') {
+			console.log('');
+			const scripts = readPackageScripts(cwd);
+			const suggestion = pickValidationSuggestion(cwd, scripts);
+			if (scripts.length) {
+				console.log(`Detected scripts in package.json: ${scripts.join(', ')}`);
+			}
+			const prompt = suggestion
+				? `Validation command [${suggestion}]: `
+				: 'Validation command (e.g. `bun test`, leave empty to skip): ';
+			const v = (await rl.question(prompt)).trim();
+			validation = v || suggestion || null;
+		}
+
+		console.log('');
+		return { tracker, linear, validation };
+	} finally {
+		rl.close();
+	}
+}
+
+async function promptChoice(rl, question, options, defaultId) {
+	console.log(question);
+	for (const opt of options) {
+		console.log(`  [${opt.id}] ${opt.label}`);
+	}
+	const answer = (await rl.question(`> [${defaultId}] `)).trim();
+	const choiceId = answer || defaultId;
+	const found = options.find((o) => o.id === choiceId);
+	if (!found) {
+		console.log(`Invalid choice "${choiceId}". Defaulting to ${defaultId}.`);
+		return options.find((o) => o.id === defaultId).value;
+	}
+	return found.value;
+}
+
+function checkLinearCli() {
+	try {
+		const path = execSync('command -v linear', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+		return path || null;
+	} catch {
+		return null;
+	}
+}
+
+function readPackageScripts(cwd) {
+	try {
+		const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8'));
+		return pkg.scripts && typeof pkg.scripts === 'object' ? Object.keys(pkg.scripts) : [];
+	} catch {
+		return [];
+	}
+}
+
+function pickValidationSuggestion(cwd, scripts) {
+	const runner = detectPkgRunner(cwd);
+	const preferred = ['test', 'check', 'validate'];
+	for (const name of preferred) {
+		if (scripts.includes(name)) {
+			return name === 'test' ? `${runner} test` : `${runner} run ${name}`;
+		}
+	}
+	return null;
+}
+
+function detectPkgRunner(cwd) {
+	if (existsSync(join(cwd, 'bun.lockb')) || existsSync(join(cwd, 'bun.lock'))) return 'bun';
+	if (existsSync(join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
+	if (existsSync(join(cwd, 'yarn.lock'))) return 'yarn';
+	return 'npm';
+}
+
+function describeDetectedStack({ values }) {
+	const items = [];
+	if (values['platform.hosting'] === 'vercel') items.push('Next.js/Vercel');
+	if (values['platform.hosting'] === 'fly.io') items.push('Fly');
+	if (values['platform.hosting'] === 'cloudflare-workers') items.push('Cloudflare Workers');
+	if (values['platform.hosting'] === 'container') items.push('Container');
+	if (values['database.migrations'] === 'prisma migrate') items.push('Prisma');
+	if (values['database.migrations'] === 'drizzle-kit') items.push('Drizzle');
+	if (values['database.migrations'] === 'alembic') items.push('Alembic');
+	if (values['ci.provider']) items.push(values['ci.provider']);
+	if (values['observability.errors'] === 'sentry') items.push('Sentry');
+	if (values['observability.errors'] === 'datadog') items.push('Datadog');
+	if (values['async.provider'] === 'bullmq') items.push('BullMQ');
+	if (values['async.provider'] === 'celery') items.push('Celery');
+	return items.length ? items.join(' + ') : null;
+}
+
+function describeAnswers(answers) {
+	const parts = [`tracker=${answers.tracker}`];
+	if (answers.linear) {
+		parts.push(`team=${answers.linear.team}`);
+		if (answers.linear.claim) parts.push(`${answers.linear.claim.kind}=${answers.linear.claim.value}`);
+	}
+	if (answers.validation) parts.push(`validation=${answers.validation}`);
+	return parts.join(', ');
+}
+
+function printNextSteps(answers) {
+	const lines = ['', 'Done.', ''];
+
+	// Always-relevant next steps.
+	lines.push('  1. Review .autoship/standards.yaml. Inferred fields carry `# inferred from <evidence>` comments; SET_ME fields are your call. Edit directly — autoship does not modify it once it exists. Re-run `autoship init` later for an advisory if repo evidence has changed.');
+
+	if (!answers || answers.tracker === 'skip') {
+		lines.push('  2. (Optional) Open .autoship/defaults.yaml and uncomment the sections that match your setup — tracker, Linear team+project+claim, validation command. Flags on the invocation always win.');
+	}
+
+	if (answers && answers.tracker === 'linear' && answers.linear?.claim?.kind === 'label') {
+		lines.push(`  2. In Linear, label issues you want autoship to take with \`${answers.linear.claim.value}\`. autoship halts on bare \`deliver\` until at least one labeled issue exists, to avoid hijacking human work.`);
+	}
+	if (answers && answers.tracker === 'linear' && answers.linear?.claim?.kind === 'assignee_email') {
+		lines.push(`  2. In Linear, assign issues you want autoship to take to \`${answers.linear.claim.value}\`. Make sure that user exists in your workspace.`);
+	}
+
+	lines.push('');
+	lines.push('  Smoke tests:');
+	lines.push('');
+	lines.push('       claude --agent autoship-controller -p "audit --report-only"');
+	if (answers && answers.tracker === 'linear') {
+		lines.push('       claude --agent autoship-controller -p "deliver"   # picks up labeled/assigned Linear issues');
+	} else if (answers && answers.tracker === 'folder') {
+		lines.push('       # For deliver, drop a brief at .autoship/issues/<id>/issue.md and run:');
+		lines.push('       claude --agent autoship-controller -p "deliver"');
+	}
+	lines.push('');
+	lines.push('  Docs: https://github.com/Calibrax-ai/autoship');
+	lines.push('');
+
+	console.log(lines.join('\n'));
 }
 
 function copyAgentFiles(files, cwd) {
@@ -241,7 +445,12 @@ function updateGitignore(cwd) {
 	}
 }
 
-function renderDefaults() {
+function renderDefaults(answers = null) {
+	if (!answers) return renderDefaultsTemplate();
+	return renderDefaultsConfigured(answers);
+}
+
+function renderDefaultsTemplate() {
 	return `# autoship defaults.yaml — optional per-repo sticky run defaults
 # Uncomment and fill in values you want autoship to assume when you don't
 # pass them as flags. Flags on the invocation always win. --report-only
@@ -262,6 +471,13 @@ function renderDefaults() {
 #   linear:
 #     team: "Delivery"
 #     project: "MyProject"
+#     # Claim convention — how autoship tells which Linear issues are its
+#     # territory vs which belong to humans. Without one, bare 'deliver' halts
+#     # rather than risk hijacking human-owned work. Pick ONE:
+#     claim:
+#       label: "autoship"        # autoship claims issues with this label (recommended)
+#       # OR
+#       # assignee_email: "autoship-bot@your-org.com"  # claims issues assigned to this user
 #   worktree:
 #     root: .autoship/worktrees
 #     branch_prefix: "autoship/"
@@ -275,6 +491,78 @@ function renderDefaults() {
 #   approval_mode: supervised   # supervised | auto
 #   max_regroom_cycles: 3
 `;
+}
+
+function renderDefaultsConfigured(answers) {
+	const lines = [];
+	lines.push('# autoship defaults.yaml — per-repo sticky run defaults.');
+	lines.push("# Generated by `autoship init`. Edit freely — autoship does not modify");
+	lines.push('# this file once it exists. Flags on the invocation always win;');
+	lines.push('# --report-only and --tracker=none override these stickies.');
+	lines.push('#');
+	lines.push('# Safety note: keep audit.create_issues: false unless you actually want');
+	lines.push('# every audit run to write into the tracker. Use --approve per-run instead.');
+	lines.push('');
+
+	// Audit block — always include with conservative defaults.
+	const auditTracker = answers.tracker === 'linear' ? 'linear' : 'none';
+	lines.push('audit:');
+	lines.push(`  tracker: ${auditTracker}            # linear | none`);
+	lines.push('  create_issues: false       # override per-run with --approve');
+	lines.push('  external_exposure: false   # override per-run with --external-url=<url>');
+	lines.push('');
+
+	// Deliver block.
+	const deliverTracker = answers.tracker === 'skip' ? null : answers.tracker;
+	if (deliverTracker) {
+		lines.push('deliver:');
+		lines.push(`  tracker: ${deliverTracker}            # folder | linear | github`);
+		lines.push('  folder:');
+		lines.push('    path: .autoship/issues');
+		if (deliverTracker === 'linear' && answers.linear) {
+			lines.push('  linear:');
+			lines.push(`    team: ${quote(answers.linear.team)}`);
+			lines.push(`    project: ${quote(answers.linear.project)}`);
+			lines.push('    claim:');
+			if (answers.linear.claim?.kind === 'label') {
+				lines.push(`      label: ${quote(answers.linear.claim.value)}`);
+			} else if (answers.linear.claim?.kind === 'assignee_email') {
+				lines.push(`      assignee_email: ${quote(answers.linear.claim.value)}`);
+			}
+		}
+		lines.push('  worktree:');
+		lines.push('    root: .autoship/worktrees');
+		lines.push('    branch_prefix: "autoship/"');
+		lines.push('  validation:');
+		lines.push('    commands:');
+		if (answers.validation) {
+			lines.push(`      - ${quote(answers.validation)}`);
+		} else {
+			lines.push("      # - \"bun test\"  # set this before running deliver");
+		}
+		lines.push('  pr:');
+		lines.push('    remote: origin');
+		lines.push('    draft: true');
+		lines.push('    base_branch: main');
+		lines.push('  approval_mode: supervised   # supervised | auto');
+		lines.push('  max_regroom_cycles: 3');
+	} else {
+		// User skipped tracker — keep the deliver block commented for later.
+		lines.push('# deliver:');
+		lines.push('#   tracker: folder            # folder | linear | github');
+		lines.push('#   folder:');
+		lines.push('#     path: .autoship/issues');
+		lines.push('#   validation:');
+		lines.push('#     commands:');
+		lines.push('#       - "bun test"');
+	}
+	lines.push('');
+
+	return lines.join('\n');
+}
+
+function quote(value) {
+	return JSON.stringify(value);
 }
 
 function renderStandardsTemplate() {

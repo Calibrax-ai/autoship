@@ -9,8 +9,9 @@ autoship — turn messy software work into reviewable, reliable delivery
 
 Usage:
   autoship init                        Install core autoship agents into the current repo
-                                       (re-run on existing .autoship/ prints an advisory of
-                                        new evidence; never modifies standards.yaml)
+                                       (interactive wizard in a TTY; --no-interactive skips it
+                                        and writes the commented template;
+                                        re-run on existing .autoship/ prints an advisory only)
   autoship audit                       Print audit invocation guidance
   autoship deliver                     Print deliver invocation guidance
 
