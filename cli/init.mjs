@@ -294,18 +294,18 @@ async function collectLinearAnswers() {
 
 	// Claim convention.
 	console.log('\nClaim convention — how autoship knows which Linear issues are');
-	console.log('its territory vs which belong to humans. Without one, bare `deliver`');
-	console.log('halts rather than risk hijacking human-owned work.\n');
+	console.log('its territory vs which belong to humans.\n');
 	const claimKind = await select({
 		message: 'Claim by:',
 		choices: [
-			{ name: 'Label  (autoship claims issues with a given label)', value: 'label' },
-			{ name: 'Assignee  (autoship claims issues assigned to a service-account user)', value: 'assignee_email' },
+			{ name: 'Label  (autoship claims labeled issues — safe for shared projects)', value: 'label' },
+			{ name: 'Assignee  (claims issues assigned to a service-account user)', value: 'assignee_email' },
+			{ name: 'Status only  (claims any issue in chosen states — only safe if you are the sole human on this project)', value: 'state' },
 		],
 		default: 'label',
 	});
 
-	let claim;
+	let claim = null;
 	if (claimKind === 'label') {
 		const labels = listLabels(teamKey);
 		if (labels && labels.length > 0) {
@@ -332,17 +332,23 @@ async function collectLinearAnswers() {
 			});
 			claim = { kind: 'label', value: v.trim() || 'autoship' };
 		}
-	} else {
+	} else if (claimKind === 'assignee_email') {
 		const email = await input({
 			message: 'Assignee email (e.g. autoship-bot@your-org.com):',
 			validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || 'Please enter a valid email',
 		});
 		claim = { kind: 'assignee_email', value: email.trim() };
 	}
+	// claimKind === 'state' falls through with claim = null; state-only mode.
 
-	// State filter — multi-select from Linear's universal workflow categories.
-	console.log('\nState filter — which Linear workflow states autoship is allowed to claim from.');
-	console.log('Defaults to backlog + unstarted (the natural "ready to work" pile).\n');
+	// State filter — required for state-only; recommended otherwise.
+	if (claimKind === 'state') {
+		console.log('\nState-only mode: autoship will claim any issue whose state.type is in your selection.');
+		console.log('No label or assignee gate. Pick states carefully.\n');
+	} else {
+		console.log('\nState filter — which Linear workflow states autoship is allowed to claim from.');
+		console.log('Defaults to backlog + unstarted (the natural "ready to work" pile).\n');
+	}
 	const stateTypes = await checkbox({
 		message: 'Allowed state types (space to toggle, enter to confirm):',
 		choices: LINEAR_STATE_TYPES.map((t) => ({ name: t.label, value: t.value })),
@@ -355,22 +361,23 @@ async function collectLinearAnswers() {
 
 async function collectLinearAnswersManual() {
 	const team = (await input({ message: 'Linear team name (e.g. Engineering, Delivery):' })).trim();
-	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by `linear` CLI):' })).trim();
+	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by linear CLI):' })).trim();
 	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
 
 	const claimKind = await select({
 		message: 'Claim convention:',
 		choices: [
-			{ name: 'Label-based', value: 'label' },
-			{ name: 'Assignee-based', value: 'assignee_email' },
+			{ name: 'Label  (autoship claims labeled issues — safe for shared projects)', value: 'label' },
+			{ name: 'Assignee  (claims issues assigned to a service-account user)', value: 'assignee_email' },
+			{ name: 'Status only  (claims any issue in chosen states — only safe if sole human)', value: 'state' },
 		],
 		default: 'label',
 	});
-	let claim;
+	let claim = null;
 	if (claimKind === 'label') {
 		const v = await input({ message: 'Label name:', default: 'autoship' });
 		claim = { kind: 'label', value: v.trim() || 'autoship' };
-	} else {
+	} else if (claimKind === 'assignee_email') {
 		const v = await input({
 			message: 'Assignee email:',
 			validate: (s) => /\S+@\S+\.\S+/.test(s.trim()) || 'Please enter a valid email',
@@ -458,6 +465,10 @@ function printNextSteps(answers) {
 	}
 	if (answers && answers.tracker === 'linear' && answers.linear?.claim?.kind === 'assignee_email') {
 		lines.push(`  2. In Linear, assign issues you want autoship to take to \`${answers.linear.claim.value}\`. Make sure that user exists in your workspace.`);
+	}
+	if (answers && answers.tracker === 'linear' && !answers.linear?.claim) {
+		const states = (answers.linear.stateTypes || []).join(' / ');
+		lines.push(`  2. State-only claim mode — autoship will pick up any issue in [${states}] state. Only safe if you're the sole agent on this project. Move issues to a state outside that list to remove them from autoship's queue.`);
 	}
 
 	lines.push('');
@@ -567,13 +578,18 @@ function renderDefaultsTemplate() {
 #     project: "MyProject"
 #     # Claim convention — how autoship tells which Linear issues are its
 #     # territory vs which belong to humans. Without one, bare 'deliver' halts
-#     # rather than risk hijacking human-owned work. Pick ONE:
+#     # rather than risk hijacking human-owned work. Three patterns:
 #     claim:
-#       label: "autoship"        # autoship claims issues with this label (recommended)
-#       # OR
-#       # assignee_email: "autoship-bot@your-org.com"  # claims issues assigned to this user
-#       # Optional: which Linear workflow state types autoship may claim from.
-#       # Defaults to backlog + unstarted (the natural "ready to work" pile).
+#       # Pattern 1 (recommended for shared projects): label-based identity
+#       label: "autoship"        # autoship claims issues with this label
+#       # Pattern 2: assignee-based identity
+#       # assignee_email: "autoship-bot@your-org.com"
+#       # Pattern 3 (sole-operator only): state-only — omit label and
+#       # assignee_email, autoship claims any issue matching state_types.
+#       # Risky on shared projects.
+#       #
+#       # State filter (always applied; defaults to backlog + unstarted):
+#       # Linear workflow categories autoship may claim from.
 #       # Values: triage, backlog, unstarted, started, completed, canceled.
 #       state_types: ["backlog", "unstarted"]
 #   worktree:
@@ -621,7 +637,7 @@ function renderDefaultsConfigured(answers) {
 			lines.push('  linear:');
 			lines.push(`    team: ${quote(answers.linear.team)}`);
 			if (answers.linear.teamKey) {
-				lines.push(`    team_key: ${quote(answers.linear.teamKey)}    # Linear short key, used by \`linear\` CLI`);
+				lines.push(`    team_key: ${quote(answers.linear.teamKey)}    # Linear short key, used by the linear CLI`);
 			}
 			if (answers.linear.project) {
 				lines.push(`    project: ${quote(answers.linear.project)}`);
@@ -631,6 +647,10 @@ function renderDefaultsConfigured(answers) {
 				lines.push(`      label: ${quote(answers.linear.claim.value)}`);
 			} else if (answers.linear.claim?.kind === 'assignee_email') {
 				lines.push(`      assignee_email: ${quote(answers.linear.claim.value)}`);
+			} else {
+				lines.push('      # state-only mode: no label or assignee gate. autoship claims any');
+				lines.push('      # issue whose state.type is in state_types below. Only safe when');
+				lines.push('      # autoship is the sole agent on this Linear project.');
 			}
 			if (answers.linear.stateTypes?.length) {
 				const states = answers.linear.stateTypes.map((s) => quote(s)).join(', ');
