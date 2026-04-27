@@ -9,11 +9,19 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { execSync } from 'node:child_process';
+
+import { select, checkbox, input, confirm } from '@inquirer/prompts';
 
 import { inferStandards, applyInferences } from './infer-standards.mjs';
+import {
+	checkLinearCli,
+	checkLinearAuth,
+	listTeams,
+	listProjects,
+	listLabels,
+	LINEAR_STATE_TYPES,
+} from './linear-cli.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -182,118 +190,200 @@ function formatYAMLValue(value) {
 //
 // Interactive setup that runs at install time when stdin is a TTY. Collects
 // the minimum answers needed to write a populated defaults.yaml: tracker
-// choice, Linear team/project + claim convention, and the validation command.
-// Skips entirely in CI / non-TTY contexts; falls back to the all-commented
-// template (preserves the headless `npx ... init` story).
+// choice, Linear team/project/claim convention/state types, and validation
+// command. When Linear is selected, drives the `linear` CLI live to discover
+// real teams / projects / labels — operator picks from real options instead of
+// typing strings that might not exist.
+//
+// Skips entirely in CI / non-TTY contexts (init.mjs entry point checks isTTY);
+// falls back to manual entry when Linear CLI is missing or not authed.
 async function runWizard(cwd) {
-	const rl = createInterface({ input: stdin, output: stdout });
-	try {
-		// Show what we detected as context for the operator.
-		const inferences = inferStandards(cwd);
-		const detected = describeDetectedStack(inferences);
-		console.log(`Detecting repo evidence... ${detected || '(no specific framework markers)'}`);
-		console.log('');
+	// Show what we detected as context for the operator.
+	const inferences = inferStandards(cwd);
+	const detected = describeDetectedStack(inferences);
+	console.log(`Detecting repo evidence... ${detected || '(no specific framework markers)'}\n`);
 
-		// Tracker choice.
-		const tracker = await promptChoice(
-			rl,
-			'Issue tracker?',
-			[
-				{ id: '1', label: 'Linear  (requires `linear` CLI on PATH or Linear MCP configured)', value: 'linear' },
-				{ id: '2', label: 'Local folder  (.autoship/issues/<id>/issue.md)', value: 'folder' },
-				{ id: '3', label: 'Skip — configure later', value: 'skip' },
-			],
-			'2'
-		);
+	// Tracker choice.
+	const tracker = await select({
+		message: 'Issue tracker?',
+		choices: [
+			{ name: 'Linear  (drives the `linear` CLI to discover teams + labels)', value: 'linear' },
+			{ name: 'Local folder  (.autoship/issues/<id>/issue.md)', value: 'folder' },
+			{ name: 'Skip — configure later', value: 'skip' },
+		],
+		default: 'folder',
+	});
 
-		let linear = null;
-		if (tracker === 'linear') {
-			// Quick environment check, advisory only.
-			const linearCli = checkLinearCli();
-			if (linearCli) {
-				console.log(`  ✓ \`linear\` CLI found at ${linearCli}`);
-			} else {
-				console.log('  ⚠ `linear` CLI not found on PATH');
-				console.log('    Install: brew install linear-cli  (or wire up Linear MCP — https://docs.anthropic.com/en/docs/mcp)');
-			}
-			console.log('');
-
-			const team = (await rl.question('Linear team name (e.g. Engineering, Delivery): ')).trim();
-			const project = (await rl.question('Linear project name (e.g. MyProject): ')).trim();
-
-			console.log('');
-			console.log('Claim convention — autoship needs a way to know which Linear issues are');
-			console.log("its territory vs which belong to humans. Without one, bare `deliver` halts");
-			console.log('rather than risk hijacking human-owned work.');
-			console.log('');
-			const claimType = await promptChoice(
-				rl,
-				'Pick one:',
-				[
-					{ id: '1', label: 'Label-based  (autoship claims issues with a given label)', value: 'label' },
-					{ id: '2', label: 'Assignee-based  (autoship claims issues assigned to a service-account user)', value: 'assignee' },
-				],
-				'1'
-			);
-
-			let claim;
-			if (claimType === 'label') {
-				const label = (await rl.question('Label name [autoship]: ')).trim() || 'autoship';
-				claim = { kind: 'label', value: label };
-			} else {
-				const email = (await rl.question('Assignee email (e.g. autoship-bot@your-org.com): ')).trim();
-				claim = { kind: 'assignee_email', value: email };
-			}
-
-			linear = { team, project, claim };
-		}
-
-		// Validation command — autoship runs this after each implementation.
-		// Suggest a candidate from package.json scripts when available.
-		let validation = null;
-		if (tracker !== 'skip') {
-			console.log('');
-			const scripts = readPackageScripts(cwd);
-			const suggestion = pickValidationSuggestion(cwd, scripts);
-			if (scripts.length) {
-				console.log(`Detected scripts in package.json: ${scripts.join(', ')}`);
-			}
-			const prompt = suggestion
-				? `Validation command [${suggestion}]: `
-				: 'Validation command (e.g. `bun test`, leave empty to skip): ';
-			const v = (await rl.question(prompt)).trim();
-			validation = v || suggestion || null;
-		}
-
-		console.log('');
-		return { tracker, linear, validation };
-	} finally {
-		rl.close();
+	let linear = null;
+	if (tracker === 'linear') {
+		linear = await collectLinearAnswers();
 	}
+
+	// Validation command — autoship runs this after each implementation.
+	let validation = null;
+	if (tracker !== 'skip') {
+		console.log('');
+		const scripts = readPackageScripts(cwd);
+		const suggestion = pickValidationSuggestion(cwd, scripts);
+		if (scripts.length) {
+			console.log(`Detected scripts in package.json: ${scripts.join(', ')}`);
+		}
+		validation = await input({
+			message: 'Validation command (autoship runs this after each implementation):',
+			default: suggestion || '',
+		});
+		validation = validation.trim() || null;
+	}
+
+	console.log('');
+	return { tracker, linear, validation };
 }
 
-async function promptChoice(rl, question, options, defaultId) {
-	console.log(question);
-	for (const opt of options) {
-		console.log(`  [${opt.id}] ${opt.label}`);
+// Collects the Linear-specific answers, driving the CLI live where possible.
+// Falls back to manual entry when CLI is missing, not authed, or returns
+// empty/null.
+async function collectLinearAnswers() {
+	const cliPath = checkLinearCli();
+	if (!cliPath) {
+		console.log('  ⚠ `linear` CLI not found on PATH.');
+		console.log('    Install: brew install linear-cli');
+		console.log('    Or use Linear MCP: https://docs.anthropic.com/en/docs/mcp');
+		console.log('    Falling back to manual entry — autoship will halt at runtime if Linear isn\'t reachable.\n');
+		return await collectLinearAnswersManual();
 	}
-	const answer = (await rl.question(`> [${defaultId}] `)).trim();
-	const choiceId = answer || defaultId;
-	const found = options.find((o) => o.id === choiceId);
-	if (!found) {
-		console.log(`Invalid choice "${choiceId}". Defaulting to ${defaultId}.`);
-		return options.find((o) => o.id === defaultId).value;
+
+	console.log(`  ✓ \`linear\` CLI found at ${cliPath}`);
+	if (!checkLinearAuth()) {
+		console.log('  ⚠ Not logged in to Linear. Run `linear auth login` and re-run autoship init.');
+		console.log('    Falling back to manual entry.\n');
+		return await collectLinearAnswersManual();
 	}
-	return found.value;
+	console.log('  ✓ authenticated\n');
+
+	// Team — discover from CLI.
+	const teams = listTeams();
+	let teamKey, teamName;
+	if (!teams || teams.length === 0) {
+		console.log('  ⚠ Could not list Linear teams. Falling back to manual entry.\n');
+		return await collectLinearAnswersManual();
+	}
+	if (teams.length === 1) {
+		teamKey = teams[0].key;
+		teamName = teams[0].name;
+		console.log(`  Team: ${teamName} (${teamKey}) — only team in workspace, auto-selected.\n`);
+	} else {
+		const picked = await select({
+			message: 'Linear team?',
+			choices: teams.map((t) => ({ name: `${t.name} (${t.key})`, value: t.key })),
+		});
+		teamKey = picked;
+		teamName = teams.find((t) => t.key === picked).name;
+	}
+
+	// Project — discover from CLI.
+	const projects = listProjects(teamKey);
+	let projectName = null;
+	if (projects && projects.length > 0) {
+		const choices = projects.map((p) => ({ name: p.name, value: p.name }));
+		choices.push({ name: '(skip — no project filter)', value: '' });
+		projectName = await select({ message: 'Linear project?', choices });
+		if (!projectName) projectName = null;
+	} else {
+		console.log('  (no projects discovered for this team — skipping)\n');
+	}
+
+	// Claim convention.
+	console.log('\nClaim convention — how autoship knows which Linear issues are');
+	console.log('its territory vs which belong to humans. Without one, bare `deliver`');
+	console.log('halts rather than risk hijacking human-owned work.\n');
+	const claimKind = await select({
+		message: 'Claim by:',
+		choices: [
+			{ name: 'Label  (autoship claims issues with a given label)', value: 'label' },
+			{ name: 'Assignee  (autoship claims issues assigned to a service-account user)', value: 'assignee_email' },
+		],
+		default: 'label',
+	});
+
+	let claim;
+	if (claimKind === 'label') {
+		const labels = listLabels(teamKey);
+		if (labels && labels.length > 0) {
+			const choices = labels.map((l) => ({ name: l.name, value: l.name }));
+			choices.unshift({ name: '+ Type a new label name (you create it in Linear)', value: '__new__' });
+			let picked = await select({
+				message: 'Pick an existing label, or type a new one:',
+				choices,
+				default: labels.find((l) => l.name === 'autoship') ? 'autoship' : '__new__',
+			});
+			if (picked === '__new__') {
+				picked = await input({
+					message: 'New label name:',
+					default: 'autoship',
+					validate: (v) => v.trim().length > 0 || 'Required',
+				});
+				console.log(`  ⚠ Remember to create the \`${picked.trim()}\` label in Linear before running deliver.\n`);
+			}
+			claim = { kind: 'label', value: picked.trim() };
+		} else {
+			const v = await input({
+				message: 'Label name (will need to exist in Linear):',
+				default: 'autoship',
+			});
+			claim = { kind: 'label', value: v.trim() || 'autoship' };
+		}
+	} else {
+		const email = await input({
+			message: 'Assignee email (e.g. autoship-bot@your-org.com):',
+			validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || 'Please enter a valid email',
+		});
+		claim = { kind: 'assignee_email', value: email.trim() };
+	}
+
+	// State filter — multi-select from Linear's universal workflow categories.
+	console.log('\nState filter — which Linear workflow states autoship is allowed to claim from.');
+	console.log('Defaults to backlog + unstarted (the natural "ready to work" pile).\n');
+	const stateTypes = await checkbox({
+		message: 'Allowed state types (space to toggle, enter to confirm):',
+		choices: LINEAR_STATE_TYPES.map((t) => ({ name: t.label, value: t.value })),
+		required: true,
+		default: ['backlog', 'unstarted'],
+	});
+
+	return { team: teamName, teamKey, project: projectName, claim, stateTypes };
 }
 
-function checkLinearCli() {
-	try {
-		const path = execSync('command -v linear', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-		return path || null;
-	} catch {
-		return null;
+async function collectLinearAnswersManual() {
+	const team = (await input({ message: 'Linear team name (e.g. Engineering, Delivery):' })).trim();
+	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by `linear` CLI):' })).trim();
+	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
+
+	const claimKind = await select({
+		message: 'Claim convention:',
+		choices: [
+			{ name: 'Label-based', value: 'label' },
+			{ name: 'Assignee-based', value: 'assignee_email' },
+		],
+		default: 'label',
+	});
+	let claim;
+	if (claimKind === 'label') {
+		const v = await input({ message: 'Label name:', default: 'autoship' });
+		claim = { kind: 'label', value: v.trim() || 'autoship' };
+	} else {
+		const v = await input({
+			message: 'Assignee email:',
+			validate: (s) => /\S+@\S+\.\S+/.test(s.trim()) || 'Please enter a valid email',
+		});
+		claim = { kind: 'assignee_email', value: v.trim() };
 	}
+	const stateTypes = await checkbox({
+		message: 'Allowed state types:',
+		choices: LINEAR_STATE_TYPES.map((t) => ({ name: t.label, value: t.value })),
+		required: true,
+		default: ['backlog', 'unstarted'],
+	});
+	return { team, teamKey, project: project || null, claim, stateTypes };
 }
 
 function readPackageScripts(cwd) {
@@ -343,8 +433,11 @@ function describeDetectedStack({ values }) {
 function describeAnswers(answers) {
 	const parts = [`tracker=${answers.tracker}`];
 	if (answers.linear) {
-		parts.push(`team=${answers.linear.team}`);
+		parts.push(`team=${answers.linear.teamKey || answers.linear.team}`);
 		if (answers.linear.claim) parts.push(`${answers.linear.claim.kind}=${answers.linear.claim.value}`);
+		if (answers.linear.stateTypes?.length) {
+			parts.push(`states=${answers.linear.stateTypes.join('+')}`);
+		}
 	}
 	if (answers.validation) parts.push(`validation=${answers.validation}`);
 	return parts.join(', ');
@@ -470,6 +563,7 @@ function renderDefaultsTemplate() {
 #     path: .autoship/issues
 #   linear:
 #     team: "Delivery"
+#     team_key: "DEL"          # Linear short key, used by the linear CLI
 #     project: "MyProject"
 #     # Claim convention — how autoship tells which Linear issues are its
 #     # territory vs which belong to humans. Without one, bare 'deliver' halts
@@ -478,6 +572,10 @@ function renderDefaultsTemplate() {
 #       label: "autoship"        # autoship claims issues with this label (recommended)
 #       # OR
 #       # assignee_email: "autoship-bot@your-org.com"  # claims issues assigned to this user
+#       # Optional: which Linear workflow state types autoship may claim from.
+#       # Defaults to backlog + unstarted (the natural "ready to work" pile).
+#       # Values: triage, backlog, unstarted, started, completed, canceled.
+#       state_types: ["backlog", "unstarted"]
 #   worktree:
 #     root: .autoship/worktrees
 #     branch_prefix: "autoship/"
@@ -522,12 +620,21 @@ function renderDefaultsConfigured(answers) {
 		if (deliverTracker === 'linear' && answers.linear) {
 			lines.push('  linear:');
 			lines.push(`    team: ${quote(answers.linear.team)}`);
-			lines.push(`    project: ${quote(answers.linear.project)}`);
+			if (answers.linear.teamKey) {
+				lines.push(`    team_key: ${quote(answers.linear.teamKey)}    # Linear short key, used by \`linear\` CLI`);
+			}
+			if (answers.linear.project) {
+				lines.push(`    project: ${quote(answers.linear.project)}`);
+			}
 			lines.push('    claim:');
 			if (answers.linear.claim?.kind === 'label') {
 				lines.push(`      label: ${quote(answers.linear.claim.value)}`);
 			} else if (answers.linear.claim?.kind === 'assignee_email') {
 				lines.push(`      assignee_email: ${quote(answers.linear.claim.value)}`);
+			}
+			if (answers.linear.stateTypes?.length) {
+				const states = answers.linear.stateTypes.map((s) => quote(s)).join(', ');
+				lines.push(`      state_types: [${states}]    # Linear workflow categories autoship may claim from`);
 			}
 		}
 		lines.push('  worktree:');
