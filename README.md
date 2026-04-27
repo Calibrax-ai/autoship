@@ -26,7 +26,7 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 Setup is one-time via `autoship init` (above). Runtime modes — `audit` and `deliver` — run through the autoship CLI directly. The CLI spawns Claude Code under the hood with the right agent + prompt.
 
-### One-shot (default)
+### Interactive (default)
 
 ```bash
 autoship audit --report-only           # zero-config, no tracker writes
@@ -38,7 +38,13 @@ autoship deliver groom FRD-162         # force the groom phase
 autoship deliver build FRD-162 --dry-run
 ```
 
-The CLI runs the controller, streams its output to your terminal, exits when the controller stops. Disk-backed state under `.autoship/` means re-running picks up where it left off.
+Default mode is interactive — the CLI opens a Claude Code session with the controller agent loaded and your prompt as the first user message. Output streams as the controller runs; the session stays open after for follow-ups. Disk-backed state under `.autoship/` means re-running picks up where it left off.
+
+Add `--print` for headless mode (CI / pipes — runs to completion, prints the final response, exits):
+
+```bash
+autoship audit --report-only --print
+```
 
 ### Interactive chat session
 

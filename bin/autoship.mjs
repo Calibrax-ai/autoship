@@ -12,20 +12,23 @@ autoship — turn messy software work into reviewable, reliable delivery
 Usage:
   autoship init                        Install + interactively configure autoship in this repo
   autoship init --no-interactive       Skip the wizard; writes the commented template
-  autoship audit [args...]             Run audit via the controller (e.g. --report-only, --approve)
-  autoship deliver [args...]           Run deliver via the controller (e.g. FRD-162, "groom FRD-162")
-  autoship interactive                 Open an interactive controller chat session
+  autoship audit [args...]             Run audit via the controller (interactive — output streams)
+  autoship deliver [args...]           Run deliver via the controller (interactive — output streams)
+  autoship interactive                 Open an interactive controller chat with no starting prompt
 
-All audit/deliver commands forward args to the controller verbatim.
-Set AUTOSHIP_PRINT=1 to see the underlying \`claude\` invocation without running it.
+Audit/deliver default to INTERACTIVE mode — output streams as the controller
+runs, session stays open for follow-ups. Add --print for headless mode (final
+response only; useful for CI / pipes).
+
+Set AUTOSHIP_PRINT=1 to see the resolved \`claude\` invocation without running it.
 
 Examples:
-  autoship audit --report-only
-  autoship audit --tracker=linear --approve
-  autoship deliver
-  autoship deliver FRD-162
-  autoship deliver groom FRD-162
-  autoship deliver build FRD-162 --dry-run
+  autoship audit --report-only             # interactive: stream output, stay open
+  autoship audit --report-only --print     # headless: print final response only
+  autoship deliver                         # claim next eligible per defaults.yaml
+  autoship deliver FRD-162                 # specific issue
+  autoship deliver groom FRD-162           # force groom phase
+  autoship deliver build FRD-162 --dry-run # plan, no push/PR
 
 Docs: https://github.com/Calibrax-ai/autoship
 `);
@@ -54,7 +57,15 @@ function fallbackGuidance(mode, prompt) {
 	process.exit(1);
 }
 
-async function spawnController({ prompt, interactive = false }) {
+// Modes:
+//   interactive (default): `claude --agent X "<prompt>"` — opens an
+//     interactive session with the prompt as the first user message. Output
+//     streams to the terminal as Claude generates. Session stays open after
+//     the controller finishes so the user can ask follow-ups.
+//   headless: `claude --agent X -p "<prompt>"` — runs and prints the final
+//     response only. Useful for CI / pipes / scripting. Triggered by
+//     --print flag.
+async function spawnController({ prompt, mode = 'interactive' }) {
 	const claudePath = which('claude');
 	if (!claudePath) {
 		fallbackGuidance(prompt.split(' ', 1)[0], prompt);
@@ -62,7 +73,14 @@ async function spawnController({ prompt, interactive = false }) {
 	}
 
 	const argv = ['--agent', 'autoship-controller'];
-	if (!interactive) argv.push('-p', prompt);
+	if (mode === 'headless') {
+		argv.push('-p', prompt);
+	} else if (mode === 'interactive') {
+		// Pass the prompt as a positional argument; claude opens an interactive
+		// session with this as the first message.
+		if (prompt) argv.push(prompt);
+	}
+	// mode === 'open' → no prompt, just open the session
 
 	if (process.env.AUTOSHIP_PRINT === '1') {
 		const display = argv.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ');
@@ -80,30 +98,31 @@ async function spawnController({ prompt, interactive = false }) {
 	});
 }
 
+// Splits args into (forwarded-to-controller-prompt) and (autoship-side flags).
+function splitArgs(args) {
+	const forwarded = [];
+	const flags = { print: false };
+	for (const a of args) {
+		if (a === '--print') flags.print = true;
+		else forwarded.push(a);
+	}
+	return { forwarded, flags };
+}
+
 async function runAudit(args = []) {
-	const prompt = buildPrompt('audit', args);
-	await spawnController({ prompt });
+	const { forwarded, flags } = splitArgs(args);
+	const prompt = buildPrompt('audit', forwarded);
+	await spawnController({ prompt, mode: flags.print ? 'headless' : 'interactive' });
 }
 
 async function runDeliver(args = []) {
-	const prompt = buildPrompt('deliver', args);
-	await spawnController({ prompt });
+	const { forwarded, flags } = splitArgs(args);
+	const prompt = buildPrompt('deliver', forwarded);
+	await spawnController({ prompt, mode: flags.print ? 'headless' : 'interactive' });
 }
 
 async function runInteractive() {
-	const claudePath = which('claude');
-	if (!claudePath) {
-		console.log('\n`claude` is not on your PATH. Install Claude Code: https://claude.com/claude-code\n');
-		process.exit(1);
-	}
-	const child = spawn(claudePath, ['--agent', 'autoship-controller'], { stdio: 'inherit' });
-	await new Promise((resolve, reject) => {
-		child.on('exit', (code) => {
-			if (code === 0 || code === null) resolve();
-			else process.exit(code);
-		});
-		child.on('error', reject);
-	});
+	await spawnController({ prompt: '', mode: 'open' });
 }
 
 const commands = {
