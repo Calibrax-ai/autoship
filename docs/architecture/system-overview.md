@@ -8,11 +8,12 @@ title: "System Overview"
 
 Autoship runs the middle of software delivery — the part between *"we need to understand or build X"* and *"X is reviewed, tested, and ready for a human decision."*
 
-The live product has three surfaces:
+The live product has two runtime surfaces:
 
-1. **Standards** — repo policy for hosting, CI, observability, secrets, release expectations, and validation.
-2. **Audit** — evidence-backed production readiness assessment that can create bounded issue candidates.
-3. **Deliver** — issue-to-brief-to-oracle-to-implementation flow that ends at a draft pull request.
+1. **Audit** — evidence-backed production readiness assessment that can create bounded issue candidates.
+2. **Deliver** — issue-to-brief-to-oracle-to-implementation flow that ends at a draft pull request.
+
+Both modes read repo policy from `.autoship/standards.yaml`, scaffolded by `autoship init` and owned by the operator after first install. Standards is setup config, not a runtime mode.
 
 Validate remains future work. Extract is retired from the live product; its implementation and research notes are archived under `docs/archive/extract/`.
 
@@ -20,23 +21,20 @@ Validate remains future work. Extract is retired from the live product; its impl
 
 ```mermaid
 flowchart LR
-    S[standards] --> A[audit]
-    A --> D[deliver]
+    init["autoship init"] -->|writes| std[".autoship/standards.yaml"]
+    std -->|read as policy| A[audit]
+    std -->|read as policy| D[deliver]
+    A --> D
     D --> V[validate]
 ```
 
-### Standards
+### Standards (setup artifact)
 
 Handles the **repo policy bootstrap** problem.
 
-**Input:**
-- existing repo
-- current evidence such as CI workflows, package manifests, deploy config, migrations, observability imports, and `.env.example`
+`.autoship/standards.yaml` is owned by the `autoship init` CLI. On install, init walks repo evidence (package manifests, CI workflows, deploy config, migration tools, observability SDKs, async/queue libs, dependency-scan config) and fills high-confidence values directly into the YAML, annotating each with `# inferred from <evidence>`. Ambiguous values stay `SET_ME` and are treated as decision-required by audit.
 
-**Output:**
-- `.autoship/standards.yaml` with high-confidence policy filled
-- ambiguous values left as `SET_ME`
-- no sidecar evidence file
+Re-running `autoship init` on an existing `.autoship/` prints an advisory of fills and conflicts based on current evidence — it never modifies the file. Operators copy any fills they want into `standards.yaml` manually. autoship does not silently overwrite the file once it exists.
 
 Standards are policy, not trigger config. They tell audit and deliver what the repo expects; they do not decide which run mode starts.
 
@@ -131,7 +129,7 @@ When autoship integrates with Linear:
 
 ## Current Implementation Status
 
-- `standards` drafts `.autoship/standards.yaml` from high-confidence repo evidence.
+- `autoship init` scaffolds `.autoship/standards.yaml` with high-confidence repo evidence. Re-running on existing `.autoship/` prints an advisory only.
 - `audit` can run report-only, or write reviewed issue candidates to Linear when explicitly approved.
 - `deliver` can drive an issue through groom → review → `Ready` → human promotion → oracle → implementation → verification → draft PR.
 - merge, deploy, and outcome verification remain future work.

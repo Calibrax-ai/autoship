@@ -10,6 +10,8 @@ import {
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { inferStandards, applyInferences } from './infer-standards.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
 
@@ -39,10 +41,16 @@ export async function init(args = []) {
 		);
 	}
 
-	const unknownArgs = args;
+	if (args.length) {
+		throw new Error(`Unknown init option: ${args.join(', ')}`);
+	}
 
-	if (unknownArgs.length) {
-		throw new Error(`Unknown init option: ${unknownArgs.join(', ')}`);
+	// If .autoship/ already exists, init becomes advisory: print what current
+	// evidence suggests, never touch the file. Operator owns standards.yaml
+	// after first install — same shape as Claude Code's /init on an existing
+	// CLAUDE.md.
+	if (existsSync(join(cwd, '.autoship'))) {
+		return printAdvisory(cwd);
 	}
 
 	console.log('\nautoship init\n');
@@ -51,11 +59,6 @@ export async function init(args = []) {
 	if (!existsSync(join(cwd, '.git'))) {
 		console.warn(
 			'Warning: this directory does not look like a git repo. autoship expects a git repo.\n'
-		);
-	}
-	if (existsSync(join(cwd, '.autoship'))) {
-		throw new Error(
-			'.autoship/ already exists here. Run `autoship update` to refresh (not yet implemented).'
 		);
 	}
 
@@ -71,9 +74,17 @@ export async function init(args = []) {
 	const autoshipDir = join(cwd, '.autoship');
 	mkdirSync(autoshipDir, { recursive: true });
 
-	// Write standards.yaml (repo policy — always scaffolded)
-	writeFileSync(join(autoshipDir, 'standards.yaml'), renderStandards());
-	console.log('  ✓ standards.yaml → .autoship/');
+	// Build standards.yaml. Inference is always on at install time — wrong
+	// guesses are reviewable inline (each carries a `# inferred from <evidence>`
+	// comment) and cost only an SET_ME edit if the operator wants to override.
+	const baseline = renderStandardsTemplate();
+	const inferences = inferStandards(cwd);
+	const { yaml: standardsYaml, filled } = applyInferences(baseline, inferences);
+	writeFileSync(join(autoshipDir, 'standards.yaml'), standardsYaml);
+	const setMeCount = (standardsYaml.match(/"SET_ME"/g) || []).length;
+	console.log(
+		`  ✓ standards.yaml → .autoship/  (filled ${filled.length} from evidence; ${setMeCount} still SET_ME)`
+	);
 
 	// Write defaults.yaml (optional per-repo stickies — commented template,
 	// inert until the operator uncomments fields)
@@ -87,9 +98,7 @@ export async function init(args = []) {
 	console.log(`
 Done. Next steps:
 
-  1. Review or draft .autoship/standards.yaml — hosting, CI, observability, secrets. autoship treats SET_ME values as decision-required.
-
-       claude --agent autoship-controller -p "draft standards from this repo"
+  1. Review .autoship/standards.yaml. Inferred fields are commented with their evidence; SET_ME fields are your call. Edit the file directly to update policy — autoship does not modify it once it exists. Re-run \`autoship init\` later to see an advisory if repo evidence has changed.
 
   2. (Optional) Uncomment per-repo stickies in .autoship/defaults.yaml — tracker, validation command, branch prefix. Flags on the invocation always win.
   3. If using Linear: install the Linear MCP — https://docs.anthropic.com/en/docs/mcp
@@ -111,6 +120,64 @@ Done. Next steps:
 
   Docs: https://github.com/Calibrax-ai/autoship
 `);
+}
+
+// Re-running `autoship init` on an existing .autoship/ prints an advisory:
+// what current repo evidence would fill into SET_ME slots, and where existing
+// non-SET_ME values disagree with current evidence. Never touches the file.
+function printAdvisory(cwd) {
+	console.log(
+		'\n.autoship/ already exists. Live policy lives in .autoship/standards.yaml — edit directly.\n'
+	);
+
+	const standardsPath = join(cwd, '.autoship', 'standards.yaml');
+	if (!existsSync(standardsPath)) {
+		console.log(
+			'(no standards.yaml found under .autoship/ — remove the directory and re-run `autoship init` to bootstrap from scratch)\n'
+		);
+		return;
+	}
+
+	const current = readFileSync(standardsPath, 'utf-8');
+	const inferences = inferStandards(cwd);
+	const { filled, conflicts } = applyInferences(current, inferences);
+
+	if (filled.length === 0 && conflicts.length === 0) {
+		console.log('Advisory: current standards.yaml matches repo evidence. Nothing to suggest.\n');
+		return;
+	}
+
+	if (filled.length > 0) {
+		console.log(
+			`Advisory — repo evidence suggests these fills for SET_ME slots (${filled.length}):`
+		);
+		for (const f of filled) {
+			console.log(`  ${f.key}: ${formatYAMLValue(f.value)}  # from ${f.source}`);
+		}
+		console.log('');
+	}
+
+	if (conflicts.length > 0) {
+		console.log(
+			`Conflicts — existing values disagree with current evidence (${conflicts.length}):`
+		);
+		for (const c of conflicts) {
+			console.log(
+				`  ${c.key}: existing=${formatYAMLValue(c.existing)} vs inferred=${formatYAMLValue(c.inferred)}  (from ${c.source})`
+			);
+		}
+		console.log('');
+	}
+
+	console.log(
+		'Copy any fills you want into .autoship/standards.yaml. autoship does not modify the file once it exists.\n'
+	);
+}
+
+function formatYAMLValue(value) {
+	if (Array.isArray(value)) return '[' + value.map((v) => JSON.stringify(v)).join(', ') + ']';
+	if (typeof value === 'string') return JSON.stringify(value);
+	return String(value);
 }
 
 function copyAgentFiles(files, cwd) {
@@ -210,10 +277,13 @@ function renderDefaults() {
 `;
 }
 
-function renderStandards() {
+function renderStandardsTemplate() {
 	return `# autoship standards.yaml — repo/org policy for controller-guided work
 # Commit this file. Keep it short and specific. These are the defaults autoship
 # should assume when auditing or delivering work in this repo.
+# Fields with a "# inferred from ..." comment were filled by autoship init from
+# repo evidence — review and override as needed. SET_ME means autoship couldn't
+# infer a value confidently and treats it as decision-required.
 
 platform:
   hosting: "SET_ME"        # e.g. gcp, vercel, aws
@@ -226,7 +296,7 @@ ci:
 observability:
   errors: "SET_ME"         # e.g. sentry
   logs: "SET_ME"           # e.g. cloud-logging, datadog
-  traces: "none"           # e.g. none, opentelemetry
+  traces: "SET_ME"         # e.g. none, opentelemetry
 
 database:
   migrations: "SET_ME"     # e.g. prisma, drizzle, rails
@@ -241,14 +311,14 @@ security:
   rate_limits_required: true
 
 tenancy:
-  model: "single-tenant"    # single-tenant, multi-tenant, account-scoped
+  model: "SET_ME"           # single-tenant, multi-tenant, account-scoped
   isolation_required: false
 
 roles:
   model: "SET_ME"           # e.g. none, user-admin, org-roles, rbac
 
 async:
-  provider: "none"          # e.g. none, inngest, bullmq, cloud-tasks, sqs
+  provider: "SET_ME"        # e.g. none, inngest, bullmq, cloud-tasks, sqs
   retries_required: true
   idempotency_required: true
 

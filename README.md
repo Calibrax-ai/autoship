@@ -16,19 +16,13 @@ Run from the root of a git repo. The CLI:
 
 - Copies 7 core autoship agents into `.claude/agents/`
 - Copies 4 core skill packs into `.claude/skills/`
-- Writes `.autoship/standards.yaml` (repo policy defaults you review or draft)
+- Writes `.autoship/standards.yaml` with high-confidence repo policy inferred from evidence (next/prisma/sentry/github-actions/etc.). Each inferred value is annotated with `# inferred from <evidence>`.
 - Writes an optional commented `.autoship/defaults.yaml` template for per-repo run defaults
 - Adds autoship runtime state to `.gitignore`
 
+After the repo evolves, re-run `autoship init` against the existing repo. It will print an advisory — what current evidence would fill into SET_ME slots, where existing values disagree with current evidence — without modifying `standards.yaml`. Copy any fills you want manually. autoship never silently overwrites the file once it exists.
+
 ## Run
-
-Optionally draft repo policy from codebase evidence first:
-
-```bash
-claude --agent autoship-controller -p "draft standards from this repo"
-```
-
-The controller fills high-confidence values in `.autoship/standards.yaml`, leaves ambiguous policy as `SET_ME`, and does not create a separate evidence artifact.
 
 Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
 

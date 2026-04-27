@@ -4,15 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Repository Nature
 
-autoship v0.1 is a **standards + audit + deliver agent framework** for turning repo evidence and approved work into reviewed, executable delivery artifacts.
+autoship v0.1 is an **audit + deliver agent framework** for turning repo evidence and approved work into reviewed, executable delivery artifacts. Repo policy (`.autoship/standards.yaml`) is owned by the `autoship init` CLI, not the controller.
 
 Extract has been retired from the live product. Its old implementation and research notes are archived under `docs/archive/extract/`; do not treat them as runnable product guidance.
 
 ## Start Here
 
-Use autoship through the core controller. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
+**`autoship init`** handles setup. It scaffolds `.claude/agents/`, `.claude/skills/`, `.autoship/standards.yaml` (with high-confidence values inferred from repo evidence), and `.autoship/defaults.yaml`. Re-running on an existing `.autoship/` prints an advisory of fills and conflicts based on current evidence — it never modifies the file. Operators own `.autoship/standards.yaml` after first install (same shape as Claude Code's `/init` on an existing CLAUDE.md).
 
-- **`standards`** — `claude --agent autoship-controller -p "draft standards from this repo"`
+The controller handles the two runtime modes. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
+
 - **`audit`** — `claude --agent autoship-controller -p "audit --report-only"` or `-p "audit --tracker=linear --approve"`
 - **`deliver`** — after configuring an issue source + validation command, use `claude --agent autoship-controller -p "deliver"` or `-p "deliver FRD-162"` / `-p "deliver groom FRD-162"` / `-p "deliver build FRD-162 --dry-run"`
 - **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-brief-reviewer` directly when you only need a brief and review.
@@ -26,9 +27,10 @@ Important boundaries:
 
 ## Key Files
 
-- `bin/autoship.mjs` — native CLI guidance stub.
+- `bin/autoship.mjs` — native CLI for `init`, plus guidance stubs for `audit` and `deliver`.
 - `cli/init.mjs` — scaffolds live core agents/skills, `.autoship/standards.yaml`, and commented `.autoship/defaults.yaml`.
-- `.claude/agents/autoship-controller.md` — controller for standards, audit, and deliver.
+- `cli/infer-standards.mjs` — heuristic inference of standards.yaml fields from repo evidence (used by both `init` and `standards`).
+- `.claude/agents/autoship-controller.md` — controller for audit and deliver.
 - `.claude/agents/audit-auditor.md`, `.claude/agents/audit-reviewer.md` — generator-evaluator pair for readiness assessment and issue-candidate review.
 - `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-brief-reviewer.md` — generator-evaluator pair for issue grooming.
 - `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-implementation.md` — frozen-oracle and implementation workers for deliver.
@@ -92,8 +94,13 @@ Expected default install: 7 agents, 4 skills, standards/defaults present, no `pr
 Controller smoke:
 
 ```bash
-claude --agent autoship-controller -p "draft standards from this repo"
 claude --agent autoship-controller -p "audit --report-only"
+```
+
+Init advisory smoke (re-run on existing .autoship/):
+
+```bash
+node /Users/shyangcalibrax/Documents/Projects/autoship/bin/autoship.mjs init
 ```
 
 ## Editing Conventions

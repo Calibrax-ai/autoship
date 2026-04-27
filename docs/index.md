@@ -11,13 +11,16 @@ Autoship does the grinding. Humans approve at the moments that matter: *is this 
 
 [→ See how it works](/architecture/system-overview/) · [GitHub ↗](https://github.com/Calibrax-ai/autoship)
 
-## Standards, audit, deliver
+## Audit and deliver
 
 **Live product path**
 
-- **Standards** — draft or review repo policy so audits and delivery do not invent platform decisions.
 - **Audit** — inspect a real repo against a fixed readiness lens, produce evidence-backed findings, and create bounded Linear issue candidates.
 - **Deliver** — take an approved issue, produce a reviewed code change through a draft pull request.
+
+**Setup**
+
+- **`autoship init`** — scaffolds `.autoship/standards.yaml` with high-confidence repo policy inferred from evidence (`next` → vercel hosting, `prisma/schema.prisma` → prisma migrations, etc.). Audit and deliver read this file as policy; they don't write it. Re-running `autoship init` on an existing `.autoship/` prints an advisory of new evidence without modifying the file — operators own standards.yaml after first install.
 
 **Coming soon**
 

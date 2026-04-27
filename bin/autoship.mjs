@@ -9,13 +9,13 @@ autoship — turn messy software work into reviewable, reliable delivery
 
 Usage:
   autoship init                        Install core autoship agents into the current repo
-  autoship standards                   Print standards drafting guidance
+                                       (re-run on existing .autoship/ prints an advisory of
+                                        new evidence; never modifies standards.yaml)
   autoship audit                       Print audit invocation guidance
   autoship deliver                     Print deliver invocation guidance
 
 Running autoship (until v0.3.0 lands a native CLI, use the controller agent directly):
 
-  claude --agent autoship-controller -p "draft standards from this repo"
   claude --agent autoship-controller -p "audit --report-only"
 
 Deliver needs an issue source plus validation.commands first:
@@ -53,18 +53,6 @@ See .claude/agents/autoship-controller.md § How I Receive Work for the full con
 `);
 }
 
-function printStandardsGuidance() {
-	console.log(`
-'autoship standards' is a CLI stub. A native wrapper is scheduled for v0.3.0.
-Until then, invoke the controller agent directly:
-
-  claude --agent autoship-controller -p "draft standards from this repo"
-
-The controller inspects repo evidence and fills .autoship/standards.yaml where confidence is high.
-Uncertain policy remains SET_ME with short inline comments. Existing non-SET_ME values are not overwritten silently.
-`);
-}
-
 function printDeliverGuidance() {
 	console.log(`
 'autoship deliver' is a CLI stub. A native wrapper is scheduled for v0.3.0.
@@ -99,7 +87,6 @@ See .claude/agents/autoship-controller.md § How I Receive Work for the full con
 
 const commands = {
 	init,
-	standards: printStandardsGuidance,
 	audit: printAuditGuidance,
 	deliver: printDeliverGuidance,
 	help: printHelp,
