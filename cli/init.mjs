@@ -11,7 +11,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin, stdout } from 'node:process';
 
-import { select, checkbox, input, confirm } from '@inquirer/prompts';
+import { select, input } from '@inquirer/prompts';
 
 import { inferStandards, applyInferences } from './infer-standards.mjs';
 import {
@@ -19,8 +19,6 @@ import {
 	checkLinearAuth,
 	listTeams,
 	listProjects,
-	listLabels,
-	LINEAR_STATE_TYPES,
 } from './linear-cli.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -189,11 +187,11 @@ function formatYAMLValue(value) {
 // ---- Wizard ----
 //
 // Interactive setup that runs at install time when stdin is a TTY. Collects
-// the minimum answers needed to write a populated defaults.yaml: tracker
-// choice, Linear team/project/claim convention/state types, and validation
-// command. When Linear is selected, drives the `linear` CLI live to discover
-// real teams / projects / labels — operator picks from real options instead of
-// typing strings that might not exist.
+// the minimum answers needed to write a populated defaults.yaml: issue source,
+// Linear team/project scope, default owner/states, and validation command. When
+// Linear is selected, drives the `linear` CLI live to discover real teams and
+// projects so the operator picks from real options instead of typing strings
+// that might not exist.
 //
 // Skips entirely in CI / non-TTY contexts (init.mjs entry point checks isTTY);
 // falls back to manual entry when Linear CLI is missing or not authed.
@@ -207,7 +205,7 @@ async function runWizard(cwd) {
 	const tracker = await select({
 		message: 'Issue tracker?',
 		choices: [
-			{ name: 'Linear  (drives the `linear` CLI to discover teams + labels)', value: 'linear' },
+			{ name: 'Linear  (drives the `linear` CLI to discover teams + projects)', value: 'linear' },
 			{ name: 'Local folder  (.autoship/issues/<id>/issue.md)', value: 'folder' },
 			{ name: 'Skip — configure later', value: 'skip' },
 		],
@@ -292,71 +290,21 @@ async function collectLinearAnswers() {
 		console.log('  (no projects discovered for this team — skipping)\n');
 	}
 
-	// Claim convention.
-	console.log('\nClaim convention — how autoship knows which Linear issues are');
-	console.log('its territory vs which belong to humans.\n');
-	const claimKind = await select({
-		message: 'Claim by:',
-		choices: [
-			{ name: 'Label  (autoship claims labeled issues — safe for shared projects)', value: 'label' },
-			{ name: 'Assignee  (claims issues assigned to a service-account user)', value: 'assignee_email' },
-			{ name: 'Status only  (claims any issue in chosen states — only safe if you are the sole human on this project)', value: 'state' },
-		],
-		default: 'label',
-	});
+	console.log('\nLinear work selection defaults:');
+	console.log('  owner: me');
+	console.log('  groom states: Todo');
+	console.log('  build states: Building\n');
 
-	let claim = null;
-	if (claimKind === 'label') {
-		const labels = listLabels(teamKey);
-		if (labels && labels.length > 0) {
-			const choices = labels.map((l) => ({ name: l.name, value: l.name }));
-			choices.unshift({ name: '+ Type a new label name (you create it in Linear)', value: '__new__' });
-			let picked = await select({
-				message: 'Pick an existing label, or type a new one:',
-				choices,
-				default: labels.find((l) => l.name === 'autoship') ? 'autoship' : '__new__',
-			});
-			if (picked === '__new__') {
-				picked = await input({
-					message: 'New label name:',
-					default: 'autoship',
-					validate: (v) => v.trim().length > 0 || 'Required',
-				});
-				console.log(`  ⚠ Remember to create the \`${picked.trim()}\` label in Linear before running deliver.\n`);
-			}
-			claim = { kind: 'label', value: picked.trim() };
-		} else {
-			const v = await input({
-				message: 'Label name (will need to exist in Linear):',
-				default: 'autoship',
-			});
-			claim = { kind: 'label', value: v.trim() || 'autoship' };
-		}
-	} else if (claimKind === 'assignee_email') {
-		const email = await input({
-			message: 'Assignee email (e.g. autoship-bot@your-org.com):',
-			validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || 'Please enter a valid email',
-		});
-		claim = { kind: 'assignee_email', value: email.trim() };
-	}
-	// claimKind === 'state' falls through with claim = null; state-only mode.
-
-	// State filter — required for state-only; recommended otherwise.
-	if (claimKind === 'state') {
-		console.log('\nState-only mode: autoship will claim any issue whose state.type is in your selection.');
-		console.log('No label or assignee gate. Pick states carefully.\n');
-	} else {
-		console.log('\nState filter — which Linear workflow states autoship is allowed to claim from.');
-		console.log('Defaults to backlog + unstarted (the natural "ready to work" pile).\n');
-	}
-	const stateTypes = await checkbox({
-		message: 'Allowed state types (space to toggle, enter to confirm):',
-		choices: LINEAR_STATE_TYPES.map((t) => ({ name: t.label, value: t.value })),
-		required: true,
-		default: ['backlog', 'unstarted'],
-	});
-
-	return { team: teamName, teamKey, project: projectName, claim, stateTypes };
+	return {
+		team: teamName,
+		teamKey,
+		project: projectName,
+		owner: 'me',
+		states: {
+			groom: ['Todo'],
+			build: ['Building'],
+		},
+	};
 }
 
 async function collectLinearAnswersManual() {
@@ -364,33 +312,18 @@ async function collectLinearAnswersManual() {
 	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by linear CLI):' })).trim();
 	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
 
-	const claimKind = await select({
-		message: 'Claim convention:',
-		choices: [
-			{ name: 'Label  (autoship claims labeled issues — safe for shared projects)', value: 'label' },
-			{ name: 'Assignee  (claims issues assigned to a service-account user)', value: 'assignee_email' },
-			{ name: 'Status only  (claims any issue in chosen states — only safe if sole human)', value: 'state' },
-		],
-		default: 'label',
-	});
-	let claim = null;
-	if (claimKind === 'label') {
-		const v = await input({ message: 'Label name:', default: 'autoship' });
-		claim = { kind: 'label', value: v.trim() || 'autoship' };
-	} else if (claimKind === 'assignee_email') {
-		const v = await input({
-			message: 'Assignee email:',
-			validate: (s) => /\S+@\S+\.\S+/.test(s.trim()) || 'Please enter a valid email',
-		});
-		claim = { kind: 'assignee_email', value: v.trim() };
-	}
-	const stateTypes = await checkbox({
-		message: 'Allowed state types:',
-		choices: LINEAR_STATE_TYPES.map((t) => ({ name: t.label, value: t.value })),
-		required: true,
-		default: ['backlog', 'unstarted'],
-	});
-	return { team, teamKey, project: project || null, claim, stateTypes };
+	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, build=Building.\n');
+
+	return {
+		team,
+		teamKey,
+		project: project || null,
+		owner: 'me',
+		states: {
+			groom: ['Todo'],
+			build: ['Building'],
+		},
+	};
 }
 
 function readPackageScripts(cwd) {
@@ -438,13 +371,12 @@ function describeDetectedStack({ values }) {
 }
 
 function describeAnswers(answers) {
-	const parts = [`tracker=${answers.tracker}`];
+	const parts = [`source=${answers.tracker}`];
 	if (answers.linear) {
 		parts.push(`team=${answers.linear.teamKey || answers.linear.team}`);
-		if (answers.linear.claim) parts.push(`${answers.linear.claim.kind}=${answers.linear.claim.value}`);
-		if (answers.linear.stateTypes?.length) {
-			parts.push(`states=${answers.linear.stateTypes.join('+')}`);
-		}
+		parts.push(`owner=${answers.linear.owner || 'me'}`);
+		parts.push(`groom=${(answers.linear.states?.groom || ['Todo']).join('+')}`);
+		parts.push(`build=${(answers.linear.states?.build || ['Building']).join('+')}`);
 	}
 	if (answers.validation) parts.push(`validation=${answers.validation}`);
 	return parts.join(', ');
@@ -457,18 +389,13 @@ function printNextSteps(answers) {
 	lines.push('  1. Review .autoship/standards.yaml. Inferred fields carry `# inferred from <evidence>` comments; SET_ME fields are your call. Edit directly — autoship does not modify it once it exists. Re-run `autoship init` later for an advisory if repo evidence has changed.');
 
 	if (!answers || answers.tracker === 'skip') {
-		lines.push('  2. (Optional) Open .autoship/defaults.yaml and uncomment the sections that match your setup — tracker, Linear team+project+claim, validation command. Flags on the invocation always win.');
+		lines.push('  2. (Optional) Open .autoship/defaults.yaml and uncomment the sections that match your setup — Linear or folder source, states, and validation command. Flags on the invocation always win.');
 	}
 
-	if (answers && answers.tracker === 'linear' && answers.linear?.claim?.kind === 'label') {
-		lines.push(`  2. In Linear, label issues you want autoship to take with \`${answers.linear.claim.value}\`. autoship halts on bare \`deliver\` until at least one labeled issue exists, to avoid hijacking human work.`);
-	}
-	if (answers && answers.tracker === 'linear' && answers.linear?.claim?.kind === 'assignee_email') {
-		lines.push(`  2. In Linear, assign issues you want autoship to take to \`${answers.linear.claim.value}\`. Make sure that user exists in your workspace.`);
-	}
-	if (answers && answers.tracker === 'linear' && !answers.linear?.claim) {
-		const states = (answers.linear.stateTypes || []).join(' / ');
-		lines.push(`  2. State-only claim mode — autoship will pick up any issue in [${states}] state. Only safe if you're the sole agent on this project. Move issues to a state outside that list to remove them from autoship's queue.`);
+	if (answers && answers.tracker === 'linear') {
+		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
+		const buildStates = (answers.linear?.states?.build || ['Building']).join(' / ');
+		lines.push(`  2. In Linear, assign issues to yourself and use ${groomStates} for grooming. ${buildStates} is the strict build-eligible state for unattended runs.`);
 	}
 
 	lines.push('');
@@ -476,9 +403,11 @@ function printNextSteps(answers) {
 	lines.push('');
 	lines.push('       autoship audit --report-only      # zero-config, no tracker writes');
 	if (answers && answers.tracker === 'linear') {
-		lines.push('       autoship deliver                  # picks up Linear issues per your claim convention');
+		lines.push('       autoship "get all Todo issues assigned to me and start grooming"');
+		lines.push('       autoship deliver FRD-162          # approve the brief and build one issue');
 	} else if (answers && answers.tracker === 'folder') {
-		lines.push('       autoship deliver                  # picks up issues from .autoship/issues/<id>/');
+		lines.push('       autoship groom FRD-162            # writes .autoship/issues/<id>/brief.md');
+		lines.push('       autoship deliver FRD-162          # approve the brief and build one issue');
 	}
 	lines.push('       autoship interactive              # open a chat session with the controller');
 	lines.push('');
@@ -572,41 +501,22 @@ function renderDefaultsTemplate() {
 #   external_exposure: false   # override per-run with --external-url=<url>
 
 # deliver:
-#   tracker: folder            # folder | linear | github
+#   # Pick exactly one source block: folder OR linear.
 #   folder:
 #     path: .autoship/issues
-#   linear:
-#     team: "Delivery"
-#     team_key: "DEL"          # Linear short key, used by the linear CLI
-#     project: "MyProject"
-#     # Claim convention — how autoship tells which Linear issues are its
-#     # territory vs which belong to humans. Without one, bare 'deliver' halts
-#     # rather than risk hijacking human-owned work. Three patterns:
-#     claim:
-#       # Pattern 1 (recommended for shared projects): label-based identity
-#       label: "autoship"        # autoship claims issues with this label
-#       # Pattern 2: assignee-based identity
-#       # assignee_email: "autoship-bot@your-org.com"
-#       # Pattern 3 (sole-operator only): state-only — omit label and
-#       # assignee_email, autoship claims any issue matching state_types.
-#       # Risky on shared projects.
-#       #
-#       # State filter (always applied; defaults to backlog + unstarted):
-#       # Linear workflow categories autoship may claim from.
-#       # Values: triage, backlog, unstarted, started, completed, canceled.
-#       state_types: ["backlog", "unstarted"]
-#   worktree:
-#     root: .autoship/worktrees
-#     branch_prefix: "autoship/"
+#
+#   # linear:
+#   #   team: "Delivery"
+#   #   team_key: "DEL"          # Linear short key, used by the linear CLI
+#   #   project: "MyProject"     # optional; omit for team-wide selection
+#   #   owner: me                # "me" means the authenticated Linear user
+#   #   states:
+#   #     groom: ["Todo"]        # human prompt/groom selection
+#   #     build: ["Building"]    # strict unattended build eligibility
+#
 #   validation:
 #     commands:
 #       - "bun test"
-#   pr:
-#     remote: origin
-#     draft: true
-#     base_branch: main
-#   approval_mode: supervised   # supervised | auto
-#   max_regroom_cycles: 3
 `;
 }
 
@@ -615,7 +525,7 @@ function renderDefaultsConfigured(answers) {
 	lines.push('# autoship defaults.yaml — per-repo sticky run defaults.');
 	lines.push("# Generated by `autoship init`. Edit freely — autoship does not modify");
 	lines.push('# this file once it exists. Flags on the invocation always win;');
-	lines.push('# --report-only and --tracker=none override these stickies.');
+	lines.push('# --report-only and --tracker=none override audit stickies.');
 	lines.push('#');
 	lines.push('# Safety note: keep audit.create_issues: false unless you actually want');
 	lines.push('# every audit run to write into the tracker. Use --approve per-run instead.');
@@ -629,14 +539,10 @@ function renderDefaultsConfigured(answers) {
 	lines.push('  external_exposure: false   # override per-run with --external-url=<url>');
 	lines.push('');
 
-	// Deliver block.
-	const deliverTracker = answers.tracker === 'skip' ? null : answers.tracker;
-	if (deliverTracker) {
+	const deliverSource = answers.tracker === 'skip' ? null : answers.tracker;
+	if (deliverSource) {
 		lines.push('deliver:');
-		lines.push(`  tracker: ${deliverTracker}            # folder | linear | github`);
-		lines.push('  folder:');
-		lines.push('    path: .autoship/issues');
-		if (deliverTracker === 'linear' && answers.linear) {
+		if (deliverSource === 'linear' && answers.linear) {
 			lines.push('  linear:');
 			lines.push(`    team: ${quote(answers.linear.team)}`);
 			if (answers.linear.teamKey) {
@@ -645,24 +551,14 @@ function renderDefaultsConfigured(answers) {
 			if (answers.linear.project) {
 				lines.push(`    project: ${quote(answers.linear.project)}`);
 			}
-			lines.push('    claim:');
-			if (answers.linear.claim?.kind === 'label') {
-				lines.push(`      label: ${quote(answers.linear.claim.value)}`);
-			} else if (answers.linear.claim?.kind === 'assignee_email') {
-				lines.push(`      assignee_email: ${quote(answers.linear.claim.value)}`);
-			} else {
-				lines.push('      # state-only mode: no label or assignee gate. autoship claims any');
-				lines.push('      # issue whose state.type is in state_types below. Only safe when');
-				lines.push('      # autoship is the sole agent on this Linear project.');
-			}
-			if (answers.linear.stateTypes?.length) {
-				const states = answers.linear.stateTypes.map((s) => quote(s)).join(', ');
-				lines.push(`      state_types: [${states}]    # Linear workflow categories autoship may claim from`);
-			}
+			lines.push(`    owner: ${answers.linear.owner || 'me'}`);
+			lines.push('    states:');
+			lines.push(`      groom: [${(answers.linear.states?.groom || ['Todo']).map(quote).join(', ')}]`);
+			lines.push(`      build: [${(answers.linear.states?.build || ['Building']).map(quote).join(', ')}]`);
+		} else {
+			lines.push('  folder:');
+			lines.push('    path: .autoship/issues');
 		}
-		lines.push('  worktree:');
-		lines.push('    root: .autoship/worktrees');
-		lines.push('    branch_prefix: "autoship/"');
 		lines.push('  validation:');
 		lines.push('    commands:');
 		if (answers.validation) {
@@ -670,16 +566,8 @@ function renderDefaultsConfigured(answers) {
 		} else {
 			lines.push("      # - \"bun test\"  # set this before running deliver");
 		}
-		lines.push('  pr:');
-		lines.push('    remote: origin');
-		lines.push('    draft: true');
-		lines.push('    base_branch: main');
-		lines.push('  approval_mode: supervised   # supervised | auto');
-		lines.push('  max_regroom_cycles: 3');
 	} else {
-		// User skipped tracker — keep the deliver block commented for later.
 		lines.push('# deliver:');
-		lines.push('#   tracker: folder            # folder | linear | github');
 		lines.push('#   folder:');
 		lines.push('#     path: .autoship/issues');
 		lines.push('#   validation:');

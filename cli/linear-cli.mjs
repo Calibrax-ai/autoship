@@ -1,6 +1,6 @@
 // Helpers for driving the `linear` CLI from the autoship init wizard.
 //
-// Used to discover real Linear teams, projects, and labels so the wizard can
+// Used to discover real Linear teams and projects so the wizard can
 // present them as picklists (no typos, no manual entry). All calls are sync
 // (~200-500ms each) — acceptable for a one-time setup flow.
 //
@@ -62,43 +62,6 @@ export function listProjects(teamKey) {
 		return null;
 	}
 }
-
-export function listLabels(teamKey) {
-	try {
-		// --all to surface workspace + team-specific labels; the team's
-		// effective label set includes both.
-		const out = execSync(`linear label list --team ${shellEscape(teamKey)} --all --json 2>/dev/null`, {
-			encoding: 'utf-8',
-			timeout: 10000,
-		});
-		const arr = JSON.parse(out);
-		return arr.map((l) => ({ id: l.id, name: l.name }));
-	} catch {
-		// Fall back to team-only if --all isn't supported by this CLI version.
-		try {
-			const out = execSync(`linear label list --team ${shellEscape(teamKey)} --json 2>/dev/null`, {
-				encoding: 'utf-8',
-				timeout: 10000,
-			});
-			const arr = JSON.parse(out);
-			return arr.map((l) => ({ id: l.id, name: l.name }));
-		} catch {
-			return null;
-		}
-	}
-}
-
-// Linear's workflow state types are universal across workspaces — they
-// describe the phase of the issue, not the team-specific state name.
-// (Real state names like "Todo", "In Review" map to one of these types.)
-export const LINEAR_STATE_TYPES = [
-	{ value: 'triage', label: 'triage  (newly filed, awaiting routing)' },
-	{ value: 'backlog', label: 'backlog  (acknowledged, not yet prioritized)' },
-	{ value: 'unstarted', label: 'unstarted  (Todo / ready to start)' },
-	{ value: 'started', label: 'started  (In Progress)' },
-	{ value: 'completed', label: 'completed  (Done / Shipped)' },
-	{ value: 'canceled', label: 'canceled' },
-];
 
 function stripAnsi(s) {
 	return s.replace(/\x1b\[[0-9;]*[mK]/g, '');

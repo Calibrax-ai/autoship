@@ -12,25 +12,26 @@ Extract has been retired from the live product. Its old implementation and resea
 
 **`autoship init`** handles setup. It scaffolds `.claude/agents/`, `.claude/skills/`, `.autoship/standards.yaml` (with high-confidence values inferred from repo evidence), and `.autoship/defaults.yaml`. Re-running on an existing `.autoship/` prints an advisory of fills and conflicts based on current evidence — it never modifies the file. Operators own `.autoship/standards.yaml` after first install (same shape as Claude Code's `/init` on an existing CLAUDE.md).
 
-The controller handles the two runtime modes. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
+The controller handles three runtime modes: `audit`, `groom`, `deliver`. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
 
-- **`audit`** — `claude --agent autoship-controller -p "audit --report-only"` or `-p "audit --tracker=linear --approve"`
-- **`deliver`** — after configuring an issue source + validation command, use `claude --agent autoship-controller -p "deliver"` or `-p "deliver FRD-162"` / `-p "deliver groom FRD-162"` / `-p "deliver build FRD-162 --dry-run"`
+- **`audit`** — `autoship audit --report-only` or `autoship audit --tracker=linear --approve`
+- **`groom`** — `autoship groom FRD-162` or `autoship "get all Todo issues assigned to me and start grooming"`. Writes briefs locally under `.autoship/issues/<id>/`; `--post` mirrors the final summary to Linear.
+- **`deliver`** — `autoship deliver FRD-162` (the explicit human approval that promotes a reviewed brief into build), `autoship deliver FRD-162 --dry-run` (plan, no push/PR), `autoship deliver --unattended` (strict machine mode: only operates on issues in `states.build`, refuses fuzzy NL scope).
 - **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-brief-reviewer` directly when you only need a brief and review.
 
 Important boundaries:
 
 - **No `.autoship/program.md`** — live autoship uses triggers, defaults, and standards. If a prompt asks autoship to use `program.md`, treat it as unsupported.
 - **`.autoship/standards.yaml`** is repo-local policy: hosting, CI, observability, secrets, release expectations. Use `.env.example` as evidence of current repo shape, not as policy.
-- **`.autoship/defaults.yaml`** is optional per-repo run defaults: tracker, validation command, branch prefix. Flags always win; `--report-only` and `--tracker=none` override stickies.
+- **`.autoship/defaults.yaml`** is optional per-repo run defaults (v2 schema): exactly one source block (`deliver.linear` or `deliver.folder`); for Linear, `team_key` + optional `project` + `owner: me` + `states.groom` (default `["Todo"]`) + `states.build` (default `["Building"]`); plus `deliver.validation.commands`. PR defaults (draft, `origin`, detected default branch) are implicit. Flags always win; `--report-only` and `--tracker=none` override audit stickies.
 - **`.claude/agents/autoship-controller.md`** holds the stable operating discipline, RunRequest contract, workflow-surface ownership, generator-evaluator separation, disk-backed state, and per-mode procedure.
 
 ## Key Files
 
-- `bin/autoship.mjs` — native CLI for `init`, plus guidance stubs for `audit` and `deliver`.
+- `bin/autoship.mjs` — native CLI: `init`, `audit`, `groom`, `deliver`, bare-prompt forwarding, and `interactive`. All non-init commands spawn `claude --agent autoship-controller` with the right prompt.
 - `cli/init.mjs` — scaffolds live core agents/skills, `.autoship/standards.yaml`, and commented `.autoship/defaults.yaml`.
 - `cli/infer-standards.mjs` — heuristic inference of standards.yaml fields from repo evidence (used by both `init` and `standards`).
-- `.claude/agents/autoship-controller.md` — controller for audit and deliver.
+- `.claude/agents/autoship-controller.md` — controller for audit, groom, and deliver.
 - `.claude/agents/audit-auditor.md`, `.claude/agents/audit-reviewer.md` — generator-evaluator pair for readiness assessment and issue-candidate review.
 - `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-brief-reviewer.md` — generator-evaluator pair for issue grooming.
 - `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-implementation.md` — frozen-oracle and implementation workers for deliver.

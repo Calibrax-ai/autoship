@@ -2,7 +2,7 @@
 
 Turn messy software work into reviewable, reliable delivery — humans approve what matters, agents do the grinding.
 
-Autoship is a set of Claude Code agents and skills for the path from repo readiness to draft pull request: audit turns production gaps into bounded work, deliver turns approved work into a reviewed brief, frozen tests, implementation, and a draft PR.
+Autoship is a set of Claude Code agents and skills for the path from repo readiness to draft pull request: audit turns production gaps into bounded work, groom turns issues into reviewed local briefs, and deliver turns one approved brief into frozen tests, implementation, and a draft PR.
 
 ## Install
 
@@ -24,7 +24,7 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 ## Run autoship
 
-Setup is one-time via `autoship init` (above). Runtime modes — `audit` and `deliver` — run through the autoship CLI directly. The CLI spawns Claude Code under the hood with the right agent + prompt.
+Setup is one-time via `autoship init` (above). Runtime modes — natural-language prompt, `audit`, `groom`, and `deliver` — run through the autoship CLI directly. The CLI spawns Claude Code under the hood with the right agent + prompt.
 
 ### Interactive (default)
 
@@ -32,9 +32,10 @@ Setup is one-time via `autoship init` (above). Runtime modes — `audit` and `de
 autoship audit --report-only           # zero-config, no tracker writes
 autoship audit --tracker=linear --approve
 
-autoship deliver                       # claim next eligible issue per defaults.yaml
-autoship deliver FRD-162               # work a specific issue
-autoship deliver groom FRD-162         # force the groom phase
+autoship "get all Todo issues assigned to me and start grooming"
+autoship groom mine --state Todo --yes # skip confirmation after resolving scope
+autoship groom FRD-162 --post          # local brief, then mirror summary to Linear
+autoship deliver FRD-162               # approve current brief and build one issue
 autoship deliver build FRD-162 --dry-run
 ```
 
@@ -54,9 +55,9 @@ Best when you want to watch the run unfold, review artifacts as they land, or pu
 autoship interactive
 ```
 
-Drops you into a chat with the controller loaded. Type `audit --report-only`, `deliver FRD-162`, or any natural-language prompt.
+Drops you into a chat with the controller loaded. Type `audit --report-only`, `groom FRD-162`, `deliver FRD-162`, or any natural-language prompt.
 
-> Set `AUTOSHIP_PRINT=1` to see the underlying `claude --agent autoship-controller -p "..."` command without running it. Useful when wiring autoship into CI.
+> Set `AUTOSHIP_PRINT=1` to see the underlying `claude --agent autoship-controller ...` command without running it. Useful when wiring autoship into CI.
 
 > Already in an existing Claude Code session in the same repo? You can also dispatch the autoship-controller as a subagent from there — see [Claude Code's subagent docs](https://code.claude.com/docs/en/sub-agents.md).
 
@@ -69,16 +70,17 @@ autoship audit --report-only
 autoship audit --tracker=linear --approve
 ```
 
-Deliver needs an issue source and a validation command first. The wizard in `autoship init` collects both; otherwise edit `.autoship/defaults.yaml` and set `deliver.tracker`, `deliver.linear.*` (if tracker=linear), and `deliver.validation.commands`. Then:
+Groom/deliver need an issue source and a validation command first. The wizard in `autoship init` collects both; otherwise edit `.autoship/defaults.yaml` and configure exactly one source block (`deliver.linear` or `deliver.folder`) plus `deliver.validation.commands`. Then:
 
 ```bash
-autoship deliver                       # resume in-flight or claim next eligible
-autoship deliver FRD-162               # one issue
-autoship deliver groom FRD-162         # force groom phase
-autoship deliver build FRD-162 --dry-run   # plan, no push/PR
+autoship "get all Todo issues assigned to me and start grooming"  # preview, confirm, groom locally
+autoship groom FRD-162                                            # write .autoship/issues/<id>/brief.md
+autoship groom FRD-162 --post                                     # also mirror summary to Linear
+autoship deliver FRD-162                                          # approve current brief and build one issue
+autoship deliver build FRD-162 --dry-run                          # plan, no push/PR
 ```
 
-The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility, and drives each issue through grooming → human approval → build → draft pull request.
+The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local briefs under `.autoship/issues/<id>/`; `--post` opts into Linear mirroring. `autoship deliver <id>` is the human approval signal for building one reviewed brief.
 
 Per-repo sticky defaults live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies.
 

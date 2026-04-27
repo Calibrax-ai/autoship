@@ -424,7 +424,7 @@ Five specialized agents participate in a deliver run. The controller dispatches 
 
 | Agent | Role | Owns | Judged by |
 |---|---|---|---|
-| **Controller** (deliver mode) | Orchestrator. Resolves the RunRequest from flags or NL prompt (with per-repo stickies from `.autoship/defaults.yaml`), claims an eligible issue, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
+| **Controller** (deliver mode) | Orchestrator. Resolves the RunRequest from flags or NL prompt (with per-repo stickies from `.autoship/defaults.yaml`), selects eligible work, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
 | **Pre-groomer** | Writes the **brief** — the plain-English plan — from the raw issue. | `brief.md` in the run directory. Populates every base field in the schema. | Brief-reviewer (separate agent). Never grades its own output. |
 | **Brief-reviewer** | Judges whether the brief is well-formed, grounded in the codebase, and well-scoped. Returns `APPROVED` or `REJECTED` with specific objections. | `reviews/review-NN.md` — append-only, one file per pass. | The operator, indirectly, through the calibration set grown from observed overrides. |
 | **Oracle writer** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. Owns `oracle/result.md`. | Implementation executor (tests pass once code is written, or don't) and the human reviewer on the PR. |
@@ -579,10 +579,10 @@ Extends the same generator-evaluator pattern validated in the archived extract r
 
 The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
-- grooming path: claim → pre-groom → brief review → regroom → `Ready | needs-human-input`
-- build path: `Ready` (after human promotion to `Building`) → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
+- grooming path: human prompt/query → preview → confirmation → pre-groom → brief review → regroom → local brief / `Ready | needs-human-input`
+- build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
 
-Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, regroom policy, worktree/branch policy, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
+Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
 The controller reads two distinct instruction layers:
 
@@ -590,7 +590,7 @@ The controller reads two distinct instruction layers:
   Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself. Also hosts § How I Receive Work, which defines the RunRequest contract and configuration precedence.
 
 - **RunRequest** (in-memory per run, snapshotted to `<run-dir>/run.json`)
-  Run-scoped contract: which repo/testbed to operate on, which tracker/project or issue source to pull from, approval mode (`supervised` vs `auto`), which states are eligible, whether merge is allowed, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → framework defaults.
+  Run-scoped contract: which repo/testbed to operate on, which issue source to pull from (`deliver.linear` or `deliver.folder`), which states are eligible for grooming vs build, whether the run is unattended, whether Linear mirroring is enabled, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → framework defaults.
 
 This split keeps stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy. (The framework knowledge previously lived in a separate `autoship-controller` skill; it was folded into the agent file on 2026-04-24 because the skill had a single reader and the split was creating drift between two files. Historical note: the trigger contract was originally a committed `.autoship/program.md` file; current deliver does not read it and uses flag/NL triggers instead.)
 
@@ -646,12 +646,12 @@ GSD-style supervisor accumulation stays rejected — see Anti-Pattern 5.
 
 Current implemented runtime:
 
-- claim issue
+- select issue
 - pre-groom
 - brief review
 - regroom up to limit
 - park at `Ready | needs-human-input`
-- after human promotion to `Building`: worktree + branch
+- after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree + branch
 - oracle result
 - implementation result
 - controller reruns validation
@@ -665,7 +665,7 @@ Explicitly not yet implemented in the current runtime:
 - post-deploy monitoring
 - outcome verification against business/product success criteria
 - parallel builds
-- auto-promotion past `Ready`
+- broad unattended promotion from natural-language scope
 
 Next placeholders:
 
@@ -763,7 +763,7 @@ Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) 
 
 Each graduates to a richer shape when observed need justifies it.
 
-- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns claim → pre-groom → review → `Ready | needs-human-input`, then after human promotion to `Building`: worktree → oracle → implementation → verification → draft PR.
+- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → local brief / `Ready | needs-human-input`, then after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree → oracle → implementation → verification → draft PR.
 - **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The brief schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-brief-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The brief-specific reviewer checks live in `deliver-grooming/references/brief-review-rubric.md`.
 - **State derived from filesystem.** `brief.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. No `state.json`.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
