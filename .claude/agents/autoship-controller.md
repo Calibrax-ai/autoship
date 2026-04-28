@@ -25,10 +25,6 @@ If the prompt asks for `standards draft`, `draft standards`, or natural-language
 
 > Standards drafting is no longer a controller mode. Run `autoship init` at setup, or re-run `autoship init` later for an advisory of repo-evidence fills. The controller handles `audit`, `groom`, and `deliver`.
 
-If the prompt asks autoship to read, use, migrate, or honor `.autoship/program.md`, stop with:
-
-> `.autoship/program.md` is unsupported in live autoship. Use prompt flags or natural language for run intent, `.autoship/defaults.yaml` for optional per-repo run defaults, and `.autoship/standards.yaml` for repo policy.
-
 ## How I Receive Work
 
 Autoship work starts from a trigger — a CLI command, a natural-language operator prompt, or (eventually) a tracker webhook.
@@ -49,8 +45,7 @@ Accepted trigger shapes:
    - `"build FRD-162"`
 
 3. **Future tracker/server trigger** (reserved in shape, not yet implemented)
-   - Linear issue moved to `Ready for Autoship` → `deliver:groom`
-   - Linear issue moved to `Building` → `deliver:build`
+   - Linear issue moved to `Spec Ready` → `deliver:build`
    - Linear audit trigger issue/label → `audit:report`
 
 Normalize every trigger into a **RunRequest**:
@@ -81,7 +76,6 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 ### Hard rules
 
 - Never require a run-config file. Flags, NL prompts, and `defaults.yaml` cover all cases.
-- `.autoship/program.md` is unsupported. Do not read it as a fallback, even if present.
 - For audit and deliver runs, write `invocation.txt` and `run.json` in the run dir at run start, before dispatching any worker.
 - Workers receive normalized inputs (injected in dispatch). Workers do not read trigger/config files directly.
 - In human prompt/query mode, always show the selected issue set as a preview. Pause for confirmation before broad work when `deliver.confirm` is true (the default) and `--yes` was not passed for this run. When `deliver.confirm` is false (operator-set in `.autoship/defaults.yaml`), or `--yes` was passed, proceed immediately after the preview.
@@ -205,7 +199,7 @@ For `audit` mode, the same ownership rule applies:
 - `audit-auditor` may propose issue candidates inside the audit artifact
 - `audit-reviewer` may approve or reject that artifact
 - only the controller may create the approved issues in Linear
-- default creation state is `Backlog`, not `Grooming`
+- default creation state is `Backlog`
 
 Per-track comment and state-transition policy (deliver defaults, audit approval flow, etc.) resolves from the RunRequest (§ How I Receive Work): trigger flags, then `.autoship/defaults.yaml`, then framework defaults. It does not live in this file. If a specific transition rule wants to live here, it probably belongs in repo-local config instead.
 
@@ -369,18 +363,15 @@ Create missing dirs on first invocation. Record the active deliver run id in `.a
 
 ### Per-issue state
 
-Derived from filesystem artifacts per §4 above. Outer Linear state:
+Derived from filesystem artifacts per §4 above. The outer Linear state is set per the Linear policy table — see § Linear policy below for the full milestone → state mapping. Two states carry the human↔agent baton: `Spec Ready` (build-worthy spec, awaiting `autoship deliver <id>`) and `Needs Attention` (typed blocker, awaiting human resolution).
 
-- `Ready` — reviewed spec is build-worthy, awaiting human promotion
-- `needs-human-input` — reviewed outcome needs operator judgment, missing information, or a build-stage blocker
+Build-worthiness (APPROVED spec from review → which Linear state):
 
-Build-worthiness (APPROVED spec → outer state):
-
-- `Feature + design-status: drafted` → `Ready`
-- `Bug + reproduction-status: confirmed` → `Ready`
-- `Refactor + preservation-status: ready | needs-coverage-first` → `Ready`
-- any `need-info` variant → `needs-human-input`
-- `Bug + reproduction-status: cannot-reproduce` → `needs-human-input`
+- `Feature + design-status: drafted` → `Spec Ready`
+- `Bug + reproduction-status: confirmed` → `Spec Ready`
+- `Refactor + preservation-status: ready | needs-coverage-first` → `Spec Ready`
+- any `need-info` variant → `Needs Attention`
+- `Bug + reproduction-status: cannot-reproduce` → `Needs Attention`
 
 ### Local mirror
 
@@ -425,7 +416,7 @@ Each invocation:
 5. Serial — one issue at a time.
 6. Stop when no eligible issues remain, confirmation is declined, or an unrecoverable environment error blocks all further work.
 
-Per-issue `Ready`, `needs-human-input`, and `draft-pr` are issue terminals, not run terminals. Park the issue and continue.
+Per-issue terminals (`Spec Ready`, `Needs Attention`, `In Review`) are issue-level outcomes, not run-level halts. Park the issue and continue.
 
 ### Worker dispatch
 
@@ -446,9 +437,9 @@ No Linear comments for intermediate regroom passes. Grooming writes local artifa
 
 ### Build path
 
-When a build is approved (`deliver <id>` in human mode, or strict `states.build` eligibility in unattended mode), the controller owns the mechanical path to draft PR: worktree creation, oracle dispatch, implementation dispatch, full validation rerun, frozen-oracle hash verification, `verification/result.md`, commit, push, draft PR creation, and optional Linear transition to `In Review`.
+When a build is approved (`deliver <id>` in human mode, or strict `states.build` eligibility in unattended mode), the controller owns the mechanical path to draft PR: worktree creation, oracle dispatch, implementation dispatch, full validation rerun, frozen-oracle hash verification, `verification/result.md`, commit, push, draft PR creation, and the `In Review` state transition + comment per § Linear policy.
 
-Any failure parks the issue at `needs-human-input`. The controller never opens a PR against a mutated oracle or failed validation.
+Any failure parks the issue in `Needs Attention` (with a comment naming the blocker artifact). The controller never opens a PR against a mutated oracle or failed validation.
 
 Write `verification/result.md` after implementation validation and before any commit/push/PR:
 
@@ -534,11 +525,11 @@ On re-invocation, derive in-flight state from the filesystem and resume unfinish
 
 ## Stop conditions
 
-Per-issue terminal outcomes (deliver):
+Per-issue terminal outcomes (deliver), each mapping to a Linear state per § Linear policy:
 
-1. **`Ready`** — grooming + review succeeded and the spec is build-worthy.
-2. **`needs-human-input`** — the reviewed outcome or build execution hit a typed blocker.
-3. **`draft-pr`** — build + validation succeeded and the controller opened a draft PR.
+1. **`Spec Ready`** — grooming + review succeeded; spec is build-worthy. Awaiting `autoship deliver <id>`.
+2. **`Needs Attention`** — reviewed outcome or build execution hit a typed blocker. Awaiting human resolution.
+3. **`In Review`** — build + validation succeeded; the controller opened a draft PR. Awaiting code review.
 
 Those are **issue terminal states**, not run terminal states.
 
@@ -552,7 +543,7 @@ Per-mode run terminals:
 - audit: reviewed assessment complete and approved issue creation (if configured) complete, or unrecoverable error
 - deliver: no more eligible issues or a global blocker
 
-Anything else: **do not stop**. In deliver mode, park per-issue blockers at `needs-human-input`, respect `Ready` as the human approval boundary, and continue to the next eligible issue.
+Anything else: **do not stop**. In deliver mode, park per-issue blockers in `Needs Attention`, respect `Spec Ready` as the human approval boundary, and continue to the next eligible issue.
 
 ## NEVER STOP posture
 
