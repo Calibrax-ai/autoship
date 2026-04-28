@@ -332,7 +332,7 @@ The resolved contract declares: issue source (`deliver.linear` or `deliver.folde
 - `pr.base_branch`: detected repo default branch
 - `dry_run: false`
 - `max_regroom_cycles: 3`
-- `post: false`
+- `post: true`
 - `unattended: false`
 
 If the resolved contract requests auto-merge, deploy, or broad unattended work from a natural-language prompt, stop — those are later-phase concerns.
@@ -340,7 +340,7 @@ If the resolved contract requests auto-merge, deploy, or broad unattended work f
 Required inputs and blockers:
 
 - Exactly one deliver source must resolve: `deliver.linear` or `deliver.folder`. If neither or both are configured, stop with `needs-human-input` and show the v2 defaults shape.
-- `deliver.linear` requires `team_key` or `team`; `project` is optional; `owner` defaults to `me`; missing `states.groom` defaults to `["Todo"]`; missing `states.build` defaults to `["Building"]`.
+- `deliver.linear` requires `team_key` or `team`; `project` is optional; `owner` defaults to `me`; missing `states.groom` defaults to `["Todo"]`; missing `states.build` defaults to `["Brief Ready"]`.
 - Build phase requires `validation.commands`; if missing, stop before oracle dispatch with a clear blocker asking the operator to add commands to `.autoship/defaults.yaml`.
 - PR creation uses implicit defaults: draft PR, `origin`, and detected repo default branch. If `dry_run` is true, stop before push/PR and write the blocker/result into `verification/result.md`.
 
@@ -440,7 +440,7 @@ Accepted outcomes for each worker are in its agent definition. Any other return 
 
 On REJECTED review: increment regroom count. If within `max_regroom_cycles` (default 3), dispatch deliver-pre-groomer again with the latest review objections. If exceeded, park at `needs-human-input`.
 
-No Linear comments for intermediate regroom passes. Grooming writes local artifacts by default; mirror the final grooming summary to Linear only when `--post` is set.
+No Linear comments for intermediate regroom passes. Grooming writes local artifacts and mirrors the final per-issue handoff to Linear by default (state transition + comment with @mention of the assignee). Pass `--no-post` to keep the run silent on Linear.
 
 ### Build path
 
@@ -503,19 +503,24 @@ created_at: <ISO timestamp>
 
 ### Linear policy
 
-Single writer to Linear. One state transition + one summary comment per milestone:
+Single writer to Linear. State change + one comment with @mention of the assignee per milestone — together they form the human↔agent handoff signal. State change is the kanban-glance baton; comment is the Inbox notification.
 
-| Trigger | Linear state | Comment |
+| Milestone | Set state to | Comment payload |
 |---|---|---|
-| grooming selection | `Grooming` | optional and only when `--post` is set |
-| final reviewed brief | `Ready` | only when `--post` is set: type + status + brief path + "run `autoship deliver <id>` or move to Building if approved" |
-| build start | `Building` | optional, name the branch |
-| draft PR | `In Review` | PR URL + branch + validations passed |
-| `needs-human-input` | `needs-human-input` | reason + next action + artifact path |
+| autoship picks up an issue (groom phase) | `transitions.working` (default `In Progress`) | `Autoship grooming started.` |
+| grooming complete, brief APPROVED | `transitions.brief_ready` (default `Brief Ready`) | `Brief written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/brief.md. Run \`autoship deliver <id>\` to build.` (with @mention of assignee) |
+| grooming hit blocker (`needs-human-input`) | `transitions.blocked` (default `Needs Attention`) | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
+| build starts (`autoship deliver <id>`) | `transitions.working` (default `In Progress`) | `Build started — branch <branch>, worktree <path>.` |
+| draft PR opens | `transitions.pr_open` (default `In Review`) | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
+| build hit blocker | `transitions.blocked` (default `Needs Attention`) | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-The state names above are autoship's vocabulary. Real Linear workspaces often have only the default states (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`). **State transitions are best-effort:** try to set the named state; if it doesn't exist in the workspace, post the comment anyway and skip the state change. Never fail a run because the state mapping is incomplete. The comment is the load-bearing signal; the state change is convenience for humans glancing at the board.
+The default state names assume two states have been created in the Linear workspace beyond the universal `Todo` / `In Progress` / `In Review` set: `Brief Ready` (between Todo and In Progress, type `unstarted`) and `Needs Attention` (parallel column, type `unstarted`). They carry the "your turn — read brief" and "your turn — unblock me" baton signals.
 
-No artifact dumps in Linear. The repo-local mirror is the execution contract. `--post` mirrors summaries and links/paths, not full briefs.
+**State transitions are best-effort:** if a named target state doesn't exist in the workspace, post the comment anyway and skip the state change. Never fail a run because of state-mapping gaps. The comment carries the canonical detail; missing state changes degrade kanban-glance UX but do not break the run.
+
+`--no-post` suppresses both state changes and comments for a fully silent run. Without `--no-post`, every milestone above fires.
+
+No artifact dumps in Linear. The repo-local mirror is the execution contract. Comments carry one-line summaries and links to local paths, not full briefs.
 
 ### Logging
 
