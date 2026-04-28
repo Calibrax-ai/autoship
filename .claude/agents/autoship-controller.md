@@ -465,6 +465,31 @@ On REJECTED review: increment regroom count. If within `max_regroom_cycles` (def
 
 No Linear comments for intermediate regroom passes. Grooming writes local artifacts and mirrors the final per-issue handoff to Linear by default (state transition + comment with @mention of the assignee). Pass `--no-post` to keep the run silent on Linear.
 
+### Grooming batch summary
+
+When a multi-issue grooming batch reaches run-terminal — every selected issue has hit a per-issue terminal (`Spec Ready`, `Needs Attention`, or REJECTED beyond `max_regroom_cycles`) — print a status table to the operator before exiting. This is the operator's read-out of the batch; the controller already has every piece of state on disk, so the summary is just rendering, not a new judgment.
+
+Format:
+
+```
+Grooming complete (N selected).
+
+  FRD-157  Spec Ready        Bug,     reproduction confirmed
+  FRD-158  Needs Attention   Bug,     cannot reproduce
+  FRD-153  Spec Ready        Bug,     reproduction confirmed
+  FRD-122  Spec Ready        Feature, design drafted (2 Assumptions)
+  FRD-121  Spec Ready        Feature, design drafted
+  FRD-120  Needs Attention   regroom limit exceeded (3/3)
+
+Next:
+  - Read each spec at .autoship/issues/<id>/spec.md
+  - Reply `autoship deliver FRD-XXX` to build one (or exit and resume from a fresh terminal)
+```
+
+Columns: issue id, terminal state, type + status enum, optional `(N Assumptions)` annotation when the spec's `Assumptions` section is non-empty. Single-issue runs (`groom <id>`) skip the summary — the per-issue worker return already covers it. The summary fires only when the batch was query/NL-selected and produced multiple terminal outcomes.
+
+After printing, halt cleanly. The session stays open in interactive mode for the operator's next message.
+
 ### Build path
 
 When a build is approved (`deliver <id>` in human mode, or strict `states.build` eligibility in unattended mode), the controller owns the mechanical path to draft PR: worktree creation, oracle dispatch, implementation dispatch, full validation rerun, frozen-oracle hash verification, `verification/result.md`, commit, push, draft PR creation, and the `In Review` state transition + comment per § Linear policy.

@@ -2,7 +2,9 @@
 title: "Deliver"
 ---
 
-**Status:** v0.1 proposal · **Last updated:** 2026-04-27
+**Status:** Operational · **Last updated:** 2026-04-28
+
+> **Implementation status.** The grooming → review → spec, build → oracle → implementation → verification, and draft-PR phases are operational and validated across Bug, Feature, Refactor, and UI-build shapes. Merge, deploy, and outcome verification (the `validate` module) remain future work. Sections labeled "Considered and deferred" are aspirational; everything else describes shipped behavior.
 
 ## In plain English
 
