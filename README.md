@@ -26,7 +26,7 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. This needs two extra states beyond the universal `Todo` / `In Progress` / `In Review` set:
 
-- **Spec Ready** — type `unstarted`, position between `Todo` and `In Progress`. Set when grooming finishes and a reviewed spec is waiting on you to run `autoship deliver <id>`.
+- **Spec Ready** — type `unstarted`, position between `Todo` and `In Progress`. Set when grooming finishes and a reviewed spec is waiting on you to run `autoship deliver <id>`. In automatic remote runs, it is also the manifest phase that lets Autoship continue into build after an approved spec review.
 - **Needs Attention** — type `unstarted`, parallel column. Set when autoship halts on a typed blocker.
 
 Create both manually in your Linear workspace settings (Workflow → States). `autoship init`'s next-steps printout reminds you with the exact names; this is the one piece of setup the CLI can't do for you.
@@ -45,8 +45,10 @@ autoship audit --tracker=linear --approve
 
 autoship "get all Todo issues assigned to me and start grooming"
 autoship groom mine --state Todo --yes # skip confirmation after resolving scope
-autoship groom FRD-162                 # write local spec; mirror milestones to Linear (--no-post for silent)
+autoship groom FRD-162                 # write local spec
+autoship groom FRD-162 --post          # write local spec and mirror summary to Linear
 autoship deliver FRD-162               # approve current spec and build one issue
+autoship deliver FRD-162 --unattended --auto --post
 autoship deliver build FRD-162 --dry-run
 ```
 
@@ -85,17 +87,20 @@ Groom/deliver auto-configures itself from repo evidence — autoship infers sour
 
 ```bash
 autoship "get all Todo issues assigned to me and start grooming"  # preview, groom locally
-autoship groom FRD-162                                            # write .autoship/issues/<id>/spec.md, mirror to Linear
-autoship groom FRD-162 --no-post                                  # local-only, no Linear writes
+autoship groom FRD-162                                            # write .autoship/issues/<id>/spec.md locally
+autoship groom FRD-162 --post                                     # opt into Linear mirroring
 autoship deliver FRD-162                                          # approve current spec and build one issue
+autoship deliver FRD-162 --unattended --auto --post               # remote-style automatic: groom then build if safe
 autoship deliver build FRD-162 --dry-run                          # plan, no push/PR
 ```
 
-The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local specs under `.autoship/issues/<id>/`. Each deliver milestone (groom-start, spec-ready, build-start, PR-open, blocker) fires a Linear state change + a comment with @mention to the assignee — `--post` is on by default; pass `--no-post` for a fully silent run.
+The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local specs under `.autoship/issues/<id>/`. Local runs are local-first; pass `--post` to mirror concise milestone summaries and best-effort Linear state changes. Remote runners may pass `--post` as policy.
+
+In automatic mode, Autoship uses the draft PR branch as the durable work envelope: grooming commits `spec.md`, the latest review, and `manifest.json`, opens or updates a spec-first draft PR, then continues into oracle/build only when the reviewed spec is build-worthy. If the spec needs clarification, Autoship parks the issue in `Needs Attention` and does not dispatch build workers.
 
 Per-repo overrides live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies. By default, query/batch runs proceed immediately after the preview; set `deliver.confirm: true` per-repo to require a `[y/N]` pause, or use the per-run `--yes` flag as the one-shot opposite.
 
-`autoship deliver --unattended` keeps strict config-as-truth behavior (no inference, no announce affordance) — use it for machine-driven runs where there's no human to interrupt.
+`autoship deliver --unattended` keeps strict config-as-truth behavior (no inference, no announce affordance). Add `--auto` only when the remote trigger should run grooming and, if review approves the spec, continue directly into build.
 
 Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, `.autoship/standards.yaml`, and runtime inference.
 

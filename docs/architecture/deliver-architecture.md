@@ -17,7 +17,7 @@ Asking an AI to *"just implement the ticket"* tends to produce code that looks r
 - A **spec** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the spec is weak, work doesn't start.
 - A **draft pull request** with the code change, the tests, and the evidence that the change actually works.
 
-When grooming finishes, autoship parks the issue in `Spec Ready` and hands the baton back to the human. The human runs `autoship deliver <id>` only when the spec is trustworthy. Everything past that point runs until the draft PR is ready for human review (`In Review`).
+In supervised mode, grooming parks the issue in `Spec Ready` and hands the baton back to the human. The human runs `autoship deliver <id>` only when the spec is trustworthy. In automatic remote mode, the same reviewed spec boundary exists, but `--auto` lets Autoship continue into build without a human pause when the reviewer approves the spec. Any blocker lands in `Needs Attention`.
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
 >
@@ -42,13 +42,13 @@ The goal of `deliver` is not to reverse-engineer the whole product again. The go
 
 `deliver` is the **delivery-layer** module, not the whole future product workflow. Upstream concerns like intent capture, enrichment, prioritization, and decomposition may exist elsewhere in autoship later. For now, they appear only in the limited ways needed to produce a trustworthy change spec and move an approved work item toward build.
 
-At the broader product level, those are better treated as **concerns** than one rigid global pipeline. Enrichment can recur during grooming, regroom, and later verification. Decomposition can happen during grooming or before a work item enters `deliver`. `deliver` itself remains a **small explicit local workflow**.
+At the broader product level, those are better treated as **concerns** than one rigid global pipeline. Enrichment can recur during grooming, regroom, and later verification. Decomposition can happen during grooming or before a work item enters `deliver`. `deliver` itself remains a **small explicit workflow**.
 
 Operator experience should stay pragmatic. A tracker like Linear is the likely **outer workflow surface** for humans: status, comments, lineage, priority, and linked issues. Repo-local artifacts remain the **inner execution contract** for agents — they version with code, freeze review inputs, and keep the machine-facing spec, test suite, and evidence stable.
 
 ### What deliver owns
 
-Deliver zooms into the operational middle of the [system end-to-end flow](/architecture/system-overview/#end-to-end-flow): from an approved issue to a reviewed draft pull request. The shape is two generator-evaluator pairs with a human approval boundary between them.
+Deliver zooms into the operational middle of the [system end-to-end flow](/architecture/system-overview/#end-to-end-flow): from an approved issue to a reviewed draft pull request. The shape is two generator-evaluator pairs with an explicit spec approval boundary between them. That approval can be a human action in supervised mode or an explicit `--auto` run policy plus reviewer APPROVED verdict in remote automatic mode.
 
 ```mermaid
 flowchart LR
@@ -61,7 +61,7 @@ flowchart LR
       PG --> BR
     end
 
-    HA["Human approves<br/>Spec Ready → autoship deliver"]
+    HA["Approval boundary<br/>Spec Ready → deliver or --auto"]
 
     subgraph BUILD ["Build · oracle frozen"]
       direction TB
@@ -142,23 +142,24 @@ The inner filesystem state machine is the agents' source of truth. The outer Lin
 
 Two operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
 
-- **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. Signals "spec is written and reviewed; your turn to approve and run `autoship deliver <id>`."
+- **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. In supervised mode, signals "spec is written and reviewed; your turn to approve and run `autoship deliver <id>`." In automatic mode, records that the reviewed spec boundary was satisfied.
 - **`Needs Attention`** — type `unstarted`, parallel column. Signals "autoship halted on a typed blocker; your turn to unblock."
 
-The controller is the single writer to Linear. At each milestone it fires both a state change and a comment with @mention of the assignee — the state change is the kanban-glance baton, the comment is the Inbox notification. The canonical transition table:
+The controller is the single writer to Linear when posting is enabled. At each posted milestone it fires both a best-effort state change and a comment with @mention of the assignee — the state change is the kanban-glance baton, the comment is the Inbox notification. The canonical transition table:
 
 | Milestone | Linear state | Comment payload |
 |---|---|---|
 | autoship picks up an issue (groom phase) | `In Progress` | `Autoship grooming started.` |
 | grooming complete, spec APPROVED | `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
+| automatic spec PR opens | `Spec Ready` | `Spec PR ready: <url>. Autoship will continue automatically only because \`--auto\` was explicitly requested.` |
 | grooming hit blocker (`needs-human-input`) | `Needs Attention` | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 | build starts (`autoship deliver <id>`) | `In Progress` | `Build started — branch <branch>, worktree <path>.` |
 | draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
 | build hit blocker | `Needs Attention` | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-State names are configurable via `transitions.{working,spec_ready,blocked,pr_open}` in `.autoship/defaults.yaml`. Defaults assume the two new states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror is the execution contract — comments carry one-line summaries and links to local paths, not full specs.
+State names are configurable via `transitions.{working,spec_ready,blocked,pr_open}` in `.autoship/defaults.yaml`. Defaults assume the two new states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
 
-`--no-post` (or `deliver.post: false`) suppresses both state changes and comments for a fully silent run. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
+Local runs are local-first. `--post` opts into Linear comments and best-effort state transitions; remote runners may pass `--post` as policy. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
 
 ### Per-type grooming flow
 
@@ -605,10 +606,11 @@ Extends the same generator-evaluator pattern validated in the archived extract r
 
 The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
-- grooming path: human prompt/query → preview → pre-groom → spec review → regroom → local spec parked at `Spec Ready` (or `Needs Attention` on blocker). Preview is informational by default; per-repo `deliver.confirm: true` turns it into a `[y/N]` boundary.
-- build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
+- supervised grooming path: human prompt/query → preview → pre-groom → spec review → regroom → local spec parked at `Spec Ready` (or `Needs Attention` on blocker). Preview is informational by default; per-repo `deliver.confirm: true` turns it into a `[y/N]` boundary.
+- supervised build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
+- automatic path: `autoship deliver <id> --unattended --auto` → groom/review → commit spec ledger + `manifest.json` to the issue branch → open/update a spec-first draft PR → continue to build only when the reviewed spec is build-worthy
 
-Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
+Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, `--auto`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
 The controller reads two distinct instruction layers:
 
@@ -616,7 +618,7 @@ The controller reads two distinct instruction layers:
   Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself. Also hosts § How I Receive Work, which defines the RunRequest contract and configuration precedence.
 
 - **RunRequest** (in-memory per run, snapshotted to `<run-dir>/run.json`)
-  Run-scoped contract: which repo/testbed to operate on, which issue source to pull from (`deliver.linear` or `deliver.folder`), which states are eligible for grooming vs build, whether the run is unattended, whether Linear mirroring is enabled, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → **runtime inference from repo evidence** (`linear auth list`, `package.json`, `Makefile`, etc.) → framework defaults. Inference fires only when the higher-precedence layers do not set the field; each fired inference writes to `inferences.jsonl`. `defaults.yaml` is therefore **optional override** rather than required setup.
+  Run-scoped contract: which repo/testbed to operate on, which issue source to pull from (`deliver.linear` or `deliver.folder`), which states are eligible for grooming vs build, whether the run is unattended, whether automatic groom-then-build is authorized, whether Linear mirroring is enabled, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → **runtime inference from repo evidence** (`linear auth list`, `package.json`, `Makefile`, etc.) → framework defaults. Inference fires only when the higher-precedence layers do not set the field; each fired inference writes to `inferences.jsonl`. `defaults.yaml` is therefore **optional override** rather than required setup.
 
 This split keeps stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy. (The framework knowledge previously lived in a separate `autoship-controller` skill; it was folded into the agent file on 2026-04-24 because the skill had a single reader and the split was creating drift between two files. Historical note: the trigger contract was originally a committed `.autoship/program.md` file; current deliver does not read it and uses flag/NL triggers instead.)
 
@@ -654,7 +656,7 @@ The core handoff boundaries should stay explicit:
 
 3. **Approval boundary**
    In supervised mode, a human promotes work out of `Spec Ready` by running `autoship deliver <id>`; the controller transitions the issue to `In Progress` and dispatches the build half.
-   In unattended mode, the controller advances eligible issues automatically from configured `states.build`, but only until a typed blocker forces `needs-human-input` (and the issue lands in `Needs Attention`).
+   In automatic mode, `--auto` plus an APPROVED spec review is the explicit authorization to continue into build for one issue. In unattended build-only mode, the controller advances eligible issues from configured `states.build`. Both stop at `Needs Attention` on any typed blocker.
 
 4. **Agent -> review**
    After build/validation/PR creation, the agent hands off again at review/merge boundaries.
@@ -676,12 +678,13 @@ Current implemented runtime:
 - pre-groom
 - spec review
 - regroom up to limit
-- park at `Spec Ready` (or `Needs Attention` on blocker)
-- after explicit `autoship deliver <id>` approval or strict build-state eligibility: controller transitions to `In Progress`, creates worktree + branch
+- park at `Spec Ready` (or `Needs Attention` on blocker), or in automatic mode commit the spec ledger and open/update a spec-first draft PR
+- write `manifest.json` for PR-envelope runs so later phases can verify issue, phase, base SHA, branch/PR, and artifact hashes
+- after explicit `autoship deliver <id>` approval, strict build-state eligibility, or approved `--auto` spec review: controller transitions to `In Progress`, creates worktree + branch
 - oracle result
 - implementation result
 - controller reruns validation
-- controller commits, pushes, and opens a draft PR
+- controller commits, pushes, and opens or updates the draft PR
 - issue moves to `In Review`
 
 Explicitly not yet implemented in the current runtime:
@@ -789,9 +792,9 @@ Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) 
 
 Each graduates to a richer shape when observed need justifies it.
 
-- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → spec parked at `Spec Ready` (or `Needs Attention` on blocker), then after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree → oracle → implementation → verification → draft PR → `In Review`.
+- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → spec parked at `Spec Ready` (or `Needs Attention` on blocker). Automatic mode may commit the spec ledger and open a spec-first draft PR before build. After explicit `autoship deliver <id>` approval, strict build-state eligibility, or approved `--auto` spec review: worktree → oracle → implementation → verification → draft PR update → `In Review`.
 - **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The spec schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-spec-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The spec-specific reviewer checks live in `deliver-grooming/references/spec-review-rubric.md`.
-- **State derived from filesystem.** `spec.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. No `state.json`.
+- **State derived from artifacts.** `spec.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. Remote automatic runs also write `manifest.json` as a machine-readable ledger with legal phases `grooming`, `spec_ready`, `needs_attention`, `building`, and `in_review`.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
 - **Reproduction outcome is a spec field, not a separate artifact.** A bug that cannot be reproduced is a `spec.md` with `reproduction-status: cannot-reproduce`; the reviewer's groundedness check flags it.
 - **Non-functional type deferred.** Only Bug, Feature, and Refactor are designed; Non-functional grooming is implemented when probe-0.2+ has real data to inform it.

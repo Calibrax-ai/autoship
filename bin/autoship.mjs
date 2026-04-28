@@ -31,6 +31,7 @@ Examples:
   autoship groom mine --state Todo --yes   # batch groom after explicit confirmation skip
   autoship groom FRD-162 --post            # groom locally, then mirror summary to Linear
   autoship deliver FRD-162                 # approve current spec and build one issue
+  autoship deliver FRD-162 --unattended --auto --post
   autoship deliver build FRD-162 --dry-run # plan/build path, no push/PR
 
 Docs: https://github.com/Calibrax-ai/autoship
