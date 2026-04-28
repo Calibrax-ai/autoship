@@ -187,11 +187,12 @@ function formatYAMLValue(value) {
 // ---- Wizard ----
 //
 // Interactive setup that runs at install time when stdin is a TTY. Collects
-// the minimum answers needed to write a populated defaults.yaml: issue source,
-// Linear team/project scope, default owner/states, and validation command. When
-// Linear is selected, drives the `linear` CLI live to discover real teams and
-// projects so the operator picks from real options instead of typing strings
-// that might not exist.
+// optional overrides for the values autoship would otherwise infer at runtime
+// (source, Linear scope, validation command). Every answer is optional — the
+// runtime controller infers source from `linear auth list` + filesystem state,
+// scope from `linear team list`, and validation from package.json scripts /
+// Makefile / pyproject.toml. The wizard exists to let operators lock down
+// explicit choices when they don't want inference.
 //
 // Skips entirely in CI / non-TTY contexts (init.mjs entry point checks isTTY);
 // falls back to manual entry when Linear CLI is missing or not authed.
@@ -200,16 +201,18 @@ async function runWizard(cwd) {
 	const inferences = inferStandards(cwd);
 	const detected = describeDetectedStack(inferences);
 	console.log(`Detecting repo evidence... ${detected || '(no specific framework markers)'}\n`);
+	console.log('autoship infers source, scope, and validation at runtime. This wizard');
+	console.log('is for explicit overrides — skip any answer to let autoship infer.\n');
 
 	// Tracker choice.
 	const tracker = await select({
-		message: 'Issue tracker?',
+		message: 'Issue tracker (lock down a source override, or skip to let autoship infer)?',
 		choices: [
-			{ name: 'Linear  (drives the `linear` CLI to discover teams + projects)', value: 'linear' },
+			{ name: 'Linear  (lock to Linear; drives the `linear` CLI to discover teams + projects)', value: 'linear' },
 			{ name: 'Local folder  (.autoship/issues/<id>/issue.md)', value: 'folder' },
-			{ name: 'Skip — configure later', value: 'skip' },
+			{ name: 'Skip — autoship infers at runtime', value: 'skip' },
 		],
-		default: 'folder',
+		default: 'skip',
 	});
 
 	let linear = null;
@@ -217,7 +220,9 @@ async function runWizard(cwd) {
 		linear = await collectLinearAnswers();
 	}
 
-	// Validation command — autoship runs this after each implementation.
+	// Validation command override — autoship infers from package.json/Makefile/etc.
+	// at runtime. This wizard step exists to lock down a specific gate when the
+	// operator wants something other than the inferred default.
 	let validation = null;
 	if (tracker !== 'skip') {
 		console.log('');
@@ -226,9 +231,12 @@ async function runWizard(cwd) {
 		if (scripts.length) {
 			console.log(`Detected scripts in package.json: ${scripts.join(', ')}`);
 		}
+		if (suggestion) {
+			console.log(`At runtime autoship would infer: ${suggestion}`);
+		}
 		validation = await input({
-			message: 'Validation command (autoship runs this after each implementation):',
-			default: suggestion || '',
+			message: 'Validation command override (leave blank to let autoship infer):',
+			default: '',
 		});
 		validation = validation.trim() || null;
 	}
@@ -389,7 +397,7 @@ function printNextSteps(answers) {
 	lines.push('  1. Review .autoship/standards.yaml. Inferred fields carry `# inferred from <evidence>` comments; SET_ME fields are your call. Edit directly — autoship does not modify it once it exists. Re-run `autoship init` later for an advisory if repo evidence has changed.');
 
 	if (!answers || answers.tracker === 'skip') {
-		lines.push('  2. (Optional) Open .autoship/defaults.yaml and uncomment the sections that match your setup — Linear or folder source, states, and validation command. Flags on the invocation always win.');
+		lines.push('  2. defaults.yaml is empty — autoship will infer source, scope, and validation at runtime from repo evidence. Each inference is announced at run start and logged to .autoship/runs/<run-id>/inferences.jsonl. Edit defaults.yaml only if you want to lock down explicit overrides.');
 	}
 
 	if (answers && answers.tracker === 'linear') {
@@ -491,12 +499,18 @@ function renderDefaults(answers = null) {
 }
 
 function renderDefaultsTemplate() {
-	return `# autoship defaults.yaml — optional per-repo sticky run defaults
-# Uncomment and fill in values you want autoship to assume when you don't
-# pass them as flags. Flags on the invocation always win. --report-only
-# and --tracker=none are always respected even if defaults say otherwise.
+	return `# autoship defaults.yaml — optional per-repo overrides.
 #
-# Safety note: keep create_issues: false unless you actually want every
+# autoship infers source, scope, and validation from repo evidence at runtime.
+# This file is for *overrides* — fields you want to lock down so autoship does
+# not infer them. Every block below is commented out by default; uncomment and
+# fill in only the fields you want to override.
+#
+# Flags on the invocation always win. --report-only and --tracker=none are
+# always respected even if defaults say otherwise. Each runtime inference is
+# announced at run start and logged to .autoship/runs/<run-id>/inferences.jsonl.
+#
+# Safety note: keep audit.create_issues: false unless you actually want every
 # audit run to write into the tracker. Use --approve to opt in per-run.
 
 # audit:
@@ -505,15 +519,17 @@ function renderDefaultsTemplate() {
 #   external_exposure: false   # override per-run with --external-url=<url>
 
 # deliver:
-#   # Set to false to skip the "Proceed? [y/N]" prompt on query/batch runs.
-#   # The preview is still shown — autoship just doesn't pause for input.
-#   # The per-run --yes flag has the same effect for one run.
-#   confirm: true
+#   # Set to true to make query/batch runs pause at the preview for [y/N]
+#   # confirmation. Default is false — preview is informational, run starts
+#   # immediately. The per-run --yes flag forces this off for one run.
+#   confirm: false
 #
-#   # Pick exactly one source block: folder OR linear.
-#   folder:
-#     path: .autoship/issues
-#
+#   # Source override. Skip both blocks to let autoship infer from
+#   # \`linear auth list\` + .autoship/issues/ filesystem state.
+#   #
+#   # folder:
+#   #   path: .autoship/issues
+#   #
 #   # linear:
 #   #   team: "Delivery"
 #   #   team_key: "DEL"          # Linear short key, used by the linear CLI
@@ -530,18 +546,26 @@ function renderDefaultsTemplate() {
 #   #     blocked: "Needs Attention"  # autoship halted, awaiting human unblock
 #   #     pr_open: "In Review"        # draft PR opened, awaiting code review
 #
-#   validation:
-#     commands:
-#       - "bun test"
+#   # Validation gate override. Skip to let autoship infer from package.json
+#   # scripts (test/check/validate), Makefile targets, pyproject.toml, or
+#   # Cargo.toml. The inferred gate is baseline-tested before any build run.
+#   #
+#   # validation:
+#   #   commands:
+#   #     - "bun test"
 `;
 }
 
 function renderDefaultsConfigured(answers) {
 	const lines = [];
-	lines.push('# autoship defaults.yaml — per-repo sticky run defaults.');
+	lines.push('# autoship defaults.yaml — per-repo overrides.');
 	lines.push("# Generated by `autoship init`. Edit freely — autoship does not modify");
 	lines.push('# this file once it exists. Flags on the invocation always win;');
 	lines.push('# --report-only and --tracker=none override audit stickies.');
+	lines.push('#');
+	lines.push('# autoship infers source, scope, and validation at runtime when not');
+	lines.push('# overridden here. Each inference is announced at run start and logged to');
+	lines.push('# .autoship/runs/<run-id>/inferences.jsonl.');
 	lines.push('#');
 	lines.push('# Safety note: keep audit.create_issues: false unless you actually want');
 	lines.push('# every audit run to write into the tracker. Use --approve per-run instead.');
@@ -558,10 +582,9 @@ function renderDefaultsConfigured(answers) {
 	const deliverSource = answers.tracker === 'skip' ? null : answers.tracker;
 	if (deliverSource) {
 		lines.push('deliver:');
-		lines.push('  # Set to false to skip the "Proceed? [y/N]" prompt on query/batch runs.');
-		lines.push('  # The preview is still shown; autoship just does not pause for input.');
-		lines.push('  # The per-run --yes flag has the same effect for one run.');
-		lines.push('  confirm: true');
+		lines.push('  # Uncomment to make query/batch runs pause at the preview for [y/N].');
+		lines.push('  # Default behavior is to proceed immediately after the preview.');
+		lines.push('  # confirm: true');
 		lines.push('');
 		if (deliverSource === 'linear' && answers.linear) {
 			lines.push('  linear:');
@@ -588,20 +611,19 @@ function renderDefaultsConfigured(answers) {
 			lines.push('  folder:');
 			lines.push('    path: .autoship/issues');
 		}
-		lines.push('  validation:');
-		lines.push('    commands:');
+		// Validation block: only write when operator explicitly chose an override
+		// during the wizard. Empty means "let autoship infer at runtime".
 		if (answers.validation) {
+			lines.push('  validation:');
+			lines.push('    commands:');
 			lines.push(`      - ${quote(answers.validation)}`);
 		} else {
-			lines.push("      # - \"bun test\"  # set this before running deliver");
+			lines.push('  # Validation gate left to runtime inference (package.json scripts,');
+			lines.push('  # Makefile, pyproject.toml, Cargo.toml). Uncomment to override:');
+			lines.push('  # validation:');
+			lines.push('  #   commands:');
+			lines.push('  #     - "bun test"');
 		}
-	} else {
-		lines.push('# deliver:');
-		lines.push('#   folder:');
-		lines.push('#     path: .autoship/issues');
-		lines.push('#   validation:');
-		lines.push('#     commands:');
-		lines.push('#       - "bun test"');
 	}
 	lines.push('');
 
