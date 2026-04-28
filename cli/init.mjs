@@ -29,7 +29,7 @@ const CORE_AGENTS = [
 	'audit-auditor.md',
 	'audit-reviewer.md',
 	'deliver-pre-groomer.md',
-	'deliver-brief-reviewer.md',
+	'deliver-spec-reviewer.md',
 	'deliver-oracle-writer.md',
 	'deliver-implementation.md',
 ];
@@ -293,7 +293,7 @@ async function collectLinearAnswers() {
 	console.log('\nLinear work selection defaults:');
 	console.log('  owner: me');
 	console.log('  groom states: Todo');
-	console.log('  build states: Brief Ready  (create this state in Linear — see Done section)\n');
+	console.log('  build states: Spec Ready  (create this state in Linear — see Done section)\n');
 
 	return {
 		team: teamName,
@@ -302,7 +302,7 @@ async function collectLinearAnswers() {
 		owner: 'me',
 		states: {
 			groom: ['Todo'],
-			build: ['Brief Ready'],
+			build: ['Spec Ready'],
 		},
 	};
 }
@@ -312,7 +312,7 @@ async function collectLinearAnswersManual() {
 	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by linear CLI):' })).trim();
 	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
 
-	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, build=Brief Ready.\n');
+	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, build=Spec Ready.\n');
 
 	return {
 		team,
@@ -321,7 +321,7 @@ async function collectLinearAnswersManual() {
 		owner: 'me',
 		states: {
 			groom: ['Todo'],
-			build: ['Brief Ready'],
+			build: ['Spec Ready'],
 		},
 	};
 }
@@ -394,12 +394,12 @@ function printNextSteps(answers) {
 
 	if (answers && answers.tracker === 'linear') {
 		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
-		const buildStates = (answers.linear?.states?.build || ['Brief Ready']).join(' / ');
+		const buildStates = (answers.linear?.states?.build || ['Spec Ready']).join(' / ');
 		lines.push(`  2. In Linear, create two new workflow states (Settings → Workflow → Add status):`);
-		lines.push(`       • "Brief Ready"     (type: unstarted, position between Todo and In Progress)`);
+		lines.push(`       • "Spec Ready"      (type: unstarted, position between Todo and In Progress)`);
 		lines.push(`       • "Needs Attention" (type: unstarted, parallel column)`);
 		lines.push(`     These carry the "your turn" baton: autoship moves issues into them when grooming completes or a blocker fires.`);
-		lines.push(`  3. Assign issues to yourself and put them in ${groomStates} when ready for autoship to groom. ${buildStates} is the build-eligible state autoship transitions to after the brief is reviewed.`);
+		lines.push(`  3. Assign issues to yourself and put them in ${groomStates} when ready for autoship to groom. ${buildStates} is the build-eligible state autoship transitions to after the spec is reviewed.`);
 	}
 
 	lines.push('');
@@ -408,10 +408,10 @@ function printNextSteps(answers) {
 	lines.push('       autoship audit --report-only      # zero-config, no tracker writes');
 	if (answers && answers.tracker === 'linear') {
 		lines.push('       autoship "get all Todo issues assigned to me and start grooming"');
-		lines.push('       autoship deliver FRD-162          # approve the brief and build one issue');
+		lines.push('       autoship deliver FRD-162          # approve the spec and build one issue');
 	} else if (answers && answers.tracker === 'folder') {
-		lines.push('       autoship groom FRD-162            # writes .autoship/issues/<id>/brief.md');
-		lines.push('       autoship deliver FRD-162          # approve the brief and build one issue');
+		lines.push('       autoship groom FRD-162            # writes .autoship/issues/<id>/spec.md');
+		lines.push('       autoship deliver FRD-162          # approve the spec and build one issue');
 	}
 	lines.push('       autoship interactive              # open a chat session with the controller');
 	lines.push('');
@@ -517,11 +517,11 @@ function renderDefaultsTemplate() {
 #   #   states:
 #   #     # Eligibility (which Linear states autoship picks up from)
 #   #     groom: ["Todo"]
-#   #     build: ["Brief Ready"]
+#   #     build: ["Spec Ready"]
 #   #     # Transitions (which states autoship sets at handoffs)
 #   #     # State changes are best-effort: missing target states fall back to comment-only.
 #   #     working: "In Progress"      # autoship has the baton (grooming or building)
-#   #     brief_ready: "Brief Ready"  # grooming complete, awaiting human approval
+#   #     spec_ready: "Spec Ready"    # grooming complete, awaiting human approval
 #   #     blocked: "Needs Attention"  # autoship halted, awaiting human unblock
 #   #     pr_open: "In Review"        # draft PR opened, awaiting code review
 #
@@ -566,12 +566,12 @@ function renderDefaultsConfigured(answers) {
 			lines.push('    states:');
 			lines.push('      # Eligibility (which Linear states autoship picks up from)');
 			lines.push(`      groom: [${(answers.linear.states?.groom || ['Todo']).map(quote).join(', ')}]`);
-			lines.push(`      build: [${(answers.linear.states?.build || ['Brief Ready']).map(quote).join(', ')}]`);
+			lines.push(`      build: [${(answers.linear.states?.build || ['Spec Ready']).map(quote).join(', ')}]`);
 			lines.push('      # Transitions (which states autoship sets at handoffs).');
 			lines.push('      # Best-effort — if a target state does not exist in the workspace,');
 			lines.push('      # autoship falls back to comment-only at that handoff.');
 			lines.push('      working: "In Progress"      # autoship has the baton (grooming or building)');
-			lines.push('      brief_ready: "Brief Ready"  # grooming complete, awaiting human approval');
+			lines.push('      spec_ready: "Spec Ready"    # grooming complete, awaiting human approval');
 			lines.push('      blocked: "Needs Attention"  # autoship halted, awaiting human unblock');
 			lines.push('      pr_open: "In Review"        # draft PR opened, awaiting code review');
 		} else {

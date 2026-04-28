@@ -15,7 +15,7 @@ The rest of this page unpacks where those findings came from, which probes stres
 ## Where to look next
 
 - [Archived extract learnings](/archive/extract/extract-learnings/) — findings from the retired prototype-reconstruction research track
-- [Deliver learnings](/deliver-learnings/) — findings from the existing-project track (grooming, brief review, issue-driven delivery)
+- [Deliver learnings](/deliver-learnings/) — findings from the existing-project track (grooming, spec review, issue-driven delivery)
 
 This page carries findings that still generalize to live autoship. Per-track detail and probe-by-probe chronology live in the files above.
 
@@ -29,39 +29,39 @@ Probes are not benchmarks. They're where we go looking for failure modes, so the
 
 | Track | Probes | Main question | Current answer |
 |---|---|---|---|
-| `deliver` | 0.1 → 0.5 | Can autoship turn a real issue into a trustworthy brief and a reviewed change? | Yes across Bug, Feature, Refactor, and UI-build shapes. UI build validated end-to-end on FRD-162 — all 12 Playwright tests green on first run, zero test mutations. Cross-repo generalization and outcome verification still open. |
+| `deliver` | 0.1 → 0.5 | Can autoship turn a real issue into a trustworthy spec and a reviewed change? | Yes across Bug, Feature, Refactor, and UI-build shapes. UI build validated end-to-end on FRD-162 — all 12 Playwright tests green on first run, zero test mutations. Cross-repo generalization and outcome verification still open. |
 | `extract` | 0 → 2.5 | Can autoship reconstruct intent from a prototype and build against it reliably? | Retired from the live product, but its generator-evaluator lessons remain useful. Details are archived. |
 
 ---
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here.
 >
-> **Key terms used below.** **Artifacts** — the bundle of outputs from grooming or audit (brief, findings, tests, evidence). **Oracle** — the generated test suite that judges whether code matches the spec. **Brief** — the plain-English plan for a single change. **Oracle writer / implementation executor** — two separate agent sessions: one writes the oracle, the other writes the code and cannot edit the oracle.
+> **Key terms used below.** **Artifacts** — the bundle of outputs from grooming or audit (spec, findings, tests, evidence). **Oracle** — the generated test suite that judges whether code matches the spec. **Spec** — the plain-English plan for a single change. **Oracle writer / implementation executor** — two separate agent sessions: one writes the oracle, the other writes the code and cannot edit the oracle.
 
 ## The pipeline works when artifacts are strong
 
 The system thesis still holds: the hard problem is not raw code generation, it is artifact quality.
 
 - In historical `extract`, demo -> reverse spec -> oracle -> build converged when the spec pack and oracle were strong enough.
-- In `deliver`, issue -> brief -> oracle -> build also converges on at least one clean issue when the brief is trustworthy.
+- In `deliver`, issue -> spec -> oracle -> build also converges on at least one clean issue when the spec is trustworthy.
 
 The implementation agent is usually not the ceiling. The ceiling is the quality of the contract it is asked to satisfy.
 
-## The oracle or brief is the real bottleneck
+## The oracle or spec is the real bottleneck
 
 Both tracks show the same pattern:
 
 - weak oracle -> "tests pass" instead of "product works"
-- weak brief -> downstream stages would optimize for an underspecified change
+- weak spec -> downstream stages would optimize for an underspecified change
 
 In historical `extract`, this showed up as Goodhart's Law at the oracle layer: the executor optimized for exactly what the tests measured and ignored what they did not.
 
-In `deliver`, the same pattern appears one layer earlier: the downstream builder can only be as trustworthy as the approved brief and frozen oracle it receives.
+In `deliver`, the same pattern appears one layer earlier: the downstream builder can only be as trustworthy as the approved spec and frozen oracle it receives.
 
 **Implication:** the load-bearing document is the executable contract:
 
 - historical `extract`: oracle + slice plan
-- `deliver`: approved brief + frozen oracle
+- `deliver`: approved spec + frozen oracle
 
 ## Generator-evaluator separation is a structural fix, not a local trick
 
@@ -79,7 +79,7 @@ The fix is structural:
 Validated at three layers now:
 
 - historical `extract`: plan-reviewer in probe-2.5 — planning layer
-- `deliver`: brief-reviewer in probe-0.1 — grooming layer
+- `deliver`: spec-reviewer in probe-0.1 — grooming layer
 - `deliver`: frozen oracle in probe-0.3 — preservation-proof layer. The author-judge separation here is reflected in artifacts rather than agents: the oracle writer writes the invariants, and the implementation executor is forbidden from modifying them. Test mutation becomes the signal. On a Refactor where the executor had full opportunity to weaken tests to shortcut the structural change, it did not — because the separation made that move visible.
 
 This pattern should be the default answer whenever a stage starts confidently approving mediocre output or shortcutting its own checks.

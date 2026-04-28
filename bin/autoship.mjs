@@ -14,7 +14,7 @@ Usage:
   autoship init --no-interactive       Skip the wizard; writes the commented template
   autoship "<prompt>"                  Run a natural-language request through the controller
   autoship audit [args...]             Run audit via the controller (interactive — output streams)
-  autoship groom [scope...]            Groom issues and write local briefs
+  autoship groom [scope...]            Groom issues and write local specs
   autoship deliver [args...]           Run deliver via the controller (interactive — output streams)
   autoship interactive                 Open an interactive controller chat with no starting prompt
 
@@ -30,7 +30,7 @@ Examples:
   autoship audit --report-only --print     # headless: print final response only
   autoship groom mine --state Todo --yes   # batch groom after explicit confirmation skip
   autoship groom FRD-162 --post            # groom locally, then mirror summary to Linear
-  autoship deliver FRD-162                 # approve current brief and build one issue
+  autoship deliver FRD-162                 # approve current spec and build one issue
   autoship deliver build FRD-162 --dry-run # plan/build path, no push/PR
 
 Docs: https://github.com/Calibrax-ai/autoship

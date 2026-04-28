@@ -15,9 +15,9 @@ Extract has been retired from the live product. Its old implementation and resea
 The controller handles three runtime modes: `audit`, `groom`, `deliver`. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
 
 - **`audit`** — `autoship audit --report-only` or `autoship audit --tracker=linear --approve`
-- **`groom`** — `autoship groom FRD-162` or `autoship "get all Todo issues assigned to me and start grooming"`. Writes briefs locally under `.autoship/issues/<id>/`; `--post` mirrors the final summary to Linear.
-- **`deliver`** — `autoship deliver FRD-162` (the explicit human approval that promotes a reviewed brief into build), `autoship deliver FRD-162 --dry-run` (plan, no push/PR), `autoship deliver --unattended` (strict machine mode: only operates on issues in `states.build`, refuses fuzzy NL scope).
-- **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-brief-reviewer` directly when you only need a brief and review.
+- **`groom`** — `autoship groom FRD-162` or `autoship "get all Todo issues assigned to me and start grooming"`. Writes specs locally under `.autoship/issues/<id>/`; `--post` mirrors the final summary to Linear.
+- **`deliver`** — `autoship deliver FRD-162` (the explicit human approval that promotes a reviewed spec into build), `autoship deliver FRD-162 --dry-run` (plan, no push/PR), `autoship deliver --unattended` (strict machine mode: only operates on issues in `states.build`, refuses fuzzy NL scope).
+- **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-spec-reviewer` directly when you only need a spec and review.
 
 Important boundaries:
 
@@ -33,10 +33,10 @@ Important boundaries:
 - `cli/infer-standards.mjs` — heuristic inference of standards.yaml fields from repo evidence (used by both `init` and `standards`).
 - `.claude/agents/autoship-controller.md` — controller for audit, groom, and deliver.
 - `.claude/agents/audit-auditor.md`, `.claude/agents/audit-reviewer.md` — generator-evaluator pair for readiness assessment and issue-candidate review.
-- `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-brief-reviewer.md` — generator-evaluator pair for issue grooming.
+- `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-spec-reviewer.md` — generator-evaluator pair for issue grooming.
 - `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-implementation.md` — frozen-oracle and implementation workers for deliver.
 - `.claude/skills/autoship-audit/` — audit protocol, assessment template, review rubric, and safe external exposure reference.
-- `.claude/skills/deliver-grooming/` — deliver brief schema and review rubric.
+- `.claude/skills/deliver-grooming/` — deliver spec schema and review rubric.
 - `.claude/skills/reviewing/` — shared reviewer discipline.
 - `.claude/skills/blocker-escalation/` — blocker report template, category enum, and lint script.
 - `docs/architecture/audit-architecture.md` — audit lifecycle and handoff boundary.
@@ -52,14 +52,14 @@ Important boundaries:
 Autoship keeps a clear split between outer workflow surfaces and inner execution artifacts.
 
 - **Outer workflow surface**: Linear/GitHub/Slack/future UI for human-visible state, approval, comments, priority, and lineage.
-- **Inner execution contract**: repo-local briefs, oracle artifacts, reviews, evidence, run-local state, and validation outputs.
+- **Inner execution contract**: repo-local specs, oracle artifacts, reviews, evidence, run-local state, and validation outputs.
 
 Workers produce artifacts and structured results. The controller owns tracker mutations and state transitions. Workers do not write to Linear or GitHub directly.
 
 Generator-evaluator separation is load-bearing:
 
 - audit-auditor writes; audit-reviewer judges.
-- deliver-pre-groomer writes; deliver-brief-reviewer judges.
+- deliver-pre-groomer writes; deliver-spec-reviewer judges.
 - deliver-oracle-writer writes the frozen test contract; deliver-implementation must satisfy it without mutating it.
 - controller-owned verification checks the final implementation before PR creation.
 

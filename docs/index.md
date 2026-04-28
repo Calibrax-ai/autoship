@@ -39,7 +39,7 @@ The retired extract research track is archived under `/archive/extract/`; it is 
 
 Four load-bearing ideas. They shape every design choice downstream.
 
-1. **The plan is the ceiling.** If the plan (brief, spec, tests) is weak, the code will be too — *"tests pass"* instead of *"product works."* The highest-leverage work is producing a trustworthy plan before any code is written.
+1. **The plan is the ceiling.** If the plan (spec, tests) is weak, the code will be too — *"tests pass"* instead of *"product works."* The highest-leverage work is producing a trustworthy plan before any code is written.
 2. **The author doesn't grade its own homework.** Every handoff has a separate reviewer. Without this split, agents learn the shape of a check while reproducing the same failure under a cleaner label.
 3. **Mechanical checks go to grep; judgment goes to a reviewer.** Regex tests for exact patterns. Everything that needs interpretation gets a fresh reviewer with no skin in the author's work.
 4. **No structure before evidence.** We don't add formalism until a concrete failure demands it. Ideas that were cut are documented in "Considered and deferred" sections so we don't re-derive them.

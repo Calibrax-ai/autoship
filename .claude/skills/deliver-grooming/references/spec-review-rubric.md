@@ -1,13 +1,13 @@
-# Brief Review Rubric
+# Spec Review Rubric
 
-Use this rubric when `deliver-brief-reviewer` judges `brief.md`.
+Use this rubric when `deliver-spec-reviewer` judges `spec.md`.
 
 ## Required inputs
 
 - `.claude/skills/reviewing/SKILL.md`
 - `.claude/skills/deliver-grooming/SKILL.md`
-- `.claude/skills/deliver-grooming/assets/brief-template.md`
-- injected `brief.md`
+- `.claude/skills/deliver-grooming/assets/spec-template.md`
+- injected `spec.md`
 - injected issue body/comments
 - injected testbed root
 
@@ -15,9 +15,9 @@ Use this rubric when `deliver-brief-reviewer` judges `brief.md`.
 
 ### Check 1 - Well-formedness
 
-Does the brief conform to `assets/brief-template.md`?
+Does the spec conform to `assets/spec-template.md`?
 
-Verify all required frontmatter keys are present, including the type-specific status field. All seven universal sections must be populated with non-placeholder content. Blast-Radius must use four buckets. Outcome must be one line around 15 words. Type-specific sections required by `SKILL.md` Brief schema must be present and populated.
+Verify all required frontmatter keys are present, including the type-specific status field. All seven universal sections must be populated with non-placeholder content. Blast-Radius must use four buckets. Outcome must be one line around 15 words. Type-specific sections required by `SKILL.md` Spec schema must be present and populated.
 
 For Feature, check conditional subsections required by blast-radius shape: migrations in blast-radius -> Migration Plan; db/schema changes -> Schema Diff; queue/worker files created -> Failure Modes; existing API routes changed -> Backward Compatibility; runtime risk -> Constraints.
 
@@ -40,12 +40,12 @@ Any unverifiable claim, mismatched citation, or hallucinated invariant is `FAIL`
 
 ### Check 3 - Scope sanity
 
-Does the brief's scope match what was asked, without widening, deferring, or over-engineering?
+Does the spec's scope match what was asked, without widening, deferring, or over-engineering?
 
 Apply `SKILL.md` Scope sanity principles, universal plus the matching type section. Load-bearing checks:
 
 - Feature: grep for simpler existing patterns that could solve the stated problem. If one exists and Design Rationale did not consider it, `FAIL`.
-- Feature: if the brief is single-slice but the issue has multi-slice indicators, `FAIL`.
+- Feature: if the spec is single-slice but the issue has multi-slice indicators, `FAIL`.
 - Refactor: any hint of observable behavior drift is `FAIL`.
 - Refactor: coverage-gap plan must name specific test files, test names, and behaviors.
 - Hidden product judgment is a scope failure. If the body shows the groomer made a product call that a human might reasonably override (e.g. picked one of multiple plausible interpretations of user intent, decided who should have access, set a cap or threshold) and that call is not surfaced in `Assumptions`, `FAIL`. An empty `Assumptions` section on a Feature touching auth, money, customer data, or external egress is suspicious and warrants a closer read.
@@ -55,13 +55,13 @@ Apply `SKILL.md` Scope sanity principles, universal plus the matching type secti
 ```markdown
 ---
 issue: <id>
-review-of: brief.md
+review-of: spec.md
 reviewed-at: <ISO timestamp>
 reviewer-sha: <testbed SHA>
 verdict: APPROVED | REJECTED
 ---
 
-# Brief Review NN - <ISO date>
+# Spec Review NN - <ISO date>
 
 ## VERDICT: APPROVED | REJECTED
 

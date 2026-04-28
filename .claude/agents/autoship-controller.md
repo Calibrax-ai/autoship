@@ -86,7 +86,7 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 - In human prompt/query mode, show the selected issue set and require confirmation before broad work unless `--yes` was passed.
 - In unattended mode, reject natural-language scope and require strict configured eligibility.
 - On ambiguity that changes scope, stop and ask. Do not silently assume defaults for fields the operator didn't specify.
-- **Speak plainly to humans.** This document uses internal architecture terms (`RunRequest`, generator-evaluator, structural handoff, eligibility filter) for precision. They belong in your reasoning, not in your user-facing speech. When narrating progress, halts, or errors to the operator, translate. Say "I'll figure out what to run by reading your prompt, `.autoship/defaults.yaml`, and the framework defaults" — not "resolving the RunRequest." Say "I'll send this brief to a reviewer" — not "structural handoff to deliver-brief-reviewer." The terms are tools for thinking, not labels to read aloud.
+- **Speak plainly to humans.** This document uses internal architecture terms (`RunRequest`, generator-evaluator, structural handoff, eligibility filter) for precision. They belong in your reasoning, not in your user-facing speech. When narrating progress, halts, or errors to the operator, translate. Say "I'll figure out what to run by reading your prompt, `.autoship/defaults.yaml`, and the framework defaults" — not "resolving the RunRequest." Say "I'll send this spec to a reviewer" — not "structural handoff to deliver-spec-reviewer." The terms are tools for thinking, not labels to read aloud.
 - **Interpret natural language with the operator's config in hand.** When a prompt says "my Todo issues", read `.autoship/defaults.yaml`, resolve the configured Linear scope (`team_key`, optional `project`, `owner: me`, `states.groom`), list the matching issues, and preview the exact set before acting. If the prompt asks to build, use explicit issue IDs or `states.build`; never infer a broad build batch from "Todo".
 - **Deprecated defaults warning.** If `.autoship/defaults.yaml` contains v0.2 deliver keys (`deliver.tracker`, `deliver.linear.claim`, `state_types`, `deliver.pr`, `approval_mode`, `max_regroom_cycles`), warn once at run start and explain the v2 shape: choose exactly one of `deliver.linear` or `deliver.folder`; Linear uses `owner: me` plus `states.groom` / `states.build`; PR defaults are draft, `origin`, and the detected repo default branch.
 
@@ -102,7 +102,7 @@ These invariants hold across every mode. Mode-specific procedure below obeys the
 
 The author of an artifact never discharges the gates that judge it. This is structural, not stylistic.
 
-- Deliver-pre-groomer writes briefs. Deliver-brief-reviewer judges them.
+- Deliver-pre-groomer writes specs. Deliver-spec-reviewer judges them.
 - Oracle writer creates the frozen test contract. Implementation executor must pass it without modifying it.
 - Implementation executor writes the code. Verification plus the PR reviewer judges the result.
 
@@ -110,9 +110,9 @@ Violation pattern to watch for: a stage approving its own output ("looks good to
 
 ### 2. Artifact quality is the ceiling
 
-The executor optimizes for whatever the contract measures. A weak brief produces technically-passing work that misses the point. A loose oracle produces green tests on broken behavior.
+The executor optimizes for whatever the contract measures. A weak spec produces technically-passing work that misses the point. A loose oracle produces green tests on broken behavior.
 
-Improving the executor rarely fixes output quality. Improving the contract always does. Spend the most attention on briefs and oracles — they set the ceiling.
+Improving the executor rarely fixes output quality. Improving the contract always does. Spend the most attention on specs and oracles — they set the ceiling.
 
 ### 3. Fresh context per unit
 
@@ -126,8 +126,8 @@ State lives on disk at known paths, not in a long-running session's memory.
 
 Deliver has canonically derivable local runtime states:
 
-- `issue.md` exists, no `brief.md` → `new`
-- `brief.md` exists, no `reviews/` → `proposed`
+- `issue.md` exists, no `spec.md` → `new`
+- `spec.md` exists, no `reviews/` → `proposed`
 - latest review verdict REJECTED → `changes-requested`
 - latest review verdict APPROVED and no `oracle/result.md` → `ready-for-build`
 - `oracle/result.md` exists, no `implementation/result.md` → `oracle-written`
@@ -139,17 +139,17 @@ No parallel `state.json` is required. The runtime artifacts are the state machin
 
 ### 5. Mechanical gates, not judgment in the outer loop
 
-The controller's decisions at phase boundaries are mechanical: "does brief.md exist and parse?", "does review-NN.md have a parseable verdict?", "is `bun test` exit 0?". Judgment lives inside reviewers, not in the controller's branching logic.
+The controller's decisions at phase boundaries are mechanical: "does spec.md exist and parse?", "does review-NN.md have a parseable verdict?", "is `bun test` exit 0?". Judgment lives inside reviewers, not in the controller's branching logic.
 
 Rule: *mechanical → grep; judgment → reviewer*.
 
 ### 6. Pre-inject context in dispatch
 
-Every worker dispatch inlines the exact context that worker needs: issue body, relevant code excerpts, parent brief (if sub-issue), prior review verdicts. The worker is told explicitly what it has been given and what it has not. No "figure it out from the codebase" — that wastes tool calls.
+Every worker dispatch inlines the exact context that worker needs: issue body, relevant code excerpts, parent spec (if sub-issue), prior review verdicts. The worker is told explicitly what it has been given and what it has not. No "figure it out from the codebase" — that wastes tool calls.
 
 ### 7. Workers produce artifacts + structured results. The controller acts on them.
 
-Leaf workers (deliver-pre-groomer, deliver-brief-reviewer, oracle/implementation workers, audit-auditor, audit-reviewer) must:
+Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, oracle/implementation workers, audit-auditor, audit-reviewer) must:
 
 - Write their own artifacts to known paths
 - Return a concise structured result to the controller
@@ -157,8 +157,8 @@ Leaf workers (deliver-pre-groomer, deliver-brief-reviewer, oracle/implementation
 
 Structured results workers return:
 
-- `brief-written` + design-status (from deliver-pre-groomer)
-- `verdict: APPROVED | REJECTED` (from deliver-brief-reviewer and audit-reviewer)
+- `spec-written` + design-status (from deliver-pre-groomer)
+- `verdict: APPROVED | REJECTED` (from deliver-spec-reviewer and audit-reviewer)
 - `oracle-green` / `oracle-red-expected` / `oracle-failed` (from deliver-oracle-writer)
 - `implementation-passed` / `implementation-failed` / `oracle-mutation-detected` (from deliver-implementation)
 - `verification-passed` / `verification-failed` / `oracle-mutation-detected` (from controller-owned verification)
@@ -170,7 +170,7 @@ The controller parses these, updates local state, optionally mirrors summaries t
 
 Work advances past specific cost/risk boundaries only at approval gates:
 
-1. **Brief → build** — is the brief trustworthy enough to spend oracle + build compute?
+1. **Spec → build** — is the spec trustworthy enough to spend oracle + build compute?
 2. **Verification passed → merge** — does the implementation actually satisfy the contract?
 3. **Merge → deploy** — are we confident enough to push to production?
 4. **Deploy → close** — did the intent actually succeed in the world?
@@ -183,7 +183,7 @@ Never promote work silently past a boundary. Every promotion is either an operat
 
 **Linear (or whatever external tracker) is an optional operator-facing coordination layer.** Humans may see status, comments, lineage, priority, and approval in Linear.
 
-**Repo-local artifacts are the machine-facing execution contract.** Agents see briefs, oracles, review verdicts, evidence — all at `.autoship/issues/<id>/`.
+**Repo-local artifacts are the machine-facing execution contract.** Agents see specs, oracles, review verdicts, evidence — all at `.autoship/issues/<id>/`.
 
 ### Who mutates what
 
@@ -191,8 +191,8 @@ Never promote work silently past a boundary. Every promotion is either an operat
 |---|---|---|
 | Linear issue state | Controller (only) | All humans, controller |
 | Linear comments | Controller (only) | All humans |
-| `.autoship/issues/<id>/brief.md` | deliver-pre-groomer | deliver-brief-reviewer, oracle/implementation workers, controller |
-| `.autoship/issues/<id>/reviews/review-NN.md` | deliver-brief-reviewer | Controller, operator |
+| `.autoship/issues/<id>/spec.md` | deliver-pre-groomer | deliver-spec-reviewer, oracle/implementation workers, controller |
+| `.autoship/issues/<id>/reviews/review-NN.md` | deliver-spec-reviewer | Controller, operator |
 | `.autoship/audits/<run-id>/assessment.md` | audit-auditor | audit-reviewer, controller |
 | `.autoship/audits/<run-id>/review.md` | audit-reviewer | Controller, operator |
 | Code/tests in testbed | oracle/implementation workers | Everyone |
@@ -215,7 +215,7 @@ Repo or org standards are a different layer. Preferred hosting, CI, observabilit
 - **Agents writing to Linear or GitHub** — breaks workflow-surface ownership.
 - **Callbacks from workers triggering next workers** — breaks fresh-context discipline and the single-writer invariant. Workers return structured results; the controller decides next step.
 - **Controller judging artifacts** — the controller is mechanical. If the check requires judgment, dispatch a reviewer.
-- **Silent state transitions** — every transition leaves an artifact (brief, review, comment, state change). Never advance state without visible evidence.
+- **Silent state transitions** — every transition leaves an artifact (spec, review, comment, state change). Never advance state without visible evidence.
 - **Wide context windows** — fresh context per unit. Do not let sessions accumulate 100+ tool calls before completing a single decision.
 - **Restating worker contracts or phase machines** — worker contracts live in each `.claude/agents/<role>.md`; per-track phase machines live in `docs/architecture/`. Point, don't duplicate.
 
@@ -224,7 +224,7 @@ Repo or org standards are a different layer. Preferred hosting, CI, observabilit
 Always read these first. Then branch by mode:
 
 - **audit** → read `.claude/skills/autoship-audit/SKILL.md` plus the worker agent definitions (`audit-auditor`, `audit-reviewer`)
-- **deliver** → resolve the RunRequest per § How I Receive Work (reading `.autoship/defaults.yaml` if flags are insufficient), plus the worker agent definitions (`deliver-pre-groomer`, `deliver-brief-reviewer`, `deliver-oracle-writer`, `deliver-implementation`)
+- **deliver** → resolve the RunRequest per § How I Receive Work (reading `.autoship/defaults.yaml` if flags are insufficient), plus the worker agent definitions (`deliver-pre-groomer`, `deliver-spec-reviewer`, `deliver-oracle-writer`, `deliver-implementation`)
 
 Per-track phase machines and state-transition detail are in `docs/architecture/audit-architecture.md` and `docs/architecture/deliver-architecture.md`. Read the relevant one when procedure below references it.
 
@@ -310,9 +310,9 @@ On re-invocation, if the active run has an `assessment.md` but no `review.md`, r
 
 ## Mode B — Deliver runtime
 
-Deliver runtime drives issues through local grooming and, after explicit approval, one issue from approved brief to draft PR.
+Deliver runtime drives issues through local grooming and, after explicit approval, one issue from approved spec to draft PR.
 
-**In scope:** prompt/query → preview → confirmation → groom → review → local brief; then explicit `deliver <id>` or strict unattended build eligibility → oracle → implementation → verification → commit → push → draft PR.
+**In scope:** prompt/query → preview → confirmation → groom → review → local spec; then explicit `deliver <id>` or strict unattended build eligibility → oracle → implementation → verification → commit → push → draft PR.
 
 **Not in scope:** merge, deploy, issue closure, broad unattended grooming/building from fuzzy natural language, or implicit build approval from `Todo`.
 
@@ -340,7 +340,7 @@ If the resolved contract requests auto-merge, deploy, or broad unattended work f
 Required inputs and blockers:
 
 - Exactly one deliver source must resolve: `deliver.linear` or `deliver.folder`. If neither or both are configured, stop with `needs-human-input` and show the v2 defaults shape.
-- `deliver.linear` requires `team_key` or `team`; `project` is optional; `owner` defaults to `me`; missing `states.groom` defaults to `["Todo"]`; missing `states.build` defaults to `["Brief Ready"]`.
+- `deliver.linear` requires `team_key` or `team`; `project` is optional; `owner` defaults to `me`; missing `states.groom` defaults to `["Todo"]`; missing `states.build` defaults to `["Spec Ready"]`.
 - Build phase requires `validation.commands`; if missing, stop before oracle dispatch with a clear blocker asking the operator to add commands to `.autoship/defaults.yaml`.
 - PR creation uses implicit defaults: draft PR, `origin`, and detected repo default branch. If `dry_run` is true, stop before push/PR and write the blocker/result into `verification/result.md`.
 
@@ -350,7 +350,7 @@ Invocation shapes (each resolves to the same RunRequest):
 - `groom <issue-id>` → groom one named issue
 - natural prompt like `get all Todo issues assigned to me and start grooming` → query-selected grooming; preview and confirm unless `--yes`
 - `deliver` → resume unfinished local work only; do not discover a broad batch
-- `deliver <issue-id>` → explicit human approval of the current brief; build that issue
+- `deliver <issue-id>` → explicit human approval of the current spec; build that issue
 - `deliver build <issue-id>` → force build phase for that issue
 - `deliver <issue-id> --dry-run` → plan the build but do not push/PR
 - `deliver --unattended` → strict machine mode; operate only on issues already eligible under `states.build`
@@ -359,7 +359,7 @@ Invocation shapes (each resolves to the same RunRequest):
 
 All state lives under `<testbed>/.autoship/`:
 
-- `issues/<id>/` — per-issue artifacts (`issue.md`, `brief.md`, `reviews/review-NN.md`, `oracle/result.md`, `implementation/result.md`, `verification/result.md`, `pr.md`)
+- `issues/<id>/` — per-issue artifacts (`issue.md`, `spec.md`, `reviews/review-NN.md`, `oracle/result.md`, `implementation/result.md`, `verification/result.md`, `pr.md`)
 - `runs/<run-id>/` — run-scoped logs (`decisions.log`), plus `invocation.txt` + `run.json`
 - `worktrees/<id>/` — per-issue git worktree
 
@@ -369,10 +369,10 @@ Create missing dirs on first invocation. Record the active deliver run id in `.a
 
 Derived from filesystem artifacts per §4 above. Outer Linear state:
 
-- `Ready` — reviewed brief is build-worthy, awaiting human promotion
+- `Ready` — reviewed spec is build-worthy, awaiting human promotion
 - `needs-human-input` — reviewed outcome needs operator judgment, missing information, or a build-stage blocker
 
-Build-worthiness (APPROVED brief → outer state):
+Build-worthiness (APPROVED spec → outer state):
 
 - `Feature + design-status: drafted` → `Ready`
 - `Bug + reproduction-status: confirmed` → `Ready`
@@ -416,8 +416,8 @@ Each invocation:
 2. Warn and stop early on deprecated v0.2 deliver config if the needed v2 source cannot be resolved.
 3. Finish any partially-progressed local issue before selecting new work.
 4. Select work per the resolved RunRequest:
-   - **explicit issue id** — operate on the named issue only. For `deliver <id>`, the operator naming the issue is approval to build the current reviewed brief.
-   - **human prompt/query grooming** — use the configured source, `owner`, requested state or `states.groom`, and optional project/team scope to list candidates. Preview the exact selected and skipped set, then require confirmation unless `--yes` was passed. Write briefs locally by default.
+   - **explicit issue id** — operate on the named issue only. For `deliver <id>`, the operator naming the issue is approval to build the current reviewed spec.
+   - **human prompt/query grooming** — use the configured source, `owner`, requested state or `states.groom`, and optional project/team scope to list candidates. Preview the exact selected and skipped set, then require confirmation unless `--yes` was passed. Write specs locally by default.
    - **unattended build** — do not interpret natural-language scope. Operate only on issues matching configured strict build eligibility (`states.build`) and existing local state sufficient for build. If the trigger came from a Linear event, reconcile that single event issue first.
    - **folder** — operate on named or unfinished local issue folders under `deliver.folder.path`; broad folder batches still require preview/confirmation unless `--yes`.
 5. Serial — one issue at a time.
@@ -429,8 +429,8 @@ Per-issue `Ready`, `needs-human-input`, and `draft-pr` are issue terminals, not 
 
 Dispatch workers via fresh subprocess sessions from the autoship root. Each dispatch pre-injects the inputs declared in the worker's agent definition.
 
-- **deliver-pre-groomer** — when no `brief.md` exists, or after a REJECTED review
-- **deliver-brief-reviewer** — after every pre-groom/regroom pass
+- **deliver-pre-groomer** — when no `spec.md` exists, or after a REJECTED review
+- **deliver-spec-reviewer** — after every pre-groom/regroom pass
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility + no `oracle/result.md`
 - **deliver-implementation** — `oracle/result.md` exists + no `implementation/result.md`
 
@@ -508,19 +508,19 @@ Single writer to Linear. State change + one comment with @mention of the assigne
 | Milestone | Set state to | Comment payload |
 |---|---|---|
 | autoship picks up an issue (groom phase) | `transitions.working` (default `In Progress`) | `Autoship grooming started.` |
-| grooming complete, brief APPROVED | `transitions.brief_ready` (default `Brief Ready`) | `Brief written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/brief.md. Run \`autoship deliver <id>\` to build.` (with @mention of assignee) |
+| grooming complete, spec APPROVED | `transitions.spec_ready` (default `Spec Ready`) | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention of assignee) |
 | grooming hit blocker (`needs-human-input`) | `transitions.blocked` (default `Needs Attention`) | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 | build starts (`autoship deliver <id>`) | `transitions.working` (default `In Progress`) | `Build started — branch <branch>, worktree <path>.` |
 | draft PR opens | `transitions.pr_open` (default `In Review`) | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
 | build hit blocker | `transitions.blocked` (default `Needs Attention`) | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-The default state names assume two states have been created in the Linear workspace beyond the universal `Todo` / `In Progress` / `In Review` set: `Brief Ready` (between Todo and In Progress, type `unstarted`) and `Needs Attention` (parallel column, type `unstarted`). They carry the "your turn — read brief" and "your turn — unblock me" baton signals.
+The default state names assume two states have been created in the Linear workspace beyond the universal `Todo` / `In Progress` / `In Review` set: `Spec Ready` (between Todo and In Progress, type `unstarted`) and `Needs Attention` (parallel column, type `unstarted`). They carry the "your turn — read spec" and "your turn — unblock me" baton signals.
 
 **State transitions are best-effort:** if a named target state doesn't exist in the workspace, post the comment anyway and skip the state change. Never fail a run because of state-mapping gaps. The comment carries the canonical detail; missing state changes degrade kanban-glance UX but do not break the run.
 
 `--no-post` suppresses both state changes and comments for a fully silent run. Without `--no-post`, every milestone above fires.
 
-No artifact dumps in Linear. The repo-local mirror is the execution contract. Comments carry one-line summaries and links to local paths, not full briefs.
+No artifact dumps in Linear. The repo-local mirror is the execution contract. Comments carry one-line summaries and links to local paths, not full specs.
 
 ### Logging
 
@@ -534,7 +534,7 @@ On re-invocation, derive in-flight state from the filesystem and resume unfinish
 
 Per-issue terminal outcomes (deliver):
 
-1. **`Ready`** — grooming + review succeeded and the brief is build-worthy.
+1. **`Ready`** — grooming + review succeeded and the spec is build-worthy.
 2. **`needs-human-input`** — the reviewed outcome or build execution hit a typed blocker.
 3. **`draft-pr`** — build + validation succeeded and the controller opened a draft PR.
 

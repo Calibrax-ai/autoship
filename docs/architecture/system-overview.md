@@ -11,7 +11,7 @@ Autoship runs the middle of software delivery — the part between *"we need to 
 The live product has two runtime surfaces:
 
 1. **Audit** — evidence-backed production readiness assessment that can create bounded issue candidates.
-2. **Deliver** — issue-to-brief-to-oracle-to-implementation flow that ends at a draft pull request.
+2. **Deliver** — issue-to-spec-to-oracle-to-implementation flow that ends at a draft pull request.
 
 Both modes read repo policy from `.autoship/standards.yaml`, scaffolded by `autoship init` and owned by the operator after first install. Standards is setup config, not a runtime mode.
 
@@ -68,7 +68,7 @@ Handles the **known repo, bounded change** problem.
 - current tests and local conventions
 
 **Output:**
-- a trustworthy brief
+- a trustworthy spec
 - a frozen test oracle
 - a validated code change, shipped as a draft pull request
 
@@ -89,9 +89,9 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 | **autoship-controller** | Core | Resolves triggers into RunRequests, dispatches workers, owns tracker mutations. | Operational |
 | **audit-auditor** | Audit | Inspects the repo and writes the audit artifact plus bounded issue candidates. | Scaffolded |
 | **audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, tracker annotations, and issue-candidate quality. | Scaffolded |
-| **deliver-pre-groomer** | Deliver | Writes the brief from an approved issue. | Operational |
-| **deliver-brief-reviewer** | Deliver | Judges the brief. Separate agent from the one that wrote it. | Operational |
-| **deliver-oracle-writer** | Deliver | Writes the frozen test oracle from the approved brief. | Operational |
+| **deliver-pre-groomer** | Deliver | Writes the spec from an approved issue. | Operational |
+| **deliver-spec-reviewer** | Deliver | Judges the spec. Separate agent from the one that wrote it. | Operational |
+| **deliver-oracle-writer** | Deliver | Writes the frozen test oracle from the approved spec. | Operational |
 | **deliver-implementation** | Deliver | Writes the code; forbidden from editing the oracle. | Operational |
 | **Validation agents** | Validate | Check security, quality, and outcome against stated intent. | Coming soon |
 
@@ -112,7 +112,7 @@ Live autoship has no `.autoship/program.md`.
 - **`.autoship/defaults.yaml`** — optional per-repo run defaults. Flags always win.
 - **`.autoship/audits/<run-id>/`** — audit artifacts.
 - **`.autoship/runs/<run-id>/`** — deliver run logs and snapshots.
-- **`.autoship/issues/<id>/`** — deliver issue mirror, brief, reviews, oracle, implementation, verification, and PR artifact.
+- **`.autoship/issues/<id>/`** — deliver issue mirror, spec, reviews, oracle, implementation, verification, and PR artifact.
 
 ## Workflow-Surface Ownership
 

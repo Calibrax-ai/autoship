@@ -12,14 +12,14 @@ Asking an AI to *"just implement the ticket"* tends to produce code that looks r
 
 **Deliver** takes an approved ticket and produces:
 
-- A **brief** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the brief is weak, work doesn't start.
+- A **spec** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the spec is weak, work doesn't start.
 - A **draft pull request** with the code change, the tests, and the evidence that the change actually works.
 
-A human promotes the brief to "Building" only when it's trustworthy. Everything past that point runs until the draft PR is ready for human review.
+A human promotes the spec to "Building" only when it's trustworthy. Everything past that point runs until the draft PR is ready for human review.
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
 >
-> **Key terms used below.** **Brief** — the plain-English plan for the change. **Oracle** — the test suite that judges whether the code is done; the author of the code cannot edit it. **Oracle writer / Implementation executor** — two separate agent sessions: one writes the oracle, the other writes the code. **Pre-groomer / Brief-reviewer** — the two agents that write and judge the brief respectively.
+> **Key terms used below.** **Spec** — the plain-English plan for the change. **Oracle** — the test suite that judges whether the code is done; the author of the code cannot edit it. **Oracle writer / Implementation executor** — two separate agent sessions: one writes the oracle, the other writes the code. **Pre-groomer / Spec-reviewer** — the two agents that write and judge the spec respectively.
 
 ## Problem
 
@@ -32,17 +32,17 @@ For an existing project, the challenge is different:
 - regression risk matters more than discovery breadth
 - the execution system needs stronger state, recovery, and verification discipline than a one-off prompt loop
 
-The goal of `deliver` is not to reverse-engineer the whole product again. The goal is to take a bounded change request, produce a trustworthy change brief, and drive it through build and validation without losing control of scope or evidence.
+The goal of `deliver` is not to reverse-engineer the whole product again. The goal is to take a bounded change request, produce a trustworthy change spec, and drive it through build and validation without losing control of scope or evidence.
 
 ## Architecture Overview
 
 `deliver` is an autonomous change pipeline built around an external state machine. Canonical state lives on disk. Each unit runs in a fresh context window. Evidence anchors every transition. A separate reviewer judges the author's work at every structural handoff.
 
-`deliver` is the **delivery-layer** module, not the whole future product workflow. Upstream concerns like intent capture, enrichment, prioritization, and decomposition may exist elsewhere in autoship later. For now, they appear only in the limited ways needed to produce a trustworthy change brief and move an approved work item toward build.
+`deliver` is the **delivery-layer** module, not the whole future product workflow. Upstream concerns like intent capture, enrichment, prioritization, and decomposition may exist elsewhere in autoship later. For now, they appear only in the limited ways needed to produce a trustworthy change spec and move an approved work item toward build.
 
 At the broader product level, those are better treated as **concerns** than one rigid global pipeline. Enrichment can recur during grooming, regroom, and later verification. Decomposition can happen during grooming or before a work item enters `deliver`. `deliver` itself remains a **small explicit local workflow**.
 
-Operator experience should stay pragmatic. A tracker like Linear is the likely **outer workflow surface** for humans: status, comments, lineage, priority, and linked issues. Repo-local artifacts remain the **inner execution contract** for agents — they version with code, freeze review inputs, and keep the machine-facing brief, test suite, and evidence stable.
+Operator experience should stay pragmatic. A tracker like Linear is the likely **outer workflow surface** for humans: status, comments, lineage, priority, and linked issues. Repo-local artifacts remain the **inner execution contract** for agents — they version with code, freeze review inputs, and keep the machine-facing spec, test suite, and evidence stable.
 
 ### What deliver owns
 
@@ -54,8 +54,8 @@ flowchart LR
 
     subgraph GROOM ["Groom · generator-evaluator"]
       direction TB
-      PG["Pre-groomer<br/>writes the brief"]
-      BR["Brief-reviewer<br/>separate AI,<br/>judges the brief"]
+      PG["Pre-groomer<br/>writes the spec"]
+      BR["Spec-reviewer<br/>separate AI,<br/>judges the spec"]
       PG --> BR
     end
 
@@ -91,12 +91,12 @@ flowchart LR
 
 The same structural discipline shows up at both stages:
 
-- **Grooming** — one AI writes the brief, a *separate* AI judges it. The author never grades its own homework.
+- **Grooming** — one AI writes the spec, a *separate* AI judges it. The author never grades its own homework.
 - **Building** — the oracle writer creates the tests. The implementation executor writes the code, and it is **forbidden** from modifying the tests. The oracle-freeze plays the role of the separate reviewer; test mutation becomes a visible signal that something's wrong.
 
-When review rejects, work loops back: Brief-reviewer REJECT sends the pre-groomer back to rewrite the brief; a Verify failure sends the implementation executor back to fix the code. Merge, deploy, and outcome verification sit **outside** deliver's scope — they belong to the system-level flow and (when they land) the `validate` module.
+When review rejects, work loops back: Spec-reviewer REJECT sends the pre-groomer back to rewrite the spec; a Verify failure sends the implementation executor back to fix the code. Merge, deploy, and outcome verification sit **outside** deliver's scope — they belong to the system-level flow and (when they land) the `validate` module.
 
-**Current probe scope.** Probe 0.1 proved the grooming half (Pre-groomer + Brief-reviewer). Probes 0.2–0.5 extended through the building half (oracle + implementation + verification) and across Bug, Feature, Refactor, and UI-build shapes. Draft-PR handoff is operational today.
+**Current probe scope.** Probe 0.1 proved the grooming half (Pre-groomer + Spec-reviewer). Probes 0.2–0.5 extended through the building half (oracle + implementation + verification) and across Bug, Feature, Refactor, and UI-build shapes. Draft-PR handoff is operational today.
 
 ### Load-bearing architectural choices
 
@@ -113,14 +113,14 @@ When review rejects, work loops back: Brief-reviewer REJECT sends the pre-groome
 
 ### Issue state machine (0.1 scope)
 
-State is derived from filesystem presence — no parallel state file. Reviews are append-only (new file per pass); briefs overwrite (git log preserves history).
+State is derived from filesystem presence — no parallel state file. Reviews are append-only (new file per pass); specs overwrite (git log preserves history).
 
 ```mermaid
 stateDiagram-v2
     [*] --> new: issue arrives<br/>(issue.md created)
-    new --> proposed: pre-groom<br/>writes brief.md
+    new --> proposed: pre-groom<br/>writes spec.md
     proposed --> changes_requested: reviewer REJECTS<br/>(review-NN.md)
-    changes_requested --> proposed: regroom writes<br/>new brief.md
+    changes_requested --> proposed: regroom writes<br/>new spec.md
     proposed --> ready_for_oracle: reviewer APPROVES
     ready_for_oracle --> [*]: handoff to<br/>downstream (post-0.1)
 ```
@@ -129,14 +129,14 @@ stateDiagram-v2
 
 | Filesystem condition | State |
 |---|---|
-| `issue.md` exists, no `brief.md` | `new` |
-| `brief.md` exists, no `reviews/` | `proposed` |
+| `issue.md` exists, no `spec.md` | `new` |
+| `spec.md` exists, no `reviews/` | `proposed` |
 | latest `reviews/review-NN.md` verdict is REJECTED | `changes-requested` |
 | latest `reviews/review-NN.md` verdict is APPROVED | `ready-for-oracle` |
 
 ### Per-type grooming flow
 
-All four types share the same overall shape: `read issue → apply type-specific procedure → map blast-radius → write brief → review`. The type-specific middle differs per type because the truth source differs.
+All four types share the same overall shape: `read issue → apply type-specific procedure → map blast-radius → write spec → review`. The type-specific middle differs per type because the truth source differs.
 
 ```mermaid
 flowchart TB
@@ -159,8 +159,8 @@ flowchart TB
     R2 --> Map
     N2 --> Map
 
-    Map --> Write[Write brief<br/>with type-specific<br/>section]
-    Write --> BriefOut[(brief.md)]
+    Map --> Write[Write spec<br/>with type-specific<br/>section]
+    Write --> SpecOut[(spec.md)]
 
     style B1 fill:#ef4444,color:#fff
     style B2 fill:#ef4444,color:#fff
@@ -176,7 +176,7 @@ flowchart TB
 
 `deliver` is not a linear chain — it's a DAG with explicit feedback edges:
 
-- **Regroom** — reviewer REJECTS a brief → pre-groomer re-grooms from updated inputs. Same issue, new brief; prior review preserved in `reviews/review-NN.md` history.
+- **Regroom** — reviewer REJECTS a spec → pre-groomer re-grooms from updated inputs. Same issue, new spec; prior review preserved in `reviews/review-NN.md` history.
 - **Re-plan** (future) — oracle-reviewer REJECTS oracle plan → oracle-planner re-plans.
 - **Rebuild** (future) — walker or post-build reviewer REJECTS → builder re-dispatches with revised plan.
 - **Rollback + new issue** (future) — monitor detects regression → auto-rollback + new issue created for investigation.
@@ -191,7 +191,7 @@ Deliver is an automation pipeline built on top of a running codebase. The full p
 - **Reproducible environment** — seedable database, consistent fixtures, runnable locally or in CI
 - **Clean version control** — git with a stable main branch to anchor against
 
-These apply to the full pipeline, not to probe-0.1 specifically. Probe-0.1's grooming stage produces briefs that *reference* tests (Acceptance Criteria verifications and Refactor's Preservation Proof); it does not execute them. A testbed with thin tests can host grooming — it becomes a blocker at oracle and build stages in later probes.
+These apply to the full pipeline, not to probe-0.1 specifically. Probe-0.1's grooming stage produces specs that *reference* tests (Acceptance Criteria verifications and Refactor's Preservation Proof); it does not execute them. A testbed with thin tests can host grooming — it becomes a blocker at oracle and build stages in later probes.
 
 When preconditions are not met, the fix is itself a change. Adding tests, seeding fixtures, or stabilizing CI is a precursor issue that deliver can groom and drive like any other.
 
@@ -210,7 +210,7 @@ Each type has a materially different grooming shape. Two types with the same sha
 
 ### Types are classifications, not pipelines
 
-For v0.1, one pre-groomer + one brief-reviewer handle all four types. Type is a field on the brief. Type-specific optional sections carry the shape differences:
+For v0.1, one pre-groomer + one spec-reviewer handle all four types. Type is a field on the spec. Type-specific optional sections carry the shape differences:
 
 - **Bug** — Reproduction Steps, Root Cause
 - **Feature** — Design Rationale (alternatives considered, picked design, reasoning)
@@ -257,13 +257,13 @@ For `deliver-0.1`, keep this minimal:
 
 ```text
 .autoship/issues/<id>/
-  brief.md
+  spec.md
   reviews/
     review-01.md
     review-02.md
 ```
 
-State is derived from filesystem presence — no parallel state file. Reviews are append-only (new file per pass); briefs overwrite (git log preserves history).
+State is derived from filesystem presence — no parallel state file. Reviews are append-only (new file per pass); specs overwrite (git log preserves history).
 
 ### 2. Fresh Session Per Unit
 
@@ -305,8 +305,8 @@ Small enough to support pre-groom, review, and regroom without importing a full 
 
 No judgment-only transitions in the outer loop. At minimum:
 
-- `brief.md` exists
-- required brief sections are present
+- `spec.md` exists
+- required spec sections are present
 - `reviews/review-NN.md` contains a parseable verdict
 - state is derivable from filesystem presence — no parallel state store to drift
 
@@ -325,19 +325,19 @@ Trackers own:
 
 Repo-local artifacts own:
 
-- machine-readable brief state
+- machine-readable spec state
 - retry and recovery data
 - reviewer verdicts
 - execution truth
 
-### 7. Brief Schema
+### 7. Spec Schema
 
-`brief.md` has seven base fields, one optional universal field, and one type-specific section.
+`spec.md` has seven base fields, one optional universal field, and one type-specific section.
 
 **Schema tree:**
 
 ```
-brief.md
+spec.md
 │
 ├── [Frontmatter]
 │   ├── issue, issue-rev, groomed-at, trigger, type
@@ -377,12 +377,12 @@ brief.md
 
 **Optional universal field:**
 
-- **Failure Modes** — populated when the change has runtime risk (external dependencies, queued jobs, state mutation, non-trivial errors). Bug briefs may omit; Feature briefs with async or stateful work should fill.
+- **Failure Modes** — populated when the change has runtime risk (external dependencies, queued jobs, state mutation, non-trivial errors). Bug specs may omit; Feature specs with async or stateful work should fill.
 
 **Behavior Preservation (Refactor only).** Three subsections:
 
 - **What must be preserved** — observable invariants (API response shapes, status codes, DB row shapes, emitted events, side effects) + non-observable behaviors that matter (performance characteristics, ordering)
-- **Preservation Proof** — existing tests that cover the refactor target (grep-verifiable list, not line coverage) + identified gaps + specific regression tests the brief commits to adding BEFORE the refactor lands + runnable verification command
+- **Preservation Proof** — existing tests that cover the refactor target (grep-verifiable list, not line coverage) + identified gaps + specific regression tests the spec commits to adding BEFORE the refactor lands + runnable verification command
 - **Structure Improvement** — before → after structural shape, improvement axis (coupling / readability / testability / complexity / performance / security), measurable criterion for "done"
 
 Refactor may also include `Design Rationale` when ≥2 structural approaches exist (split god-class N ways). For trivial refactors (rename a function), Design Rationale is skipped — one approach, no alternatives to weigh.
@@ -406,14 +406,14 @@ Every agent prompt carries a short adversarial section — specific failure mode
 
 Thicker than a principle list; lighter than a rubric. Calls out the shape of failure: "do not ship affordances without effects; do not mark a task done because the code compiles; do not cut scope and relabel it as `blocked-other`."
 
-Applies across the pipeline — pre-groomer, brief-reviewer, later the builder and post-build reviewer — with anti-pattern content specific to each role.
+Applies across the pipeline — pre-groomer, spec-reviewer, later the builder and post-build reviewer — with anti-pattern content specific to each role.
 
 ### 9. Pre-Inject Context In Dispatch Prompts
 
 The dispatch prompt for each unit inlines all the context that unit needs:
 
 - for `pre-groom` — issue body, relevant code excerpts, recent commits, test summaries
-- for `brief-reviewer` — the brief, the issue, relevant code, any prior review verdicts
+- for `spec-reviewer` — the spec, the issue, relevant code, any prior review verdicts
 - for later stages — their own specific inputs
 
 The agent is told explicitly what it has been given and what it has not. This avoids burning the first ten tool calls re-orienting to context the dispatcher already has, and prevents the agent from fishing outside the intended scope.
@@ -424,13 +424,13 @@ Five specialized agents participate in a deliver run. The controller dispatches 
 
 | Agent | Role | Owns | Judged by |
 |---|---|---|---|
-| **Controller** (deliver mode) | Orchestrator. Resolves the RunRequest from flags or NL prompt (with per-repo stickies from `.autoship/defaults.yaml`), selects eligible work, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no briefs. | The human, via the eventual draft pull request and the tracker state. |
-| **Pre-groomer** | Writes the **brief** — the plain-English plan — from the raw issue. | `brief.md` in the run directory. Populates every base field in the schema. | Brief-reviewer (separate agent). Never grades its own output. |
-| **Brief-reviewer** | Judges whether the brief is well-formed, grounded in the codebase, and well-scoped. Returns `APPROVED` or `REJECTED` with specific objections. | `reviews/review-NN.md` — append-only, one file per pass. | The operator, indirectly, through the calibration set grown from observed overrides. |
-| **Oracle writer** | Writes the **oracle** — the test suite that will judge the code — from the approved brief. | Tests only. The brief is read-only; the codebase is read-only; no source code is edited. Owns `oracle/result.md`. | Implementation executor (tests pass once code is written, or don't) and the human reviewer on the PR. |
-| **Implementation executor** | Writes the code change against the frozen oracle. | Application source code only. **Forbidden** from editing tests, the brief, or any oracle artifact. Owns `implementation/result.md`. | The oracle — implementation cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
+| **Controller** (deliver mode) | Orchestrator. Resolves the RunRequest from flags or NL prompt (with per-repo stickies from `.autoship/defaults.yaml`), selects eligible work, dispatches each agent, and owns all tracker mutations. | Orchestration state and tracker updates. No code, no specs. | The human, via the eventual draft pull request and the tracker state. |
+| **Pre-groomer** | Writes the **spec** — the plain-English plan — from the raw issue. | `spec.md` in the run directory. Populates every base field in the schema. | Spec-reviewer (separate agent). Never grades its own output. |
+| **Spec-reviewer** | Judges whether the spec is well-formed, grounded in the codebase, and well-scoped. Returns `APPROVED` or `REJECTED` with specific objections. | `reviews/review-NN.md` — append-only, one file per pass. | The operator, indirectly, through the calibration set grown from observed overrides. |
+| **Oracle writer** | Writes the **oracle** — the test suite that will judge the code — from the approved spec. | Tests only. The spec is read-only; the codebase is read-only; no source code is edited. Owns `oracle/result.md`. | Implementation executor (tests pass once code is written, or don't) and the human reviewer on the PR. |
+| **Implementation executor** | Writes the code change against the frozen oracle. | Application source code only. **Forbidden** from editing tests, the spec, or any oracle artifact. Owns `implementation/result.md`. | The oracle — implementation cannot silently weaken tests to shortcut the change. Test mutation is a visible failure signal. |
 
-The shape is serial and disciplined: outputs of one agent become read-only inputs of the next. Nothing loops back except through an explicit reviewer verdict (brief-reviewer rejects → regroom) or a mechanical test failure (oracle fails → implementation rewrites the code).
+The shape is serial and disciplined: outputs of one agent become read-only inputs of the next. Nothing loops back except through an explicit reviewer verdict (spec-reviewer rejects → regroom) or a mechanical test failure (oracle fails → implementation rewrites the code).
 
 ## Agent Contract
 
@@ -579,7 +579,7 @@ Extends the same generator-evaluator pattern validated in the archived extract r
 
 The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
-- grooming path: human prompt/query → preview → confirmation → pre-groom → brief review → regroom → local brief / `Ready | needs-human-input`
+- grooming path: human prompt/query → preview → confirmation → pre-groom → spec review → regroom → local spec / `Ready | needs-human-input`
 - build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
 
 Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
@@ -596,7 +596,7 @@ This split keeps stable framework knowledge from turning into a junk drawer for 
 
 These files are **controller-only**. Manual worker dispatch remains a fallback path; it does not require them.
 
-When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`deliver-pre-groomer`, `deliver-brief-reviewer`, later oracle/build/review workers) should:
+When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`deliver-pre-groomer`, `deliver-spec-reviewer`, later oracle/build/review workers) should:
 
 - write their own artifacts
 - return a structured result to the controller
@@ -604,7 +604,7 @@ When `deliver` is connected to an external tracker, the controller is the only r
 
 That structured result acts like a callback signal to the controller:
 
-- `brief-written`
+- `spec-written`
 - `verdict: APPROVED | REJECTED`
 - `build-passed`
 - `build-failed`
@@ -624,7 +624,7 @@ The core handoff boundaries should stay explicit:
    An issue is created or selected in the outer workflow surface (a tracker) and becomes eligible for grooming.
 
 2. **Agent -> human or reviewer-agent**
-   After grooming, the agent writes the brief and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When a tracker is present, `ready-for-oracle` typically maps to an outer `Ready` state.
+   After grooming, the agent writes the spec and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When a tracker is present, `ready-for-oracle` typically maps to an outer `Ready` state.
 
 3. **Approval boundary**
    In supervised mode, a human promotes work from `Ready` to `Building`.
@@ -648,7 +648,7 @@ Current implemented runtime:
 
 - select issue
 - pre-groom
-- brief review
+- spec review
 - regroom up to limit
 - park at `Ready | needs-human-input`
 - after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree + branch
@@ -685,7 +685,7 @@ Autoship's differentiator is evidence-first reasoning.
 
 For the retired extract research track, truth came from journeys, screenshots, sample data, observed behavior, and oracle coverage.
 
-For `deliver`, truth comes from: current codebase reality, baseline snapshot, change brief, oracle draft, reviewer-approved decisions.
+For `deliver`, truth comes from: current codebase reality, baseline snapshot, change spec, oracle draft, reviewer-approved decisions.
 
 An issue tracker is an input and coordination surface, never the truth source. Issue text reflects what the reporter hoped; code reflects what the system does.
 
@@ -724,9 +724,9 @@ flowchart LR
     Op([Operator]) -->|1. create| Iss[(issue.md)]
     Op -->|2. dispatch| PG[deliver-pre-groomer]
     Iss --> PG
-    PG -->|writes| Brief[(brief.md)]
-    Op -->|3. dispatch| BR[deliver-brief-reviewer]
-    Brief --> BR
+    PG -->|writes| Spec[(spec.md)]
+    Op -->|3. dispatch| BR[deliver-spec-reviewer]
+    Spec --> BR
     BR -->|writes| Rev[(review-NN.md)]
     Rev -->|APPROVE| Done([ready-for-oracle])
     Rev -->|REJECT| Regroom[operator<br/>triggers regroom]
@@ -736,12 +736,12 @@ flowchart LR
 Five steps:
 
 1. Pull issue or local change request context (operator creates `.autoship/issues/<id>/issue.md`)
-2. Pre-groom a repo-local brief (`claude --agent deliver-pre-groomer -p "..."`)
-3. Run reviewer verdict (`claude --agent deliver-brief-reviewer -p "..."`)
+2. Pre-groom a repo-local spec (`claude --agent deliver-pre-groomer -p "..."`)
+3. Run reviewer verdict (`claude --agent deliver-spec-reviewer -p "..."`)
 4. Optionally regroom if REJECTED
 5. Stop at `ready-for-oracle`
 
-No code built yet. Prove that the system can produce a trustworthy issue brief first.
+No code built yet. Prove that the system can produce a trustworthy issue spec first.
 
 ### Filesystem layout
 
@@ -751,7 +751,7 @@ autoship-deliver-0.1/
     .autoship/
       issues/<id>/
         issue.md         # issue body + comments
-        brief.md         # pre-groomer output
+        spec.md         # pre-groomer output
         reviews/
           review-01.md   # first reviewer verdict
           review-02.md   # after regroom (if any)
@@ -763,11 +763,11 @@ Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) 
 
 Each graduates to a richer shape when observed need justifies it.
 
-- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → local brief / `Ready | needs-human-input`, then after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree → oracle → implementation → verification → draft PR.
-- **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The brief schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-brief-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The brief-specific reviewer checks live in `deliver-grooming/references/brief-review-rubric.md`.
-- **State derived from filesystem.** `brief.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. No `state.json`.
+- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → local spec / `Ready | needs-human-input`, then after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree → oracle → implementation → verification → draft PR.
+- **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The spec schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-spec-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The spec-specific reviewer checks live in `deliver-grooming/references/spec-review-rubric.md`.
+- **State derived from filesystem.** `spec.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. No `state.json`.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
-- **Reproduction outcome is a brief field, not a separate artifact.** A bug that cannot be reproduced is a `brief.md` with `reproduction-status: cannot-reproduce`; the reviewer's groundedness check flags it.
+- **Reproduction outcome is a spec field, not a separate artifact.** A bug that cannot be reproduced is a `spec.md` with `reproduction-status: cannot-reproduce`; the reviewer's groundedness check flags it.
 - **Non-functional type deferred.** Only Bug, Feature, and Refactor are designed; Non-functional grooming is implemented when probe-0.2+ has real data to inform it.
 
 ## Decision
@@ -782,7 +782,7 @@ For `deliver-0.1`, adopt the nine foundations. Defer the eight extensions. Expli
 - explicit state machine
 - mechanical gates
 - repo-local canonical state
-- brief schema
+- spec schema
 - voice-coded anti-pattern framing
 - pre-injected dispatch context
 

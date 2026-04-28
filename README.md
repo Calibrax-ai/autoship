@@ -2,7 +2,7 @@
 
 Turn messy software work into reviewable, reliable delivery — humans approve what matters, agents do the grinding.
 
-Autoship is a set of Claude Code agents and skills for the path from repo readiness to draft pull request: audit turns production gaps into bounded work, groom turns issues into reviewed local briefs, and deliver turns one approved brief into frozen tests, implementation, and a draft PR.
+Autoship is a set of Claude Code agents and skills for the path from repo readiness to draft pull request: audit turns production gaps into bounded work, groom turns issues into reviewed local specs, and deliver turns one approved spec into frozen tests, implementation, and a draft PR.
 
 ## Install
 
@@ -34,8 +34,8 @@ autoship audit --tracker=linear --approve
 
 autoship "get all Todo issues assigned to me and start grooming"
 autoship groom mine --state Todo --yes # skip confirmation after resolving scope
-autoship groom FRD-162 --post          # local brief, then mirror summary to Linear
-autoship deliver FRD-162               # approve current brief and build one issue
+autoship groom FRD-162 --post          # local spec, then mirror summary to Linear
+autoship deliver FRD-162               # approve current spec and build one issue
 autoship deliver build FRD-162 --dry-run
 ```
 
@@ -74,13 +74,13 @@ Groom/deliver need an issue source and a validation command first. The wizard in
 
 ```bash
 autoship "get all Todo issues assigned to me and start grooming"  # preview, confirm, groom locally
-autoship groom FRD-162                                            # write .autoship/issues/<id>/brief.md
+autoship groom FRD-162                                            # write .autoship/issues/<id>/spec.md
 autoship groom FRD-162 --post                                     # also mirror summary to Linear
-autoship deliver FRD-162                                          # approve current brief and build one issue
+autoship deliver FRD-162                                          # approve current spec and build one issue
 autoship deliver build FRD-162 --dry-run                          # plan, no push/PR
 ```
 
-The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local briefs under `.autoship/issues/<id>/`; `--post` opts into Linear mirroring. `autoship deliver <id>` is the human approval signal for building one reviewed brief.
+The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local specs under `.autoship/issues/<id>/`; `--post` opts into Linear mirroring. `autoship deliver <id>` is the human approval signal for building one reviewed spec.
 
 Per-repo sticky defaults live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies.
 

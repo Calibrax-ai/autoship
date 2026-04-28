@@ -1,18 +1,18 @@
 ---
 name: deliver-grooming
-description: Use during autoship's deliver track when a Linear/GitHub issue must become a reviewed executable brief for a Bug, Feature, or Refactor.
+description: Use during autoship's deliver track when a Linear/GitHub issue must become a reviewed executable spec for a Bug, Feature, or Refactor.
 ---
 
 # Deliver Grooming
 
 ## Overview
 
-Deliver grooming is the step between "a human filed an issue" and "an executor has a contract to build against." Its output is a single `brief.md` per issue, judged by a fresh-context reviewer before oracle assembly begins.
+Deliver grooming is the step between "a human filed an issue" and "an executor has a contract to build against." Its output is a single `spec.md` per issue, judged by a fresh-context reviewer before oracle assembly begins.
 
 The skill is shared by a generator-evaluator pair:
 
-- **deliver-pre-groomer** — drafts the brief. Evidence-first across all types.
-- **deliver-brief-reviewer** — skeptical judge. Three checks: well-formedness, groundedness, scope sanity. Binding verdict.
+- **deliver-pre-groomer** — drafts the spec. Evidence-first across all types.
+- **deliver-spec-reviewer** — skeptical judge. Three checks: well-formedness, groundedness, scope sanity. Binding verdict.
 
 Agents cannot discharge their own work. A deliver-pre-groomer that both wrote and approved would drift into a lower-friction standard. That's why the pair is structural.
 
@@ -20,13 +20,13 @@ Agents cannot discharge their own work. A deliver-pre-groomer that both wrote an
 
 Use this skill when:
 
-- The controller (or manual operator) has an incoming deliver-track issue and needs a reviewed brief before oracle assembly.
+- The controller (or manual operator) has an incoming deliver-track issue and needs a reviewed spec before oracle assembly.
 - A prior review returned REJECTED and the deliver-pre-groomer is regrooming.
 
 Do not use when:
 
 - The issue is still being triaged for type/scope (pre-pre-groom triage is an operator decision).
-- The brief has been approved and oracle assembly is now in progress. Different skill territory.
+- The spec has been approved and oracle assembly is now in progress. Different skill territory.
 
 ## Type postures
 
@@ -34,11 +34,11 @@ The dispatch names the type. Posture, anti-patterns, and per-type procedure foll
 
 ### Bug — forensic
 
-Every claim grounded in observed output, grep'd code, or cited issue content. Find the root cause — do not stop at the symptom. The brief covers exactly the reported bug; no adjacent fixes.
+Every claim grounded in observed output, grep'd code, or cited issue content. Find the root cause — do not stop at the symptom. The spec covers exactly the reported bug; no adjacent fixes.
 
 ### Feature — generative
 
-Evidence-first for features means evidence from codebase patterns, not runtime error output. Find the smallest design that solves the stated problem by following existing patterns. Novelty is a cost; fit is a feature. The brief covers the stated problem, not its adjacent imaginable extensions.
+Evidence-first for features means evidence from codebase patterns, not runtime error output. Find the smallest design that solves the stated problem by following existing patterns. Novelty is a cost; fit is a feature. The spec covers the stated problem, not its adjacent imaginable extensions.
 
 ### Refactor — conservational
 
@@ -54,9 +54,9 @@ Each type has one status field in frontmatter. Values are strictly enumerated �
 
 Do not invent `ready`, `proposed`, `in-progress`, `draft`, or any other label. If none of the enumerated values fit, use `need-info` and explain what is missing.
 
-## Brief schema
+## Spec schema
 
-The full brief template, including frontmatter, all universal sections, and type-specific sections, lives at `assets/brief-template.md`. The deliver-pre-groomer fills it; the reviewer checks conformance against it.
+The full spec template, including frontmatter, all universal sections, and type-specific sections, lives at `assets/spec-template.md`. The deliver-pre-groomer fills it; the reviewer checks conformance against it.
 
 Universal sections (all types): Outcome, Acceptance Criteria, Scope Fence, Rabbit-Hole Patches, Blast-Radius Manifest, Skeleton Position, Concrete Example. Optional: Failure Modes, Assumptions. `Assumptions` exists to surface product judgment the groomer made on its own — auth scope, thresholds, intent calls — so the human gate at Ready→Building can override. Hidden product judgment (made silently in body text instead of called out here) is a scope failure.
 
@@ -68,12 +68,12 @@ Type-specific sections:
 
 ## Feature scope classification
 
-Before drafting a Feature brief, classify scope:
+Before drafting a Feature spec, classify scope:
 
 - **Single-slice** — one coherent unit of work with a clear acceptance boundary. Surfaces either co-located in one file/module, or fan out across surfaces that share one enforcement chokepoint (middleware, single handler).
-- **Multi-slice** — genuinely independent surfaces whose correctness can only be verified separately, OR open questions that resolve differently per surface. Indicators live in the issue, not in the projected brief: multiple "Requested outcomes" that don't share a skeleton; open questions that branch the design tree (e.g., "per-user vs per-team vs role+entity") such that the fork drives different file sets.
+- **Multi-slice** — genuinely independent surfaces whose correctness can only be verified separately, OR open questions that resolve differently per surface. Indicators live in the issue, not in the projected spec: multiple "Requested outcomes" that don't share a skeleton; open questions that branch the design tree (e.g., "per-user vs per-team vs role+entity") such that the fork drives different file sets.
 
-If multi-slice: do not draft a unified brief. Output `design-status: need-info` with:
+If multi-slice: do not draft a unified spec. Output `design-status: need-info` with:
 
 - **Proposed decomposition** — named sub-issues (e.g., `FRD-143a data model`, `FRD-143b enforcement`) with one-line scopes
 - **Why it can't be single-sliced** — rationale citing the issue's open questions or independent surfaces
@@ -83,7 +83,7 @@ The operator splits on Linear and re-dispatches per sub-issue. Do not groom mult
 
 ## Groundedness criteria
 
-A brief is ungrounded if any claim lacks traceable evidence. These are the criteria the reviewer uses on Check 2:
+A spec is ungrounded if any claim lacks traceable evidence. These are the criteria the reviewer uses on Check 2:
 
 ### Universal
 
@@ -110,7 +110,7 @@ A brief is ungrounded if any claim lacks traceable evidence. These are the crite
 - **Observable invariants** in "What must be preserved" reference real behaviors — endpoint names, table names, event types that exist in the codebase.
 - **Structure Improvement → Before** cites the real current structure. Named files/functions/classes exist as described.
 - **Coverage gaps** are specific behaviors + specific regression tests to add (file + test name), not "add tests as needed."
-- If `preservation-status: needs-coverage-first`, Coverage gaps names specific tests; the brief is approvable only if those tests are specific enough to execute against.
+- If `preservation-status: needs-coverage-first`, Coverage gaps names specific tests; the spec is approvable only if those tests are specific enough to execute against.
 
 ## Scope sanity principles
 
@@ -128,12 +128,12 @@ A brief is ungrounded if any claim lacks traceable evidence. These are the crite
 ### Feature
 
 - **Picked alternative must be the simplest reasonable.** Over-engineering (generic abstraction for a single use case, novel machinery when existing patterns exist) is a scope failure.
-- **Substantially simpler alternative check.** If a simpler pattern exists in the codebase and Design Rationale did not consider it, the brief has failed scope sanity.
+- **Substantially simpler alternative check.** If a simpler pattern exists in the codebase and Design Rationale did not consider it, the spec has failed scope sanity.
 - **Multi-slice features acknowledge their shape.** A multi-slice feature pretending to be single-slice is a scope failure.
 
 ### Refactor
 
-- **No observable behavior changes.** API responses, DB shapes, emitted events, or any externally observable behavior must not drift. Any AC or Structure Improvement description implying behavior change is a scope failure. This is the load-bearing check for Refactor — the most common way refactor briefs fail.
+- **No observable behavior changes.** API responses, DB shapes, emitted events, or any externally observable behavior must not drift. Any AC or Structure Improvement description implying behavior change is a scope failure. This is the load-bearing check for Refactor — the most common way refactor specs fail.
 - **Improvement target is concrete and measurable**, not vague. "Reduce coupling" alone fails; "Extract auth logic into `src/auth/` (currently in `routes/*.ts`)" passes.
 - **No while-we're-here additions.** Scope matches the stated structural change; scope creep into behavior improvements or adjacent refactors is a failure.
 - **Coverage-gap plan is specific.** Named test files + test names + behaviors they cover.
@@ -142,19 +142,19 @@ A brief is ungrounded if any claim lacks traceable evidence. These are the crite
 
 ### Universal
 
-Other grooming systems produce briefs that look complete until the executor discovers they are half-specified or pointed at the wrong problem. The deliver-pre-groomer does not ship such a brief. The reviewer does not approve one.
+Other grooming systems produce specs that look complete until the executor discovers they are half-specified or pointed at the wrong problem. The deliver-pre-groomer does not ship such a spec. The reviewer does not approve one.
 
 ### Bug
 
-No brief without observed reproduction. No "Root Cause" as speculation — find the `file:line`. No scope widening beyond the bug. No stub fix disguised as a root-cause fix. No brief marked ready while any acceptance criterion lacks a runnable check.
+No spec without observed reproduction. No "Root Cause" as speculation — find the `file:line`. No scope widening beyond the bug. No stub fix disguised as a root-cause fix. No spec marked ready while any acceptance criterion lacks a runnable check.
 
 ### Feature
 
-No brief without a cited existing pattern — or, if truly new territory, an explicit "no existing pattern" decision in Design Rationale. No strawman alternatives. No machinery for imagined future requirements — deferred options live in the Deferred subsection. No pretending a multi-slice feature is single-slice. No novel abstractions when existing patterns solve the problem.
+No spec without a cited existing pattern — or, if truly new territory, an explicit "no existing pattern" decision in Design Rationale. No strawman alternatives. No machinery for imagined future requirements — deferred options live in the Deferred subsection. No pretending a multi-slice feature is single-slice. No novel abstractions when existing patterns solve the problem.
 
 ### Refactor
 
-No brief that changes observable behavior, even in "harmless" ways. No partial refactor — either it completes or does not start. No while-we're-here feature additions. No vague improvement targets. No commitment to a refactor before coverage exists for what must be preserved — if gaps exist, the brief commits to specific regression tests BEFORE the structural change.
+No spec that changes observable behavior, even in "harmless" ways. No partial refactor — either it completes or does not start. No while-we're-here feature additions. No vague improvement targets. No commitment to a refactor before coverage exists for what must be preserved — if gaps exist, the spec commits to specific regression tests BEFORE the structural change.
 
 ## Evidence discipline
 
@@ -162,12 +162,12 @@ No brief that changes observable behavior, even in "harmless" ways. No partial r
 - Design is grounded in the codebase, not in general principles.
 - Coverage is grep-inventoried from tests that actually exist.
 - File-existence is verified with an available file-listing tool (`Glob` for reviewers), not assumed.
-- The brief specifies WHAT must change and WHERE, never HOW.
+- The spec specifies WHAT must change and WHERE, never HOW.
 
 ## Hard rules
 
-- The deliver-pre-groomer writes exactly one file: the injected brief path. No source code, tests, migrations, or config changes.
-- The deliver-brief-reviewer writes exactly one file: its verdict at the injected review path. Read-only otherwise.
+- The deliver-pre-groomer writes exactly one file: the injected spec path. No source code, tests, migrations, or config changes.
+- The deliver-spec-reviewer writes exactly one file: its verdict at the injected review path. Read-only otherwise.
 - No destructive commands.
 - Reviewer verdicts are strictly binary: `APPROVED` or `REJECTED`. Blocking → REJECTED with specific objections. Non-blocking → APPROVED with observations in a `notes:` field. No intermediate labels.
 - Reviewer default is REJECT; approval requires positive evidence on every check.

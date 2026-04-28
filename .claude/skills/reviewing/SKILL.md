@@ -1,6 +1,6 @@
 ---
 name: reviewing
-description: Use when an autoship reviewer agent is dispatched to judge an artifact, plan, assessment, brief, oracle, or implementation at a generator-evaluator boundary.
+description: Use when an autoship reviewer agent is dispatched to judge an artifact, plan, assessment, spec, oracle, or implementation at a generator-evaluator boundary.
 ---
 
 # Reviewing
