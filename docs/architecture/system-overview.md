@@ -127,11 +127,15 @@ When autoship integrates with Linear:
 - Audit-created issues start in `Backlog` by default.
 - Deliver starts only after an issue source and validation commands are configured.
 
+### State-as-baton handoff
+
+In deliver, the Linear workflow-state column carries the human ↔ agent baton. Cards in `In Progress` mean autoship is working; cards anywhere else mean it's the operator's turn. Two operator-created states extend the universal set: `Spec Ready` (unstarted, between Todo and In Progress) for "spec written, your turn to approve and run `autoship deliver <id>`", and `Needs Attention` (unstarted, parallel column) for "autoship halted on a typed blocker." Each milestone fires a state change + @mention comment by default — kanban for the glance, Inbox for the notification. State transitions are best-effort: if a target state is missing in the workspace, the comment still posts. See [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for the full transition table.
+
 ## Current Implementation Status
 
 - `autoship init` scaffolds `.autoship/standards.yaml` with high-confidence repo evidence. Re-running on existing `.autoship/` prints an advisory only.
 - `audit` can run report-only, or write reviewed issue candidates to Linear when explicitly approved.
-- `deliver` can drive an issue through groom → review → `Ready` → human promotion → oracle → implementation → verification → draft PR.
+- `deliver` can drive an issue through groom → review → `Spec Ready` → human runs `autoship deliver <id>` → oracle → implementation → verification → draft PR (`In Review`).
 - merge, deploy, and outcome verification remain future work.
 
 ## Documentation Hierarchy

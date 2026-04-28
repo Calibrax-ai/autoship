@@ -2,7 +2,7 @@
 title: "Deliver"
 ---
 
-**Status:** v0.1 proposal · **Last updated:** 2026-04-21
+**Status:** v0.1 proposal · **Last updated:** 2026-04-27
 
 ## In plain English
 
@@ -15,7 +15,7 @@ Asking an AI to *"just implement the ticket"* tends to produce code that looks r
 - A **spec** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the spec is weak, work doesn't start.
 - A **draft pull request** with the code change, the tests, and the evidence that the change actually works.
 
-A human promotes the spec to "Building" only when it's trustworthy. Everything past that point runs until the draft PR is ready for human review.
+When grooming finishes, autoship parks the issue in `Spec Ready` and hands the baton back to the human. The human runs `autoship deliver <id>` only when the spec is trustworthy. Everything past that point runs until the draft PR is ready for human review (`In Review`).
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
 >
@@ -59,7 +59,7 @@ flowchart LR
       PG --> BR
     end
 
-    HA["Human approves<br/>Ready → Building"]
+    HA["Human approves<br/>Spec Ready → autoship deliver"]
 
     subgraph BUILD ["Build · oracle frozen"]
       direction TB
@@ -133,6 +133,30 @@ stateDiagram-v2
 | `spec.md` exists, no `reviews/` | `proposed` |
 | latest `reviews/review-NN.md` verdict is REJECTED | `changes-requested` |
 | latest `reviews/review-NN.md` verdict is APPROVED | `ready-for-oracle` |
+
+### Outer state: state-as-baton handoff
+
+The inner filesystem state machine is the agents' source of truth. The outer Linear workflow-state column is the **human-facing baton**: a card in `In Progress` means autoship is currently working it; a card anywhere else means it's the operator's turn.
+
+Two operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
+
+- **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. Signals "spec is written and reviewed; your turn to approve and run `autoship deliver <id>`."
+- **`Needs Attention`** — type `unstarted`, parallel column. Signals "autoship halted on a typed blocker; your turn to unblock."
+
+The controller is the single writer to Linear. At each milestone it fires both a state change and a comment with @mention of the assignee — the state change is the kanban-glance baton, the comment is the Inbox notification. The canonical transition table:
+
+| Milestone | Linear state | Comment payload |
+|---|---|---|
+| autoship picks up an issue (groom phase) | `In Progress` | `Autoship grooming started.` |
+| grooming complete, spec APPROVED | `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
+| grooming hit blocker (`needs-human-input`) | `Needs Attention` | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
+| build starts (`autoship deliver <id>`) | `In Progress` | `Build started — branch <branch>, worktree <path>.` |
+| draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
+| build hit blocker | `Needs Attention` | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
+
+State names are configurable via `transitions.{working,spec_ready,blocked,pr_open}` in `.autoship/defaults.yaml`. Defaults assume the two new states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror is the execution contract — comments carry one-line summaries and links to local paths, not full specs.
+
+`--no-post` (or `deliver.post: false`) suppresses both state changes and comments for a fully silent run. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
 
 ### Per-type grooming flow
 
@@ -579,7 +603,7 @@ Extends the same generator-evaluator pattern validated in the archived extract r
 
 The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
-- grooming path: human prompt/query → preview → confirmation → pre-groom → spec review → regroom → local spec / `Ready | needs-human-input`
+- grooming path: human prompt/query → preview → confirmation → pre-groom → spec review → regroom → local spec parked at `Spec Ready` (or `Needs Attention` on blocker)
 - build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
 
 Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
@@ -624,11 +648,11 @@ The core handoff boundaries should stay explicit:
    An issue is created or selected in the outer workflow surface (a tracker) and becomes eligible for grooming.
 
 2. **Agent -> human or reviewer-agent**
-   After grooming, the agent writes the spec and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When a tracker is present, `ready-for-oracle` typically maps to an outer `Ready` state.
+   After grooming, the agent writes the spec and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When Linear is the outer surface, `ready-for-oracle` maps to `Spec Ready` and `needs-human-input` maps to `Needs Attention`.
 
 3. **Approval boundary**
-   In supervised mode, a human promotes work from `Ready` to `Building`.
-   In auto mode, a reviewer-agent may promote it, but only until a typed blocker forces `needs-human-input`.
+   In supervised mode, a human promotes work out of `Spec Ready` by running `autoship deliver <id>`; the controller transitions the issue to `In Progress` and dispatches the build half.
+   In unattended mode, the controller advances eligible issues automatically from configured `states.build`, but only until a typed blocker forces `needs-human-input` (and the issue lands in `Needs Attention`).
 
 4. **Agent -> review**
    After build/validation/PR creation, the agent hands off again at review/merge boundaries.
@@ -646,12 +670,12 @@ GSD-style supervisor accumulation stays rejected — see Anti-Pattern 5.
 
 Current implemented runtime:
 
-- select issue
+- select issue (controller transitions to `In Progress`)
 - pre-groom
 - spec review
 - regroom up to limit
-- park at `Ready | needs-human-input`
-- after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree + branch
+- park at `Spec Ready` (or `Needs Attention` on blocker)
+- after explicit `autoship deliver <id>` approval or strict build-state eligibility: controller transitions to `In Progress`, creates worktree + branch
 - oracle result
 - implementation result
 - controller reruns validation
@@ -763,7 +787,7 @@ Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) 
 
 Each graduates to a richer shape when observed need justifies it.
 
-- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → local spec / `Ready | needs-human-input`, then after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree → oracle → implementation → verification → draft PR.
+- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → spec parked at `Spec Ready` (or `Needs Attention` on blocker), then after explicit `autoship deliver <id>` approval or strict build-state eligibility: worktree → oracle → implementation → verification → draft PR → `In Review`.
 - **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The spec schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-spec-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The spec-specific reviewer checks live in `deliver-grooming/references/spec-review-rubric.md`.
 - **State derived from filesystem.** `spec.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` exists → `oracle-written`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. No `state.json`.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
