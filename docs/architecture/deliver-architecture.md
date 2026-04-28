@@ -605,10 +605,10 @@ Extends the same generator-evaluator pattern validated in the archived extract r
 
 The controller-backed runtime extends `deliver` into the first end-to-end path that reaches **draft PR**. One top-level `autoship-controller` agent running in `deliver` mode now owns both halves of the workflow:
 
-- grooming path: human prompt/query → preview → confirmation → pre-groom → spec review → regroom → local spec parked at `Spec Ready` (or `Needs Attention` on blocker)
+- grooming path: human prompt/query → preview → pre-groom → spec review → regroom → local spec parked at `Spec Ready` (or `Needs Attention` on blocker). Preview is informational by default; per-repo `deliver.confirm: true` turns it into a `[y/N]` boundary.
 - build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
 
-Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, validation commands, and outer state map. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
+Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
 The controller reads two distinct instruction layers:
 
@@ -616,7 +616,7 @@ The controller reads two distinct instruction layers:
   Stable autoship operating knowledge plus per-mode procedure: workflow semantics, approval boundaries, meaning of `needs-human-input`, reviewer/generator separation, default stop conditions, and the deliver-mode loop itself. Also hosts § How I Receive Work, which defines the RunRequest contract and configuration precedence.
 
 - **RunRequest** (in-memory per run, snapshotted to `<run-dir>/run.json`)
-  Run-scoped contract: which repo/testbed to operate on, which issue source to pull from (`deliver.linear` or `deliver.folder`), which states are eligible for grooming vs build, whether the run is unattended, whether Linear mirroring is enabled, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → framework defaults.
+  Run-scoped contract: which repo/testbed to operate on, which issue source to pull from (`deliver.linear` or `deliver.folder`), which states are eligible for grooming vs build, whether the run is unattended, whether Linear mirroring is enabled, and what "do not stop" means for this specific run. Resolved from: trigger flags → `.autoship/defaults.yaml` → **runtime inference from repo evidence** (`linear auth list`, `package.json`, `Makefile`, etc.) → framework defaults. Inference fires only when the higher-precedence layers do not set the field; each fired inference writes to `inferences.jsonl`. `defaults.yaml` is therefore **optional override** rather than required setup.
 
 This split keeps stable framework knowledge from turning into a junk drawer for repo-specific or one-off policy. (The framework knowledge previously lived in a separate `autoship-controller` skill; it was folded into the agent file on 2026-04-24 because the skill had a single reader and the split was creating drift between two files. Historical note: the trigger contract was originally a committed `.autoship/program.md` file; current deliver does not read it and uses flag/NL triggers instead.)
 
@@ -783,7 +783,7 @@ autoship-deliver-0.1/
           review-02.md   # after regroom (if any)
 ```
 
-Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) — the production shape where `deliver` gets installed into a repo the way `.github/` or `.claude/` does. Run-scoped state (`run.json`, `invocation.txt`, snapshotted `standards.yaml`, logs) lives under `app/.autoship/runs/<run-id>/`; the optional active deliver pointer is `app/.autoship/runs/current`.
+Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) — the production shape where `deliver` gets installed into a repo the way `.github/` or `.claude/` does. Run-scoped state lives under `app/.autoship/runs/<run-id>/`: `run.json` (resolved RunRequest), `invocation.txt` (raw trigger), `decisions.log` (prose audit trail of state transitions and worker dispatches), and `inferences.jsonl` (structured record of every value the controller inferred at runtime — see [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)). The optional active deliver pointer is `app/.autoship/runs/current`.
 
 ### 0.1-specific simplifications
 

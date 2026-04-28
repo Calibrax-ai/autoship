@@ -17,7 +17,7 @@ Run from the root of a git repo. The CLI:
 - Copies 7 core autoship agents into `.claude/agents/`
 - Copies 4 core skill packs into `.claude/skills/`
 - Writes `.autoship/standards.yaml` with high-confidence repo policy inferred from evidence (next/prisma/sentry/github-actions/etc.). Each inferred value is annotated with `# inferred from <evidence>`.
-- Writes an optional commented `.autoship/defaults.yaml` template for per-repo run defaults
+- Writes a commented `.autoship/defaults.yaml` overrides template — autoship infers source, scope, and validation at runtime, so this file is for explicit overrides only
 - Adds autoship runtime state to `.gitignore`
 
 After the repo evolves, re-run `autoship init` against the existing repo. It will print an advisory — what current evidence would fill into SET_ME slots, where existing values disagree with current evidence — without modifying `standards.yaml`. Copy any fills you want manually. autoship never silently overwrites the file once it exists.
@@ -81,10 +81,10 @@ autoship audit --report-only
 autoship audit --tracker=linear --approve
 ```
 
-Groom/deliver need an issue source and a validation command first. The wizard in `autoship init` collects both; otherwise edit `.autoship/defaults.yaml` and configure exactly one source block (`deliver.linear` or `deliver.folder`) plus `deliver.validation.commands`. Then:
+Groom/deliver auto-configures itself from repo evidence — autoship infers source (`linear auth list` + `.autoship/issues/`), Linear scope (`linear team list`), and the validation gate (`package.json` scripts, `Makefile`, `pyproject.toml`, `Cargo.toml`) at runtime. Each inference is announced at run start and logged to `.autoship/runs/<run-id>/inferences.jsonl`. `defaults.yaml` exists for explicit overrides only — populated by the wizard during `autoship init`, or left empty to let inference handle everything.
 
 ```bash
-autoship "get all Todo issues assigned to me and start grooming"  # preview, confirm, groom locally
+autoship "get all Todo issues assigned to me and start grooming"  # preview, groom locally
 autoship groom FRD-162                                            # write .autoship/issues/<id>/spec.md, mirror to Linear
 autoship groom FRD-162 --no-post                                  # local-only, no Linear writes
 autoship deliver FRD-162                                          # approve current spec and build one issue
@@ -93,9 +93,11 @@ autoship deliver build FRD-162 --dry-run                          # plan, no pus
 
 The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local specs under `.autoship/issues/<id>/`. Each deliver milestone (groom-start, spec-ready, build-start, PR-open, blocker) fires a Linear state change + a comment with @mention to the assignee — `--post` is on by default; pass `--no-post` for a fully silent run.
 
-Per-repo sticky defaults live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies. Set `deliver.confirm: false` to make query/batch runs proceed immediately after the preview instead of waiting for `[y/N]`; the per-run `--yes` flag is the one-shot equivalent.
+Per-repo overrides live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies. By default, query/batch runs proceed immediately after the preview; set `deliver.confirm: true` per-repo to require a `[y/N]` pause, or use the per-run `--yes` flag as the one-shot opposite.
 
-Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, and `.autoship/standards.yaml`.
+`autoship deliver --unattended` keeps strict config-as-truth behavior (no inference, no announce affordance) — use it for machine-driven runs where there's no human to interrupt.
+
+Live autoship does not require or read `.autoship/program.md`. The core path uses prompt flags, `.autoship/defaults.yaml`, `.autoship/standards.yaml`, and runtime inference.
 
 ## Requires
 

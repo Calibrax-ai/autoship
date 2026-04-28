@@ -2,7 +2,7 @@
 title: "System Overview"
 ---
 
-**Status:** draft · **Last updated:** 2026-04-27
+**Status:** Operational · **Last updated:** 2026-04-28
 
 ## In plain English
 
@@ -102,16 +102,17 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 - **Mechanical checks go to the controller.** Commands, file existence, parseable verdicts, and hash checks are mechanical.
 - **Judgment goes to reviewers.** Groundedness, scope, severity, and implementation-worthiness require a fresh evaluator.
 - **Strict ownership.** The controller never writes code. Workers never touch tracker state.
+- **Sharp policy/execution seam.** Operators own the *bar* (what counts as production-ready, what counts as passing, when humans must approve) via `standards.yaml` and explicit overrides in `defaults.yaml`. The controller owns the *path* (how to discover, how to execute, how to verify). Routine path-picking is inferred from repo evidence, logged structurally to `runs/<run-id>/inferences.jsonl`, and announced at run start — operators get an audit trail without having to restate evidence as config.
 
 ## State And Configuration
 
 Live autoship has no `.autoship/program.md`.
 
-- **RunRequest** — normalized run intent, resolved from prompt flags or natural language, optional `.autoship/defaults.yaml`, and framework defaults. Snapshotted as `run.json` under each run directory.
-- **`.autoship/standards.yaml`** — repo policy. Commit this file.
-- **`.autoship/defaults.yaml`** — optional per-repo run defaults. Flags always win.
+- **RunRequest** — normalized run intent, resolved from: prompt flags → optional `.autoship/defaults.yaml` overrides → runtime inference from repo evidence → framework defaults. Snapshotted as `run.json` under each run directory.
+- **`.autoship/standards.yaml`** — repo policy contract. Commit this file. The operator-owned source of truth for what good looks like in this repo (hosting, CI, observability, secrets, release expectations).
+- **`.autoship/defaults.yaml`** — optional per-repo overrides. Empty/absent is fine — autoship infers source, scope, and validation from repo evidence at runtime. Use this file only when you want to lock down explicit choices that override the inference. Flags always win.
 - **`.autoship/audits/<run-id>/`** — audit artifacts.
-- **`.autoship/runs/<run-id>/`** — deliver run logs and snapshots.
+- **`.autoship/runs/<run-id>/`** — deliver run logs and snapshots: `run.json` (resolved RunRequest), `invocation.txt` (raw trigger), `decisions.log` (prose state-transition log), `inferences.jsonl` (structured inference trail; see [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)).
 - **`.autoship/issues/<id>/`** — deliver issue mirror, spec, reviews, oracle, implementation, verification, and PR artifact.
 
 ## Workflow-Surface Ownership
@@ -136,6 +137,7 @@ In deliver, the Linear workflow-state column carries the human ↔ agent baton. 
 - `autoship init` scaffolds `.autoship/standards.yaml` with high-confidence repo evidence. Re-running on existing `.autoship/` prints an advisory only.
 - `audit` can run report-only, or write reviewed issue candidates to Linear when explicitly approved.
 - `deliver` can drive an issue through groom → review → `Spec Ready` → human runs `autoship deliver <id>` → oracle → implementation → verification → draft PR (`In Review`).
+- **Trust architecture (0.3.0):** the controller infers source, Linear scope, and validation commands from repo evidence at runtime; each inference is announced at run start and logged structurally to `runs/<run-id>/inferences.jsonl`. `defaults.yaml` is therefore optional override rather than required setup. Real ambiguity (multi-team workspace, no detectable test infra) still halts; routine path-picking proceeds with a logged trail.
 - merge, deploy, and outcome verification remain future work.
 
 ## Documentation Hierarchy
@@ -146,5 +148,6 @@ Use the docs in this order:
 2. [audit-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/audit-architecture.md) for audit.
 3. [audit-tracker-sync.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/audit-tracker-sync.md) for Linear audit issue sync.
 4. [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for deliver.
+5. [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md) for the runtime inference audit trail (`inferences.jsonl` schema).
 
 Archived extract material is historical only: [docs/archive/extract/](/Users/shyangcalibrax/Documents/Projects/autoship/docs/archive/extract/).
