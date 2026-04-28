@@ -64,7 +64,8 @@ Normalize every trigger into a **RunRequest**:
 - `external_url`: optional
 - `dry_run`: boolean
 - `post`: boolean; when true, mirror grooming/build summaries to Linear
-- `yes`: boolean; when true, skip human confirmation for query-selected work
+- `confirm`: boolean (default true); when false, the preview is shown but the run proceeds immediately without asking. Configurable via `deliver.confirm` in `.autoship/defaults.yaml`. The per-run `--yes` flag forces this to false for one run.
+- `yes`: boolean; when true (per-run flag), skip human confirmation for this query-selected run regardless of `confirm` default
 - `unattended`: boolean; strict machine-trigger mode, no fuzzy natural-language scope
 - `trigger_source`: `local-cli | natural-language | tracker-webhook`
 
@@ -83,7 +84,7 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 - `.autoship/program.md` is unsupported. Do not read it as a fallback, even if present.
 - For audit and deliver runs, write `invocation.txt` and `run.json` in the run dir at run start, before dispatching any worker.
 - Workers receive normalized inputs (injected in dispatch). Workers do not read trigger/config files directly.
-- In human prompt/query mode, show the selected issue set and require confirmation before broad work unless `--yes` was passed.
+- In human prompt/query mode, always show the selected issue set as a preview. Pause for confirmation before broad work when `deliver.confirm` is true (the default) and `--yes` was not passed for this run. When `deliver.confirm` is false (operator-set in `.autoship/defaults.yaml`), or `--yes` was passed, proceed immediately after the preview.
 - In unattended mode, reject natural-language scope and require strict configured eligibility.
 - On ambiguity that changes scope, stop and ask. Do not silently assume defaults for fields the operator didn't specify.
 - **Speak plainly to humans.** This document uses internal architecture terms (`RunRequest`, generator-evaluator, structural handoff, eligibility filter) for precision. They belong in your reasoning, not in your user-facing speech. When narrating progress, halts, or errors to the operator, translate. Say "I'll figure out what to run by reading your prompt, `.autoship/defaults.yaml`, and the framework defaults" — not "resolving the RunRequest." Say "I'll send this spec to a reviewer" — not "structural handoff to deliver-spec-reviewer." The terms are tools for thinking, not labels to read aloud.
@@ -333,6 +334,7 @@ The resolved contract declares: issue source (`deliver.linear` or `deliver.folde
 - `dry_run: false`
 - `max_regroom_cycles: 3`
 - `post: true`
+- `confirm: true`
 - `unattended: false`
 
 If the resolved contract requests auto-merge, deploy, or broad unattended work from a natural-language prompt, stop — those are later-phase concerns.
@@ -556,7 +558,7 @@ Anything else: **do not stop**. In deliver mode, park per-issue blockers at `nee
 
 Run autonomously after the selected scope is authorized. Do not ask "should I continue?" between mechanical stages.
 
-For human prompt/query batches, the preview confirmation is the authorization boundary; if `--yes` was not passed, stop for that confirmation before dispatching workers. For unattended runs, only proceed when strict eligibility is already satisfied.
+For human prompt/query batches, always render the preview. When `deliver.confirm` is true (default) and `--yes` was not passed, the preview is the authorization boundary — stop for confirmation before dispatching workers. When `deliver.confirm` is false (operator-configured) or `--yes` was passed, the preview is informational only — proceed immediately. For unattended runs, only proceed when strict eligibility is already satisfied.
 
 Continue until a run-level stop condition above fires. When a stop condition fires, write the reason, set the right local state and any configured Linear comment, then exit cleanly with a machine-readable exit code so the operator can resume later.
 

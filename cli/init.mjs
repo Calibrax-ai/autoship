@@ -505,6 +505,11 @@ function renderDefaultsTemplate() {
 #   external_exposure: false   # override per-run with --external-url=<url>
 
 # deliver:
+#   # Set to false to skip the "Proceed? [y/N]" prompt on query/batch runs.
+#   # The preview is still shown — autoship just doesn't pause for input.
+#   # The per-run --yes flag has the same effect for one run.
+#   confirm: true
+#
 #   # Pick exactly one source block: folder OR linear.
 #   folder:
 #     path: .autoship/issues
@@ -553,6 +558,11 @@ function renderDefaultsConfigured(answers) {
 	const deliverSource = answers.tracker === 'skip' ? null : answers.tracker;
 	if (deliverSource) {
 		lines.push('deliver:');
+		lines.push('  # Set to false to skip the "Proceed? [y/N]" prompt on query/batch runs.');
+		lines.push('  # The preview is still shown; autoship just does not pause for input.');
+		lines.push('  # The per-run --yes flag has the same effect for one run.');
+		lines.push('  confirm: true');
+		lines.push('');
 		if (deliverSource === 'linear' && answers.linear) {
 			lines.push('  linear:');
 			lines.push(`    team: ${quote(answers.linear.team)}`);
