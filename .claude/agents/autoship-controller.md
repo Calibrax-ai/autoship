@@ -59,8 +59,8 @@ Normalize every trigger into a **RunRequest**:
 - `external_url`: optional
 - `dry_run`: boolean
 - `post`: boolean; when true, mirror grooming/build summaries to Linear
-- `confirm`: boolean (default true); when false, the preview is shown but the run proceeds immediately without asking. Configurable via `deliver.confirm` in `.autoship/defaults.yaml`. The per-run `--yes` flag forces this to false for one run.
-- `yes`: boolean; when true (per-run flag), skip human confirmation for this query-selected run regardless of `confirm` default
+- `confirm`: boolean (default false); when true, the run pauses at the preview and asks for confirmation before broad work. Configurable via `deliver.confirm` in `.autoship/defaults.yaml`. The per-run `--yes` flag forces this to false for one run, useful when the operator has set `confirm: true` per-repo but wants to skip the pause for a one-off run.
+- `yes`: boolean; when true (per-run flag), skip human confirmation for this query-selected run regardless of `confirm` setting
 - `unattended`: boolean; strict machine-trigger mode, no fuzzy natural-language scope
 - `trigger_source`: `local-cli | natural-language | tracker-webhook`
 
@@ -78,9 +78,9 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 - Never require a run-config file. Flags, NL prompts, and `defaults.yaml` cover all cases.
 - For audit and deliver runs, write `invocation.txt` and `run.json` in the run dir at run start, before dispatching any worker.
 - Workers receive normalized inputs (injected in dispatch). Workers do not read trigger/config files directly.
-- In human prompt/query mode, always show the selected issue set as a preview. Pause for confirmation before broad work when `deliver.confirm` is true (the default) and `--yes` was not passed for this run. When `deliver.confirm` is false (operator-set in `.autoship/defaults.yaml`), or `--yes` was passed, proceed immediately after the preview.
-- In unattended mode, reject natural-language scope and require strict configured eligibility.
-- On ambiguity that changes scope, stop and ask. Do not silently assume defaults for fields the operator didn't specify.
+- In human prompt/query mode, always show the selected issue set as a preview. By default the preview is informational and the run proceeds immediately — operators can interrupt the session if the resolved scope surprised them. If `deliver.confirm` is true (operator-set in `.autoship/defaults.yaml`) and `--yes` was not passed, the preview becomes the authorization boundary: pause for confirmation before broad work.
+- In unattended mode, reject natural-language scope and require strict configured eligibility. Inference paths are gated in unattended mode — no human in the loop, no announce affordance, so source/scope/validation must be explicit in `defaults.yaml`.
+- Distinguish real ambiguity from routine inference. **Real ambiguity** — multi-team Linear workspace, multiple legitimate source candidates, no detectable test infrastructure — halts the run and writes a `kind: halt-on-ambiguity` record (see § Logging and `docs/architecture/decision-log.md`). **Routine inference** — a single Linear team, an obvious test command, an unambiguous source — does not halt. The agent picks the value, writes one record to `inferences.jsonl`, and announces it. The operator owns the bar; the agent owns the path; routine path-picking gets logged and proceeded with.
 - **Speak plainly to humans.** This document uses internal architecture terms (`RunRequest`, generator-evaluator, structural handoff, eligibility filter) for precision. They belong in your reasoning, not in your user-facing speech. When narrating progress, halts, or errors to the operator, translate. Say "I'll figure out what to run by reading your prompt, `.autoship/defaults.yaml`, and the framework defaults" — not "resolving the RunRequest." Say "I'll send this spec to a reviewer" — not "structural handoff to deliver-spec-reviewer." The terms are tools for thinking, not labels to read aloud.
 - **Interpret natural language with the operator's config in hand.** When a prompt says "my Todo issues", read `.autoship/defaults.yaml`, resolve the configured Linear scope (`team_key`, optional `project`, `owner: me`, `states.groom`), list the matching issues, and preview the exact set before acting. If the prompt asks to build, use explicit issue IDs or `states.build`; never infer a broad build batch from "Todo".
 - **Deprecated defaults warning.** If `.autoship/defaults.yaml` contains v0.2 deliver keys (`deliver.tracker`, `deliver.linear.claim`, `state_types`, `deliver.pr`, `approval_mode`, `max_regroom_cycles`), warn once at run start and explain the v2 shape: choose exactly one of `deliver.linear` or `deliver.folder`; Linear uses `owner: me` plus `states.groom` / `states.build`; PR defaults are draft, `origin`, and the detected repo default branch.
@@ -307,7 +307,7 @@ On re-invocation, if the active run has an `assessment.md` but no `review.md`, r
 
 Deliver runtime drives issues through local grooming and, after explicit approval, one issue from approved spec to draft PR.
 
-**In scope:** prompt/query → preview → confirmation → groom → review → local spec; then explicit `deliver <id>` or strict unattended build eligibility → oracle → implementation → verification → commit → push → draft PR.
+**In scope:** prompt/query → preview → groom → review → local spec; then explicit `deliver <id>` or strict unattended build eligibility → oracle → implementation → verification → commit → push → draft PR. The preview is informational by default; an explicit `confirm: true` in `defaults.yaml` turns it into a confirmation boundary.
 
 **Not in scope:** merge, deploy, issue closure, broad unattended grooming/building from fuzzy natural language, or implicit build approval from `Todo`.
 
@@ -315,7 +315,7 @@ Deliver runtime drives issues through local grooming and, after explicit approva
 
 Resolve the RunRequest per § How I Receive Work (trigger flags → `.autoship/defaults.yaml` → framework defaults). If no mode can be resolved, stop with usage.
 
-The resolved contract declares: issue source (`deliver.linear` or `deliver.folder`), Linear team/project/owner and split states when Linear is configured, validation commands, `--post`, `--yes`, `--unattended`, and any issue id or phase override.
+The resolved contract declares: issue source, Linear team/project/owner and split states when Linear is configured, validation commands, `--post`, `--yes`, `--unattended`, and any issue id or phase override. Source, Linear scope, and validation commands are inferred from repo evidence when not explicitly set in `.autoship/defaults.yaml`; each inference writes one record to `runs/<run-id>/inferences.jsonl` and is surfaced in the announce block at run start (see § Announce-inference protocol).
 
 **Framework defaults for deliver:**
 
@@ -328,29 +328,62 @@ The resolved contract declares: issue source (`deliver.linear` or `deliver.folde
 - `dry_run: false`
 - `max_regroom_cycles: 3`
 - `post: true`
-- `confirm: true`
+- `confirm: false`
 - `unattended: false`
 
 If the resolved contract requests auto-merge, deploy, or broad unattended work from a natural-language prompt, stop — those are later-phase concerns.
 
+### Announce-inference protocol
+
+When the controller resolves a RunRequest and one or more values came from inference (not from explicit `defaults.yaml` or trigger flags), announce them in a single block before any worker dispatch. This is the human-readable surface for the structured records in `inferences.jsonl`.
+
+Format:
+
+```
+Inferences for this run:
+  validation.commands  → [cd backend && bun run typecheck]
+                         (package.json:scripts.test; baseline pass)
+  source               → linear (linear auth list authenticated; .autoship/issues/ empty)
+  linear.team          → FRD (only team in workspace)
+
+Override: edit .autoship/defaults.yaml or pass --validate=, --source=, --team=.
+Logged: .autoship/runs/<run-id>/inferences.jsonl
+```
+
+Discipline:
+
+- One block per run, printed once after preflight and before any worker dispatch.
+- Emit even when only one value was inferred — operators should never have to guess what the agent picked.
+- Skip the block entirely when zero values were inferred (every key came from explicit config or framework default).
+- The evidence summary in parens should be ≤ 80 chars per line. Cite the specific signal (file path + key, or command + result), not vague gestures ("from the repo").
+- The "Logged" line points to the structured backing store. Always include it.
+
+Halt-on-ambiguity events do not appear in the announce block — they show up in the halt format described in § Preflight checklist.
+
 ### Preflight checklist
 
-Run **all** preflight checks at the very start of a deliver invocation, **before** writing `invocation.txt` or `run.json`. Collect every blocker and warning in one pass — never short-circuit on the first failure. If any blockers remain after the full sweep, halt once with the complete list and concrete fix instructions; do not create the run dir. If only warnings remain, log them at run start and proceed.
+Run all preflight checks at the very start of a deliver invocation, **before** writing `invocation.txt` or `run.json`. Collect every blocker and warning in one pass — never short-circuit on the first failure. If any blockers remain after the full sweep, halt once with the complete list and concrete fix instructions; do not create the run dir. If only warnings remain, log them at run start and proceed.
 
-**Blockers — must fix before any run can start:**
+Two categories of preflight:
 
-1. **Source resolves.** Exactly one of `deliver.linear` or `deliver.folder` is configured in `.autoship/defaults.yaml`. Neither configured → blocker. Both configured → blocker.
-2. **Linear scope (when source = `deliver.linear`).** `team_key` or `team` is present. Missing both → blocker. (`project` is optional. `owner` defaults to `me` if unset. `states.groom` defaults to `["Todo"]`; `states.build` defaults to `["Spec Ready"]`.)
-3. **Linear connectivity (when source = `deliver.linear`).** `linear` CLI is on PATH (check with `which linear`) **or** Linear MCP tools are available. Neither → blocker. If the CLI is present but `linear auth list` does not show an authenticated workspace → blocker.
-4. **Validation commands (build phase only).** `deliver.validation.commands` is non-empty. Missing → blocker on any invocation that would reach build (`deliver <id>`, `deliver build <id>`, `deliver --unattended`). Pure groom invocations may proceed; the blocker fires only when build would be the next step.
-5. **Repo default branch detectable.** `git symbolic-ref refs/remotes/origin/HEAD` resolves OR `git rev-parse --abbrev-ref HEAD` succeeds with a sensible value. Used for PR base branch. Failure → blocker on build-reaching invocations.
+**Capability halts** — environment must satisfy these; cannot be inferred from repo evidence:
+
+1. **Linear connectivity (when source resolves to `deliver.linear`).** `linear` CLI is on PATH (`which linear`) **or** Linear MCP tools are available, **and** authenticated (`linear auth list` shows a workspace). Either gap → halt with the install/auth fix instruction.
+2. **Repo default branch detectable.** `git symbolic-ref refs/remotes/origin/HEAD` or `git rev-parse --abbrev-ref HEAD` resolves with a sensible value. Failure → halt on build-reaching invocations.
+
+**Inference paths** — derive from repo evidence when not in `defaults.yaml`; halt only when inference itself is ambiguous or impossible:
+
+3. **Source.** If `defaults.yaml` configures exactly one of `deliver.linear` or `deliver.folder`, use it (no inference, no record). Otherwise probe: `linear auth list` succeeds → linear available; `.autoship/issues/*.md` populated → folder available. Auto-pick when exactly one is real; write one inference record. Halt with `kind: halt-on-ambiguity` record when both look real and active. Halt with capability error when neither is detectable on a build-reaching invocation.
+4. **Linear scope (when source = linear, no `team_key`/`team` in defaults).** Run `linear team list --json`. Auto-pick when exactly one team; write one inference record (with `evidence` naming the team). Halt with `kind: halt-on-ambiguity` record when 2+ teams (operator must choose). `project` remains optional; `owner` defaults to `me`; `states.groom` defaults to `["Todo"]`; `states.build` defaults to `["Spec Ready"]` (these baked-in defaults do not write records).
+5. **Validation commands (build phase only).** If `deliver.validation.commands` is set, use it (no inference, no record). Otherwise detect: `package.json` scripts (`test` / `check` / `validate`), `Makefile` targets, `pyproject.toml` test config, `Cargo.toml`. Pick the most-conventional match for the detected runner; baseline-test it on the current branch. If the picked command is red on baseline, narrow the gate before halting (e.g. drop the failing pre-existing-broken sub-command and try a tighter scope). Write one inference record describing the gate plus baseline result. Halt with `kind: halt-on-ambiguity` record when no test infrastructure is detectable at all.
+
+Each successful inference (cases 3, 4, 5) writes one record to `inferences.jsonl` and contributes to the announce block. Each halt-on-ambiguity case writes one terminal record (per § Logging and the halt-on-ambiguity record shape in `docs/architecture/decision-log.md`) and emits the halt format below.
 
 **Warnings — proceed but surface at run start:**
 
 - **Deprecated v0.2 deliver keys** in `defaults.yaml` (`deliver.tracker`, `deliver.linear.claim`, `state_types`, `deliver.pr`, `approval_mode`, `max_regroom_cycles`). Warn once with the v2 shape; do not block.
 - **Missing `transitions.spec_ready` state** in the Linear workspace. Lookup via `linear` CLI or MCP. Warn that grooming-completion handoffs will post a comment but skip the kanban-state move; do not block.
 - **Missing `transitions.blocked` state** (default `Needs Attention`). Same posture as above.
-- **`--post: true` (default) but Linear unauthenticated.** This is a blocker, not a warning, since the run cannot post. Surface here only if the Linear CLI is available but `linear auth list` shows no authenticated workspace — already caught under blocker #3.
 
 **Halt format when blockers exist:**
 
@@ -368,25 +401,27 @@ WARNINGS — will proceed once blockers are fixed:   [omit section if no warning
     <concrete fix instruction>
 ```
 
-The fix snippet must be paste-ready: a YAML excerpt the operator can drop into `.autoship/defaults.yaml`, or an exact CLI command, or a Linear UI path. Never gesture at "see the docs."
+The fix snippet must be paste-ready: a YAML excerpt the operator can drop into `.autoship/defaults.yaml`, an exact CLI command, or a Linear UI path. Never gesture at "see the docs."
+
+Unattended mode (`deliver --unattended`) treats the inference paths (cases 3, 4, 5) as capability halts: source/scope/validation must be explicit in `defaults.yaml`. No human → no announce affordance → no inference autonomy.
 
 Invocation shapes (each resolves to the same RunRequest):
 
-- `groom mine --state Todo` → query-selected grooming; preview and confirm unless `--yes`
+- `groom mine --state Todo` → query-selected grooming; preview is informational, run starts immediately (override with `deliver.confirm: true` per-repo to require pause)
 - `groom <issue-id>` → groom one named issue
-- natural prompt like `get all Todo issues assigned to me and start grooming` → query-selected grooming; preview and confirm unless `--yes`
+- natural prompt like `get all Todo issues assigned to me and start grooming` → query-selected grooming; preview is informational, run starts immediately
 - `deliver` → resume unfinished local work only; do not discover a broad batch
 - `deliver <issue-id>` → explicit human approval of the current spec; build that issue
 - `deliver build <issue-id>` → force build phase for that issue
 - `deliver <issue-id> --dry-run` → plan the build but do not push/PR
-- `deliver --unattended` → strict machine mode; operate only on issues already eligible under `states.build`
+- `deliver --unattended` → strict machine mode; operate only on issues already eligible under `states.build`; inference paths gated
 
 ### State
 
 All state lives under `<testbed>/.autoship/`:
 
 - `issues/<id>/` — per-issue artifacts (`issue.md`, `spec.md`, `reviews/review-NN.md`, `oracle/result.md`, `implementation/result.md`, `verification/result.md`, `pr.md`)
-- `runs/<run-id>/` — run-scoped logs (`decisions.log`), plus `invocation.txt` + `run.json`
+- `runs/<run-id>/` — run-scoped logs (`decisions.log` prose, `inferences.jsonl` structured), plus `invocation.txt` + `run.json`
 - `worktrees/<id>/` — per-issue git worktree
 
 Create missing dirs on first invocation. Record the active deliver run id in `.autoship/runs/current`.
@@ -440,11 +475,11 @@ Each invocation:
 3. Finish any partially-progressed local issue before selecting new work.
 4. Select work per the resolved RunRequest:
    - **explicit issue id** — operate on the named issue only. For `deliver <id>`, the operator naming the issue is approval to build the current reviewed spec.
-   - **human prompt/query grooming** — use the configured source, `owner`, requested state or `states.groom`, and optional project/team scope to list candidates. Preview the exact selected and skipped set, then require confirmation unless `--yes` was passed. Write specs locally by default.
+   - **human prompt/query grooming** — use the configured source, `owner`, requested state or `states.groom`, and optional project/team scope to list candidates. Render the exact selected and skipped set as a preview. Proceed immediately by default; pause for confirmation only when `deliver.confirm` is true (operator-configured) and `--yes` was not passed. Write specs locally.
    - **unattended build** — do not interpret natural-language scope. Operate only on issues matching configured strict build eligibility (`states.build`) and existing local state sufficient for build. If the trigger came from a Linear event, reconcile that single event issue first.
-   - **folder** — operate on named or unfinished local issue folders under `deliver.folder.path`; broad folder batches still require preview/confirmation unless `--yes`.
+   - **folder** — operate on named or unfinished local issue folders under `deliver.folder.path`; broad folder batches follow the same preview-then-proceed flow as Linear queries.
 5. Serial — one issue at a time.
-6. Stop when no eligible issues remain, confirmation is declined, or an unrecoverable environment error blocks all further work.
+6. Stop when no eligible issues remain, a `deliver.confirm: true` confirmation is declined, or an unrecoverable environment error blocks all further work.
 
 Per-issue terminals (`Spec Ready`, `Needs Attention`, `In Review`) are issue-level outcomes, not run-level halts. Park the issue and continue.
 
@@ -572,7 +607,17 @@ No artifact dumps in Linear. The repo-local mirror is the execution contract. Co
 
 ### Logging
 
-Log every state transition and every worker dispatch to `<run-dir>/decisions.log` (human-readable, free-form). One file, one format — there is no consumer for a separate `events.jsonl` today; add a structured event log only when an actual consumer exists.
+Two run-scoped logs, sibling files under `<run-dir>/`:
+
+- **`decisions.log`** — prose, free-form. Log every state transition and every worker dispatch here.
+- **`inferences.jsonl`** — structured JSON, one object per line. Append-only. Written when the controller (or workers, via structured results) infers a value the operator did not explicitly configure. Schema lives in [docs/architecture/decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md). Required fields: `timestamp`, `phase`, `key`, `value`, `evidence`, `source`, `reversible_via`. Optional: `notes`, `alternatives_considered`, `kind` (`inference` default; `resolution`; `halt-on-ambiguity`), `overrode`.
+
+Mechanics for `inferences.jsonl`:
+
+- Created lazily on the first inference; absent entirely when a run had no loggable events.
+- Append using shell append (`echo '<json>' >> .autoship/runs/<id>/inferences.jsonl`) or Read-then-Write. Single-writer invariant: only the controller appends. Workers return inference candidates as structured results; the controller writes them.
+- One JSON object per line. UTF-8. No trailing comma, no surrounding array.
+- `halt-on-ambiguity` records are always the last line in the file for the affected run.
 
 ### Resume
 
@@ -600,11 +645,17 @@ Per-mode run terminals:
 
 Anything else: **do not stop**. In deliver mode, park per-issue blockers in `Needs Attention`, respect `Spec Ready` as the human approval boundary, and continue to the next eligible issue.
 
-## NEVER STOP posture
+## Default-to-act posture
 
-Run autonomously after the selected scope is authorized. Do not ask "should I continue?" between mechanical stages.
+Run autonomously after the selected scope is rendered. Do not ask "should I continue?" between mechanical stages. Do not ask permission for routine inferences — pick the value from evidence, write the record, announce the block, and proceed. Routine inferences (validation gate from `package.json`, source from authenticated Linear, scope from a single-team workspace) are *path-picking*, not *bar-setting*; the operator owns the bar via `defaults.yaml` and can interrupt the session if any inference looks wrong.
 
-For human prompt/query batches, always render the preview. When `deliver.confirm` is true (default) and `--yes` was not passed, the preview is the authorization boundary — stop for confirmation before dispatching workers. When `deliver.confirm` is false (operator-configured) or `--yes` was passed, the preview is informational only — proceed immediately. For unattended runs, only proceed when strict eligibility is already satisfied.
+The boundary the agent does NOT cross unprompted:
+
+- **State mutations to shared systems** — opening a PR, posting to Linear, pushing a branch, creating a Linear issue. These need explicit authorization (an `autoship deliver <id>` for build, an `--approve` flag for audit issue creation, an `autoship audit --tracker=linear --approve` for tracker writes). Do not infer your way into mutating shared state.
+- **Real ambiguity** — multi-team Linear workspace, dual source candidates, no detectable test infrastructure. Halt with a `kind: halt-on-ambiguity` record; do not pick.
+- **Scope expansion** — if a run started as "build FRD-157" and the agent realizes it would need to also rewrite the frontend typecheck baseline to make validation green, that's scope creep. Halt and ask, do not silently expand.
+
+For human prompt/query batches, always render the preview. By default, the preview is informational only — proceed immediately. When `deliver.confirm` is true (operator-configured per-repo) and `--yes` was not passed, the preview becomes the authorization boundary — stop for confirmation before dispatching workers. For unattended runs, inference paths are gated and only proceed when strict eligibility is already satisfied.
 
 Continue until a run-level stop condition above fires. When a stop condition fires, write the reason, set the right local state and any configured Linear comment, then exit cleanly with a machine-readable exit code so the operator can resume later.
 
