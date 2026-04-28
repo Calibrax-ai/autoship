@@ -24,12 +24,13 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 ### One-time Linear setup (deliver users)
 
-Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. This needs two extra states beyond the universal `Todo` / `In Progress` / `In Review` set:
+Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. Remote automation should wake on the explicit `Ready for Autoship` state, not on broad `Todo`. This needs three states beyond the universal `Todo` / `In Progress` / `In Review` set:
 
+- **Ready for Autoship** — type `unstarted`, used by the remote runner as the explicit "Autoship may start on this issue" signal. `Todo` remains a human/local grooming bucket.
 - **Spec Ready** — type `unstarted`, position between `Todo` and `In Progress`. Set when grooming finishes and a reviewed spec is waiting on you to run `autoship deliver <id>`. In automatic remote runs, it is also the manifest phase that lets Autoship continue into build after an approved spec review.
 - **Needs Attention** — type `unstarted`, parallel column. Set when autoship halts on a typed blocker.
 
-Create both manually in your Linear workspace settings (Workflow → States). `autoship init`'s next-steps printout reminds you with the exact names; this is the one piece of setup the CLI can't do for you.
+Create these manually in your Linear workspace settings (Workflow → States). `autoship init`'s next-steps printout reminds you with the exact names; this is the one piece of setup the CLI can't do for you.
 
 State transitions are best-effort: if either state is missing, autoship still posts the milestone comment and skips the state change rather than failing the run. The kanban-glance UX degrades, but nothing breaks.
 
@@ -97,6 +98,8 @@ autoship deliver build FRD-162 --dry-run                          # plan, no pus
 The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local specs under `.autoship/issues/<id>/`. Local runs are local-first; pass `--post` to mirror concise milestone summaries and best-effort Linear state changes. Remote runners may pass `--post` as policy.
 
 In automatic mode, Autoship uses the draft PR branch as the durable work envelope: grooming commits `spec.md`, the latest review, and `manifest.json`, opens or updates a spec-first draft PR, then continues into oracle/build only when the reviewed spec is build-worthy. If the spec needs clarification, Autoship parks the issue in `Needs Attention` and does not dispatch build workers.
+
+For remote automatic runs, the runner-selected issue and `Ready for Autoship` state are the selection authority. The controller may groom/spec from that handoff without a full Linear defaults block, but code changes still require configured or safely inferred validation. If validation is missing or ambiguous, Autoship should leave a reviewed spec/draft handoff and park the issue in `Needs Attention` instead of building.
 
 Per-repo overrides live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies. By default, query/batch runs proceed immediately after the preview; set `deliver.confirm: true` per-repo to require a `[y/N]` pause, or use the per-run `--yes` flag as the one-shot opposite.
 

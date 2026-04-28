@@ -140,8 +140,9 @@ stateDiagram-v2
 
 The inner filesystem state machine is the agents' source of truth. The outer Linear workflow-state column is the **human-facing baton**: a card in `In Progress` means autoship is currently working it; a card anywhere else means it's the operator's turn.
 
-Two operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
+Three operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
 
+- **`Ready for Autoship`** — type `unstarted`. Remote runners use this as explicit automation consent for one issue. `Todo` remains a human/local grooming bucket, not a webhook trigger.
 - **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. In supervised mode, signals "spec is written and reviewed; your turn to approve and run `autoship deliver <id>`." In automatic mode, records that the reviewed spec boundary was satisfied.
 - **`Needs Attention`** — type `unstarted`, parallel column. Signals "autoship halted on a typed blocker; your turn to unblock."
 
@@ -157,7 +158,7 @@ The controller is the single writer to Linear when posting is enabled. At each p
 | draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
 | build hit blocker | `Needs Attention` | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-State names are configurable via `transitions.{working,spec_ready,blocked,pr_open}` in `.autoship/defaults.yaml`. Defaults assume the two new states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
+State names are configurable via `transitions.{working,spec_ready,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger state is configured separately as `AUTOSHIP_LINEAR_AUTO_STATE` and defaults to `Ready for Autoship`. Defaults assume the three states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
 
 Local runs are local-first. `--post` opts into Linear comments and best-effort state transitions; remote runners may pass `--post` as policy. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
 
@@ -608,9 +609,9 @@ The controller-backed runtime extends `deliver` into the first end-to-end path t
 
 - supervised grooming path: human prompt/query → preview → pre-groom → spec review → regroom → local spec parked at `Spec Ready` (or `Needs Attention` on blocker). Preview is informational by default; per-repo `deliver.confirm: true` turns it into a `[y/N]` boundary.
 - supervised build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
-- automatic path: `autoship deliver <id> --unattended --auto` → groom/review → commit spec ledger + `manifest.json` to the issue branch → open/update a spec-first draft PR → continue to build only when the reviewed spec is build-worthy
+- automatic path: `autoship deliver <id> --unattended --auto` from a trusted runner handoff → groom/review → commit spec ledger + `manifest.json` to the issue branch → open/update a spec-first draft PR → continue to build only when the reviewed spec is build-worthy and validation is available
 
-Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or future tracker webhook) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, `--auto`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
+Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or runner webhook handoff) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, `--auto`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. In remote automatic mode the runner handoff supplies selection authority for the one issue, but the controller still owns execution authority and must stop before code changes if validation is missing or ambiguous. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
 The controller reads two distinct instruction layers:
 

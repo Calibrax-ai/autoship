@@ -403,11 +403,12 @@ function printNextSteps(answers) {
 	if (answers && answers.tracker === 'linear') {
 		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
 		const buildStates = (answers.linear?.states?.build || ['Spec Ready']).join(' / ');
-		lines.push(`  2. In Linear, create two new workflow states (Settings → Workflow → Add status):`);
+		lines.push(`  2. In Linear, create three workflow states for the full remote flow (Settings → Workflow → Add status):`);
+		lines.push(`       • "Ready for Autoship" (type: unstarted; remote runner wake-up state)`);
 		lines.push(`       • "Spec Ready"      (type: unstarted, position between Todo and In Progress)`);
 		lines.push(`       • "Needs Attention" (type: unstarted, parallel column)`);
-		lines.push(`     These carry the "your turn" baton: autoship moves issues into them when grooming completes or a blocker fires.`);
-		lines.push(`  3. Assign issues to yourself and put them in ${groomStates} when ready for autoship to groom. ${buildStates} is the build-eligible state autoship transitions to after the spec is reviewed.`);
+		lines.push(`     These carry the handoff baton: Ready for Autoship wakes the runner; Spec Ready and Needs Attention return control to you.`);
+		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Ready for Autoship. ${buildStates} is the build-eligible state autoship transitions to after the spec is reviewed.`);
 	}
 
 	lines.push('');
@@ -537,6 +538,8 @@ function renderDefaultsTemplate() {
 #   #   owner: me                # "me" means the authenticated Linear user
 #   #   states:
 #   #     # Eligibility (which Linear states autoship picks up from)
+#   #     # Local/human grooming often uses ["Todo"]. Remote runners should wake
+#   #     # from the explicit "Ready for Autoship" state instead.
 #   #     groom: ["Todo"]
 #   #     build: ["Spec Ready"]
 #   #     # Transitions (which states autoship sets at handoffs)
@@ -598,6 +601,8 @@ function renderDefaultsConfigured(answers) {
 			lines.push(`    owner: ${answers.linear.owner || 'me'}`);
 			lines.push('    states:');
 			lines.push('      # Eligibility (which Linear states autoship picks up from)');
+			lines.push('      # Local/human grooming often uses ["Todo"]. Remote runners should wake');
+			lines.push('      # from the explicit "Ready for Autoship" state instead.');
 			lines.push(`      groom: [${(answers.linear.states?.groom || ['Todo']).map(quote).join(', ')}]`);
 			lines.push(`      build: [${(answers.linear.states?.build || ['Spec Ready']).map(quote).join(', ')}]`);
 			lines.push('      # Transitions (which states autoship sets at handoffs).');
