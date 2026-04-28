@@ -494,6 +494,15 @@ Dispatch workers via fresh subprocess sessions from the autoship root. Each disp
 
 Accepted outcomes for each worker are in its agent definition. Any other return parks the issue at `needs-human-input`.
 
+**Dispatch shape and observability.** Workers run as Bash-spawned `claude --agent <worker> -p <prompt>` subprocesses. Always include `--verbose` and `tee` the output to a per-dispatch log file so the operator can tail live progress:
+
+```bash
+claude --agent <worker-name> --verbose -p "<rendered prompt>" 2>&1 \
+  | tee .autoship/runs/<run-id>/dispatches/<worker>-<ISO-timestamp>.log
+```
+
+The `dispatches/` directory must exist before the call (`mkdir -p` it once at run start, alongside the rest of the run dir). One log file per worker invocation; never overwrite a prior dispatch's log. Operators rely on `tail -f` of these files to see what a worker is doing during long runs — verbose-tee output is zero additional compute cost over silent dispatch (same model, same tokens; only the surfacing changes).
+
 ### Regroom
 
 On REJECTED review: increment regroom count. If within `max_regroom_cycles` (default 3), dispatch deliver-pre-groomer again with the latest review objections. If exceeded, park at `needs-human-input`.
