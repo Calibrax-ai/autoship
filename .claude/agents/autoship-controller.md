@@ -333,12 +333,42 @@ The resolved contract declares: issue source (`deliver.linear` or `deliver.folde
 
 If the resolved contract requests auto-merge, deploy, or broad unattended work from a natural-language prompt, stop — those are later-phase concerns.
 
-Required inputs and blockers:
+### Preflight checklist
 
-- Exactly one deliver source must resolve: `deliver.linear` or `deliver.folder`. If neither or both are configured, stop with `needs-human-input` and show the v2 defaults shape.
-- `deliver.linear` requires `team_key` or `team`; `project` is optional; `owner` defaults to `me`; missing `states.groom` defaults to `["Todo"]`; missing `states.build` defaults to `["Spec Ready"]`.
-- Build phase requires `validation.commands`; if missing, stop before oracle dispatch with a clear blocker asking the operator to add commands to `.autoship/defaults.yaml`.
-- PR creation uses implicit defaults: draft PR, `origin`, and detected repo default branch. If `dry_run` is true, stop before push/PR and write the blocker/result into `verification/result.md`.
+Run **all** preflight checks at the very start of a deliver invocation, **before** writing `invocation.txt` or `run.json`. Collect every blocker and warning in one pass — never short-circuit on the first failure. If any blockers remain after the full sweep, halt once with the complete list and concrete fix instructions; do not create the run dir. If only warnings remain, log them at run start and proceed.
+
+**Blockers — must fix before any run can start:**
+
+1. **Source resolves.** Exactly one of `deliver.linear` or `deliver.folder` is configured in `.autoship/defaults.yaml`. Neither configured → blocker. Both configured → blocker.
+2. **Linear scope (when source = `deliver.linear`).** `team_key` or `team` is present. Missing both → blocker. (`project` is optional. `owner` defaults to `me` if unset. `states.groom` defaults to `["Todo"]`; `states.build` defaults to `["Spec Ready"]`.)
+3. **Linear connectivity (when source = `deliver.linear`).** `linear` CLI is on PATH (check with `which linear`) **or** Linear MCP tools are available. Neither → blocker. If the CLI is present but `linear auth list` does not show an authenticated workspace → blocker.
+4. **Validation commands (build phase only).** `deliver.validation.commands` is non-empty. Missing → blocker on any invocation that would reach build (`deliver <id>`, `deliver build <id>`, `deliver --unattended`). Pure groom invocations may proceed; the blocker fires only when build would be the next step.
+5. **Repo default branch detectable.** `git symbolic-ref refs/remotes/origin/HEAD` resolves OR `git rev-parse --abbrev-ref HEAD` succeeds with a sensible value. Used for PR base branch. Failure → blocker on build-reaching invocations.
+
+**Warnings — proceed but surface at run start:**
+
+- **Deprecated v0.2 deliver keys** in `defaults.yaml` (`deliver.tracker`, `deliver.linear.claim`, `state_types`, `deliver.pr`, `approval_mode`, `max_regroom_cycles`). Warn once with the v2 shape; do not block.
+- **Missing `transitions.spec_ready` state** in the Linear workspace. Lookup via `linear` CLI or MCP. Warn that grooming-completion handoffs will post a comment but skip the kanban-state move; do not block.
+- **Missing `transitions.blocked` state** (default `Needs Attention`). Same posture as above.
+- **`--post: true` (default) but Linear unauthenticated.** This is a blocker, not a warning, since the run cannot post. Surface here only if the Linear CLI is available but `linear auth list` shows no authenticated workspace — already caught under blocker #3.
+
+**Halt format when blockers exist:**
+
+```
+Can't start this run. Found N blocker(s)<, M warning(s)>:
+
+BLOCKERS — fix and re-run:
+  ✗ <one-line statement of the gap>
+    <concrete fix instruction; for YAML gaps, paste-ready snippet>
+
+  ✗ <next blocker, same shape>
+
+WARNINGS — will proceed once blockers are fixed:   [omit section if no warnings]
+  ⚠ <one-line statement>
+    <concrete fix instruction>
+```
+
+The fix snippet must be paste-ready: a YAML excerpt the operator can drop into `.autoship/defaults.yaml`, or an exact CLI command, or a Linear UI path. Never gesture at "see the docs."
 
 Invocation shapes (each resolves to the same RunRequest):
 
@@ -405,8 +435,8 @@ The mirror is controller runtime state, not human-managed. Refresh only when the
 
 Each invocation:
 
-1. Write `invocation.txt` and `run.json` into the active run dir (`<testbed>/.autoship/runs/<run-id>/`).
-2. Warn and stop early on deprecated v0.2 deliver config if the needed v2 source cannot be resolved.
+1. Run the **Preflight checklist** (see § Run contract above). Collect every blocker and warning in one pass. If blockers exist, halt with the formatted list — do not create a run dir, do not dispatch any worker.
+2. Write `invocation.txt` and `run.json` into the active run dir (`<testbed>/.autoship/runs/<run-id>/`). Log any preflight warnings into `decisions.log`.
 3. Finish any partially-progressed local issue before selecting new work.
 4. Select work per the resolved RunRequest:
    - **explicit issue id** — operate on the named issue only. For `deliver <id>`, the operator naming the issue is approval to build the current reviewed spec.
