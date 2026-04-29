@@ -30,6 +30,7 @@ const CORE_AGENTS = [
 	'audit-reviewer.md',
 	'deliver-pre-groomer.md',
 	'deliver-spec-reviewer.md',
+	'deliver-decomposition-reviewer.md',
 	'deliver-oracle-writer.md',
 	'deliver-implementation.md',
 ];
@@ -403,11 +404,17 @@ function printNextSteps(answers) {
 	if (answers && answers.tracker === 'linear') {
 		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
 		const buildStates = (answers.linear?.states?.build || ['Spec Ready']).join(' / ');
-		lines.push(`  2. In Linear, create three workflow states for the full remote flow (Settings → Workflow → Add status):`);
-		lines.push(`       • "Ready for Autoship" (type: unstarted; remote runner wake-up state)`);
-		lines.push(`       • "Spec Ready"      (type: unstarted, position between Todo and In Progress)`);
-		lines.push(`       • "Needs Attention" (type: unstarted, parallel column)`);
-		lines.push(`     These carry the handoff baton: Ready for Autoship wakes the runner; Spec Ready and Needs Attention return control to you.`);
+		lines.push(`  2. In Linear, create four workflow states for the full remote flow (Settings → Workflow → Add status):`);
+		lines.push(`       • "Ready for Autoship"      (type: unstarted; remote runner wake-up state)`);
+		lines.push(`       • "Spec Ready"              (type: unstarted, position between Todo and In Progress)`);
+		lines.push(`       • "Decomposition Proposed"  (type: unstarted, parallel to Spec Ready)`);
+		lines.push(`       • "Needs Attention"         (type: unstarted, parallel column)`);
+		lines.push(`     These carry the handoff baton:`);
+		lines.push(`       Ready for Autoship → "agent please pick this up"`);
+		lines.push(`       Spec Ready          → "buildable spec ready, your turn to dispatch build"`);
+		lines.push(`       Decomposition Proposed → "umbrella decomposed, your turn to review the slice plan"`);
+		lines.push(`       Needs Attention     → "autoship halted on a blocker, your turn to unblock"`);
+		lines.push(`     PR labels are an orthogonal axis: \`autoship\` + \`autoship:<outcome>\` (spec, decomposition, need-info, blocked, cannot-reproduce) tag artifact kind. State answers "what next?"; label answers "what kind?".`);
 		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Ready for Autoship. ${buildStates} is the build-eligible state autoship transitions to after the spec is reviewed.`);
 	}
 
@@ -545,7 +552,8 @@ function renderDefaultsTemplate() {
 #   #     # Transitions (which states autoship sets at handoffs)
 #   #     # State changes are best-effort: missing target states fall back to comment-only.
 #   #     working: "In Progress"      # autoship has the baton (grooming or building)
-#   #     spec_ready: "Spec Ready"    # grooming complete, awaiting human approval
+#   #     spec_ready: "Spec Ready"    # bounded spec complete, awaiting human approval
+#   #     decomposition_proposed: "Decomposition Proposed"  # umbrella decomposed, awaiting human review
 #   #     blocked: "Needs Attention"  # autoship halted, awaiting human unblock
 #   #     pr_open: "In Review"        # draft PR opened, awaiting code review
 #
@@ -609,7 +617,8 @@ function renderDefaultsConfigured(answers) {
 			lines.push('      # Best-effort — if a target state does not exist in the workspace,');
 			lines.push('      # autoship falls back to comment-only at that handoff.');
 			lines.push('      working: "In Progress"      # autoship has the baton (grooming or building)');
-			lines.push('      spec_ready: "Spec Ready"    # grooming complete, awaiting human approval');
+			lines.push('      spec_ready: "Spec Ready"    # bounded spec complete, awaiting human approval');
+			lines.push('      decomposition_proposed: "Decomposition Proposed"  # umbrella decomposed, awaiting human review');
 			lines.push('      blocked: "Needs Attention"  # autoship halted, awaiting human unblock');
 			lines.push('      pr_open: "In Review"        # draft PR opened, awaiting code review');
 		} else {

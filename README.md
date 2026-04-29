@@ -24,15 +24,18 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 ### One-time Linear setup (deliver users)
 
-Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. Remote automation should wake on the explicit `Ready for Autoship` state, not on broad `Todo`. This needs three states beyond the universal `Todo` / `In Progress` / `In Review` set:
+Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. Remote automation should wake on the explicit `Ready for Autoship` state, not on broad `Todo`. This needs four states beyond the universal `Todo` / `In Progress` / `In Review` set:
 
 - **Ready for Autoship** — type `unstarted`, used by the remote runner as the explicit "Autoship may start on this issue" signal. `Todo` remains a human/local grooming bucket.
-- **Spec Ready** — type `unstarted`, position between `Todo` and `In Progress`. Set when grooming finishes and a reviewed spec is waiting on you to run `autoship deliver <id>`. In automatic remote runs, it is also the manifest phase that lets Autoship continue into build after an approved spec review.
+- **Spec Ready** — type `unstarted`, position between `Todo` and `In Progress`. Set when grooming finishes and a reviewed buildable spec is waiting on you to run `autoship deliver <id>`. In automatic remote runs, it is also the manifest phase that lets Autoship continue into build after an approved spec review.
+- **Decomposition Proposed** — type `unstarted`, parallel to `Spec Ready`. Set when grooming detects an umbrella issue and produces a reviewed `decomposition.md`. Run `autoship materialize <id>` to create the child sub-issues.
 - **Needs Attention** — type `unstarted`, parallel column. Set when autoship halts on a typed blocker.
+
+State and label are orthogonal: state answers "what should happen next?" (baton); PR labels (`autoship`, `autoship:spec`, `autoship:decomposition`, `autoship:need-info`, `autoship:blocked`, `autoship:cannot-reproduce`) answer "what kind of artifact is this?".
 
 Create these manually in your Linear workspace settings (Workflow → States). `autoship init`'s next-steps printout reminds you with the exact names; this is the one piece of setup the CLI can't do for you.
 
-State transitions are best-effort: if either state is missing, autoship still posts the milestone comment and skips the state change rather than failing the run. The kanban-glance UX degrades, but nothing breaks.
+State transitions are best-effort: if a state is missing, autoship still posts the milestone comment and skips the state change rather than failing the run. The kanban-glance UX degrades, but nothing breaks.
 
 ## Run autoship
 
@@ -51,6 +54,7 @@ autoship groom FRD-162 --post          # write local spec and mirror summary to 
 autoship deliver FRD-162               # approve current spec and build one issue
 autoship deliver FRD-162 --unattended --auto --post
 autoship deliver build FRD-162 --dry-run
+autoship materialize FRD-161           # create child issues from an approved decomposition
 ```
 
 Default mode is interactive — the CLI opens a Claude Code session with the controller agent loaded and your prompt as the first user message. Output streams as the controller runs; the session stays open after for follow-ups. Disk-backed state under `.autoship/` means re-running picks up where it left off.

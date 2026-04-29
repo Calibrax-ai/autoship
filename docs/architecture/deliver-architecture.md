@@ -2,7 +2,7 @@
 title: "Deliver"
 ---
 
-**Status:** Operational · **Last updated:** 2026-04-28
+**Status:** Operational · **Last updated:** 2026-04-29
 
 > **Implementation status.** The grooming → review → spec, build → oracle → implementation → verification, and draft-PR phases are operational and validated across Bug, Feature, Refactor, and UI-build shapes. Merge, deploy, and outcome verification (the `validate` module) remain future work. Sections labeled "Considered and deferred" are aspirational; everything else describes shipped behavior.
 
@@ -140,10 +140,11 @@ stateDiagram-v2
 
 The inner filesystem state machine is the agents' source of truth. The outer Linear workflow-state column is the **human-facing baton**: a card in `In Progress` means autoship is currently working it; a card anywhere else means it's the operator's turn.
 
-Three operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
+Four operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
 
 - **`Ready for Autoship`** — type `unstarted`. Remote runners use this as explicit automation consent for one issue. `Todo` remains a human/local grooming bucket, not a webhook trigger.
-- **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. In supervised mode, signals "spec is written and reviewed; your turn to approve and run `autoship deliver <id>`." In automatic mode, records that the reviewed spec boundary was satisfied.
+- **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. In supervised mode, signals "buildable spec is written and reviewed; your turn to approve and run `autoship deliver <id>`." In automatic mode, records that the reviewed spec boundary was satisfied.
+- **`Decomposition Proposed`** — type `unstarted`, parallel to `Spec Ready`. Signals "umbrella decomposed and reviewed; your turn to review the slice plan and run `autoship materialize <id>`."
 - **`Needs Attention`** — type `unstarted`, parallel column. Signals "autoship halted on a typed blocker; your turn to unblock."
 
 The controller is the single writer to Linear when posting is enabled. At each posted milestone it fires both a best-effort state change and a comment with @mention of the assignee — the state change is the kanban-glance baton, the comment is the Inbox notification. The canonical transition table:
@@ -151,14 +152,17 @@ The controller is the single writer to Linear when posting is enabled. At each p
 | Milestone | Linear state | Comment payload |
 |---|---|---|
 | autoship picks up an issue (groom phase) | `In Progress` | `Autoship grooming started.` |
-| grooming complete, spec APPROVED | `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
-| automatic spec PR opens | `Spec Ready` | `Spec PR ready: <url>. Autoship will continue automatically only because \`--auto\` was explicitly requested.` |
+| grooming complete, spec APPROVED (bounded) | `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
+| automatic spec PR opens (bounded) | `Spec Ready` | `Spec PR ready: <url>. Autoship will continue automatically only because \`--auto\` was explicitly requested.` |
+| grooming complete, decomposition APPROVED (umbrella) | `Decomposition Proposed` | `Decomposition proposed: N slices. See .autoship/issues/<id>/decomposition.md or the draft \`[Decomposition]\` PR. Run \`autoship materialize <id>\` to create child issues.` (with @mention) |
+| materialize complete (full success) | `In Progress` then `Decomposed` label | `Materialize complete: N children created (M new, K already-existing). See child links above. PR closed.` |
+| materialize partial / retryable | `Decomposition Proposed` (unchanged) | `Materialize partial: created N of M, pending P. Re-run \`autoship materialize <id>\` to resume.` |
 | grooming hit blocker (`needs-human-input`) | `Needs Attention` | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 | build starts (`autoship deliver <id>`) | `In Progress` | `Build started — branch <branch>, worktree <path>.` |
 | draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
 | build hit blocker | `Needs Attention` | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-State names are configurable via `transitions.{working,spec_ready,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger state is configured separately as `AUTOSHIP_LINEAR_AUTO_STATE` and defaults to `Ready for Autoship`. Defaults assume the three states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
+State names are configurable via `transitions.{working,spec_ready,decomposition_proposed,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger state is configured separately as `AUTOSHIP_LINEAR_AUTO_STATE` and defaults to `Ready for Autoship`. Defaults assume the four states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
 
 Local runs are local-first. `--post` opts into Linear comments and best-effort state transitions; remote runners may pass `--post` as policy. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
 
@@ -625,7 +629,7 @@ This split keeps stable framework knowledge from turning into a junk drawer for 
 
 These files are **controller-only**. Manual worker dispatch remains a fallback path; it does not require them.
 
-When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`deliver-pre-groomer`, `deliver-spec-reviewer`, later oracle/build/review workers) should:
+When `deliver` is connected to an external tracker, the controller is the only runtime actor that should mutate tracker state. Leaf workers (`deliver-pre-groomer`, `deliver-spec-reviewer`, `deliver-decomposition-reviewer`, oracle/build/review workers) should:
 
 - write their own artifacts
 - return a structured result to the controller

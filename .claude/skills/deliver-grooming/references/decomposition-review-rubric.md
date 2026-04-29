@@ -1,0 +1,102 @@
+# Decomposition Review Rubric
+
+Use this rubric when `deliver-decomposition-reviewer` judges `decomposition.md`.
+
+## Required inputs
+
+- `.claude/skills/reviewing/SKILL.md`
+- `.claude/skills/deliver-grooming/SKILL.md`
+- `.claude/skills/deliver-grooming/assets/decomposition-template.md`
+- `docs/architecture/decomposition.md`
+- injected `decomposition.md`
+- injected issue body/comments (the umbrella issue)
+- injected testbed root
+
+## Checks
+
+### Check 1 — Groundedness
+
+Is every slice grounded in observed code, cited paths, and verifiable evidence?
+
+The reviewer verifies, not re-derives:
+
+- Open every cited file (in slice scope, surfaced concerns, dependencies). Confirm the cited path exists and roughly matches the claimed line count. A slice citing `frontend/src/routes/_authed/dashboard.tsx` as 556 lines must point at a real file of approximately that size.
+- For surfaced concerns about related issue state ("Linear says FRD-162 is Done but PageShell doesn't exist on main"), grep the testbed for the claimed primitive. Confirm the state-lie reproduces. A surfaced concern that doesn't reproduce is `FAIL`.
+- Speculative slices with no `file:line` evidence ("we'll probably need to refactor the auth layer") are `FAIL`.
+
+Any unverifiable claim, hallucinated file path, or surfaced concern that can't be grepped to confirmation is `FAIL`.
+
+### Check 2 — Slice sizing
+
+Is each slice a bounded change a competent implementer can ship in one PR?
+
+- Wildly oversized slices ("migrate every route at once," "rewrite the auth subsystem") are `FAIL`. The threshold is judgment, not a number — but a slice that touches 10+ files across unrelated modules is a smell.
+- Wildly undersized slices ("rename a single function" as its own slice when it's part of a larger structural change) are `FAIL`. The threshold is whether it deserves its own ticket lifecycle, not its own commit.
+- A decomposition that produces 1 slice is suspect — either the issue wasn't actually an umbrella, or the decomposition didn't decompose. Either way `FAIL`.
+- A decomposition with > ~12 slices is suspect — that's epic-scale, not bounded-change-scale. Consider whether the umbrella itself is too big to scope as one Linear parent. Note as a `notes:` observation, not necessarily `FAIL`.
+
+### Check 3 — Dependency correctness
+
+Does the DAG reflect real dependencies in the codebase?
+
+- If Slice C uses primitives written in Slice B, the DAG must show C depends on B. False independence (claiming slices can run in parallel when they share primitives) is `FAIL`.
+- The DAG must be acyclic. A cycle is `FAIL`.
+- Independent slices must actually be independent — grep for shared imports, shared state mutations, shared route surfaces. If two "independent" slices touch the same file, they're not independent — `FAIL`.
+- Foundational slices (design system primitives, shell, infra) should appear at the top of the DAG with downstream slices depending on them. A decomposition that puts feature work before its dependencies is `FAIL`.
+
+### Check 4 — Surfaced concerns load-bearing
+
+Are surfaced concerns things the operator needs to decide before slices dispatch?
+
+Load-bearing concerns:
+
+- **State lies** — Linear says X is Done but the artifact doesn't exist on the base branch
+- **Missing primitives** — slice depends on a component/utility/type that doesn't yet exist
+- **Exclusions with rationale** — files or routes deliberately omitted from the decomposition, with reason
+- **Cross-slice ambiguity** — operator must decide an interpretation before any slice can be specced
+
+Non-load-bearing (FAIL when present):
+
+- Generic technical debt callouts ("we should also clean up X someday")
+- Telemetry wishlists ("we could add metrics here")
+- Future-proofing musings ("when we eventually move to microservices...")
+- Anything that doesn't change a slice's content or order
+
+Surfaced concerns that are load-bearing but ungrounded fail Check 1, not Check 4. Surfaced concerns that are out-of-scope speculation fail Check 4.
+
+## Output format
+
+```markdown
+---
+issue: <id>
+review-of: decomposition.md
+reviewed-at: <ISO timestamp>
+reviewer-sha: <testbed SHA>
+verdict: APPROVED | REJECTED
+---
+
+# Plan Review NN — <ISO date>
+
+## VERDICT: APPROVED | REJECTED
+
+## Check 1 — Groundedness: PASS | FAIL
+<one paragraph, citing specific slice citations and whether they verify>
+
+## Check 2 — Slice sizing: PASS | FAIL
+<one paragraph, naming any slice that's too big/small with reasoning>
+
+## Check 3 — Dependency correctness: PASS | FAIL
+<one paragraph, naming dependency edges that disagree with the codebase>
+
+## Check 4 — Surfaced concerns load-bearing: PASS | FAIL
+<one paragraph, naming any non-load-bearing concerns>
+
+## Notes (non-blocking observations)
+(none)
+
+## Specific objections (only if REJECTED)
+- <exact slice or section and what must change>
+
+## What the deliver-pre-groomer must do next (only if REJECTED)
+- <specific regroom instruction>
+```

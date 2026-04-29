@@ -12,12 +12,13 @@ Extract has been retired from the live product. Its old implementation and resea
 
 **`autoship init`** handles setup. It scaffolds `.claude/agents/`, `.claude/skills/`, `.autoship/standards.yaml` (with high-confidence values inferred from repo evidence), and `.autoship/defaults.yaml`. Re-running on an existing `.autoship/` prints an advisory of fills and conflicts based on current evidence — it never modifies the file. Operators own `.autoship/standards.yaml` after first install (same shape as Claude Code's `/init` on an existing CLAUDE.md).
 
-The controller handles three runtime modes: `audit`, `groom`, `deliver`. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
+The controller handles four runtime verbs: `audit`, `groom`, `deliver`, `materialize`. Invocation is trigger-first: pass flags or a natural-language prompt. No run-config file authoring is required.
 
 - **`audit`** — `autoship audit --report-only` or `autoship audit --tracker=linear --approve`
-- **`groom`** — `autoship groom FRD-162` or `autoship "get all Todo issues assigned to me and start grooming"`. Writes specs locally under `.autoship/issues/<id>/`; `--post` mirrors the final summary to Linear.
+- **`groom`** — `autoship groom FRD-162` or `autoship "get all Todo issues assigned to me and start grooming"`. Writes specs locally under `.autoship/issues/<id>/`; `--post` mirrors the final summary to Linear. For umbrella-shaped issues, grooming produces `decomposition.md` instead of `spec.md` and routes to `deliver-decomposition-reviewer`.
 - **`deliver`** — `autoship deliver FRD-162` (the explicit human approval that promotes a reviewed spec into build), `autoship deliver FRD-162 --dry-run` (plan, no push/PR), `autoship deliver --unattended` (strict machine mode: only operates on issues in `states.build`, refuses fuzzy NL scope).
-- **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-spec-reviewer` directly when you only need a spec and review.
+- **`materialize`** — `autoship materialize FRD-161`. Reads an approved `decomposition.md` from the latest commit on `autoship/<id>` branch and creates Linear sub-issues per the V1 contract (per-slice idempotent, partial-failure-tolerant, closes the `[Decomposition]` PR on full success). The verb invocation is the explicit consent for tracker mutation.
+- **manual deliver fallback** — dispatch `deliver-pre-groomer` + `deliver-spec-reviewer` (or `deliver-decomposition-reviewer` for umbrella outcomes) directly when you only need a spec/decomposition and review.
 
 Important boundaries:
 
@@ -25,17 +26,18 @@ Important boundaries:
 - **`.autoship/standards.yaml`** is repo-local policy: hosting, CI, observability, secrets, release expectations. Use `.env.example` as evidence of current repo shape, not as policy.
 - **`.autoship/defaults.yaml`** is optional per-repo *overrides* (v3 schema, 0.3.0+): autoship infers source, scope, and validation from repo evidence at runtime; `defaults.yaml` exists for explicit overrides only. Schema (all blocks optional): exactly one source block (`deliver.linear` or `deliver.folder`); for Linear, `team_key` + optional `project` + `owner: me` + `states.groom` (default `["Todo"]`) + `states.build` (default `["Spec Ready"]`); `deliver.validation.commands` to lock down a specific gate. PR defaults (draft, `origin`, detected default branch) are implicit. `deliver.confirm: false` (default) makes query/batch runs proceed immediately after the preview; set to `true` to require a `[y/N]` pause (per-run `--yes` is the one-shot opposite). Flags always win; `--report-only` and `--tracker=none` override audit stickies.
 - **Runtime inference** (0.3.0+): when source/scope/validation are missing from `defaults.yaml`, the controller infers them from repo evidence (`linear auth list` + `.autoship/issues/`, `linear team list`, `package.json`/`Makefile`/`pyproject.toml`/`Cargo.toml`). Each inference is announced at run start and logged structurally to `.autoship/runs/<run-id>/inferences.jsonl` per the schema in `docs/architecture/decision-log.md`. Real ambiguity (multi-team workspace, no detectable test infra) halts the run with a `kind: halt-on-ambiguity` record. `--unattended` mode gates inference paths — strict config-as-truth for machine runs.
-- **Deliver state-as-baton.** Deliver mirrors handoffs to Linear via two operator-created states beyond the universal set: `Spec Ready` (unstarted, between Todo and In Progress) signals "your turn — review the spec and run `autoship deliver <id>`"; `Needs Attention` (unstarted, parallel column) signals "your turn — autoship halted on a blocker." Default `--post: true` fires a state change + @mention comment per milestone; `--no-post` suppresses both. State transitions are best-effort: if a target state is missing, the comment still posts. Canonical Linear policy table lives in `.claude/agents/autoship-controller.md § Linear policy`.
+- **Deliver state-as-baton.** Deliver mirrors handoffs to Linear via three operator-created states beyond the universal set plus the `Ready for Autoship` automation-consent state: `Spec Ready` (unstarted, between Todo and In Progress) signals "your turn — review the spec and run `autoship deliver <id>`"; `Decomposition Proposed` (unstarted, parallel to Spec Ready) signals "your turn — review the slice plan and run `autoship materialize <id>`"; `Needs Attention` (unstarted, parallel column) signals "your turn — autoship halted on a blocker." Default `--post: true` fires a state change + @mention comment per milestone; `--no-post` suppresses both. State and label are orthogonal axes (state = baton; label = artifact kind). State transitions are best-effort: if a target state is missing, the comment still posts. Canonical Linear policy table lives in `.claude/agents/autoship-controller.md § Linear policy`.
 - **`.claude/agents/autoship-controller.md`** holds the stable operating discipline, RunRequest contract, workflow-surface ownership, generator-evaluator separation, disk-backed state, and per-mode procedure.
 
 ## Key Files
 
-- `bin/autoship.mjs` — native CLI: `init`, `audit`, `groom`, `deliver`, bare-prompt forwarding, and `interactive`. All non-init commands spawn `claude --agent autoship-controller` with the right prompt.
+- `bin/autoship.mjs` — native CLI: `init`, `audit`, `groom`, `deliver`, `materialize`, bare-prompt forwarding, and `interactive`. All non-init commands spawn `claude --agent autoship-controller` with the right prompt.
 - `cli/init.mjs` — scaffolds live core agents/skills, `.autoship/standards.yaml`, and commented `.autoship/defaults.yaml`.
 - `cli/infer-standards.mjs` — heuristic inference of standards.yaml fields from repo evidence (used by both `init` and `standards`).
 - `.claude/agents/autoship-controller.md` — controller for audit, groom, and deliver.
 - `.claude/agents/audit-auditor.md`, `.claude/agents/audit-reviewer.md` — generator-evaluator pair for readiness assessment and issue-candidate review.
-- `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-spec-reviewer.md` — generator-evaluator pair for issue grooming.
+- `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-spec-reviewer.md` — generator-evaluator pair for bounded-issue grooming.
+- `.claude/agents/deliver-decomposition-reviewer.md` — fresh-context judge of `decomposition.md` for umbrella issues (auto-routed from grooming when umbrella shape is detected).
 - `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-implementation.md` — frozen-oracle and implementation workers for deliver.
 - `.claude/skills/autoship-audit/` — audit protocol, assessment template, review rubric, and safe external exposure reference.
 - `.claude/skills/deliver-grooming/` — deliver spec schema and review rubric.
@@ -45,6 +47,7 @@ Important boundaries:
 - `docs/architecture/audit-tracker-sync.md` — opt-in Linear audit issue sync, dedup, and regression detection.
 - `docs/architecture/deliver-architecture.md` — deliver phase machine, state transitions, and approval boundaries.
 - `docs/architecture/decision-log.md` — `inferences.jsonl` schema, append discipline, and how operators read the runtime inference trail.
+- `docs/architecture/decomposition.md` — umbrella-issue decomposition lifecycle, `decomposition.md` schema, decomposition-review rubric, and the `materialize` V1 contract (0.4.0).
 - `docs/architecture/system-overview.md` — top-level live system shape.
 - `docs/learnings.md`, `docs/deliver-learnings.md` — current learnings.
 - `docs/archive/extract/` — retired extract implementation and research archive.
@@ -93,7 +96,7 @@ test -f .autoship/defaults.yaml
 test ! -e .autoship/program.md
 ```
 
-Expected default install: 7 agents, 4 skills, standards/defaults present, no `program.md`.
+Expected default install: 8 agents, 4 skills, standards/defaults present, no `program.md`.
 
 Controller smoke:
 

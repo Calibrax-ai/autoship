@@ -14,6 +14,7 @@ Your first job is to determine which mode the operator requested. See § How I R
 - `audit` or `audit <flags>` or natural-language audit prompt → **audit mode**
 - `groom` / natural-language grooming prompt → **deliver mode, groom phase**
 - `deliver` / `deliver <issue-id>` / `deliver build <issue-id>` → **deliver mode, build/resume phase**
+- `materialize <issue-id>` → **deliver mode, materialize phase** (create Linear sub-issues from an approved `decomposition.md`)
 
 If the prompt does not clearly request one of those shapes, stop and return a concise usage message. Do not guess.
 
@@ -54,7 +55,7 @@ Accepted trigger shapes:
 Normalize every trigger into a **RunRequest**:
 
 - `mode`: `audit | deliver`
-- `phase`: `report | groom | build | resume`
+- `phase`: `report | groom | build | resume | materialize`
 - `issue_id`: optional
 - `issue_source`: for deliver, inferred from exactly one configured block (`folder` or `linear`)
 - `create_issues`: boolean
@@ -131,16 +132,21 @@ State lives on disk at known paths, not in a long-running session's memory.
 
 Deliver has canonically derivable local runtime states:
 
-- `issue.md` exists, no `spec.md` → `new`
-- `spec.md` exists, no `reviews/` → `proposed`
-- latest review verdict REJECTED → `changes-requested`
-- latest review verdict APPROVED and no `oracle/result.md` → `ready-for-build`
+- `issue.md` exists, neither `spec.md` nor `decomposition.md` → `new`
+- `spec.md` exists, no `reviews/review-NN.md` → `proposed`
+- `decomposition.md` exists, no `reviews/decomposition-review-NN.md` → `decomposition-proposed`
+- latest review verdict REJECTED (spec-review or decomposition-review) → `changes-requested`
+- latest spec-review APPROVED and no `oracle/result.md` → `ready-for-build`
+- latest decomposition-review APPROVED, materialize not yet run → `decomposition-approved` (awaiting `autoship materialize <id>`)
+- materialize completed (all slices created in Linear) → `decomposed` (terminal)
 - `oracle/result.md` exists, no `implementation/result.md` → `oracle-written`
 - `implementation/result.md` exists, no `verification/result.md` → `implemented`
 - `verification/result.md` says passed, no `pr.md` → `ready-for-pr`
 - `pr.md` exists → `in-review`
 
-Remote automatic runs also write `.autoship/issues/<id>/manifest.json` as the machine-readable execution ledger. The manifest records the current phase and artifact hashes; it does not replace reviewer judgment or validation. Legal manifest phases are `grooming`, `spec_ready`, `needs_attention`, `building`, and `in_review`.
+`spec.md` and `decomposition.md` are mutually exclusive — a single issue produces one or the other, never both.
+
+Remote automatic runs also write `.autoship/issues/<id>/manifest.json` as the machine-readable execution ledger. The manifest records the current phase and artifact hashes; it does not replace reviewer judgment or validation. Legal manifest phases are `grooming`, `spec_ready`, `decomposition_proposed`, `decomposed`, `needs_attention`, `building`, and `in_review`.
 
 ### 5. Mechanical gates, not judgment in the outer loop
 
@@ -154,7 +160,7 @@ Every worker dispatch inlines the exact context that worker needs: issue body, r
 
 ### 7. Workers produce artifacts + structured results. The controller acts on them.
 
-Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, oracle/implementation workers, audit-auditor, audit-reviewer) must:
+Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, deliver-decomposition-reviewer, oracle/implementation workers, audit-auditor, audit-reviewer) must:
 
 - Write their own artifacts to known paths
 - Return a concise structured result to the controller
@@ -162,8 +168,9 @@ Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, oracle/implementation 
 
 Structured results workers return:
 
-- `spec-written` + design-status (from deliver-pre-groomer)
-- `verdict: APPROVED | REJECTED` (from deliver-spec-reviewer and audit-reviewer)
+- `spec-written` + design-status (from deliver-pre-groomer when output is `spec.md`)
+- `decomposition-written` + slice-count (from deliver-pre-groomer when output is `decomposition.md`)
+- `verdict: APPROVED | REJECTED` (from deliver-spec-reviewer, deliver-decomposition-reviewer, and audit-reviewer)
 - `oracle-green` / `oracle-red-expected` / `oracle-failed` (from deliver-oracle-writer)
 - `implementation-passed` / `implementation-failed` / `oracle-mutation-detected` (from deliver-implementation)
 - `verification-passed` / `verification-failed` / `oracle-mutation-detected` (from controller-owned verification)
@@ -196,8 +203,10 @@ Never promote work silently past a boundary. Every promotion is either an operat
 |---|---|---|
 | Linear issue state | Controller (only) | All humans, controller |
 | Linear comments | Controller (only) | All humans |
-| `.autoship/issues/<id>/spec.md` | deliver-pre-groomer | deliver-spec-reviewer, oracle/implementation workers, controller |
+| `.autoship/issues/<id>/spec.md` | deliver-pre-groomer (bounded outcome) | deliver-spec-reviewer, oracle/implementation workers, controller |
+| `.autoship/issues/<id>/decomposition.md` | deliver-pre-groomer (umbrella outcome) | deliver-decomposition-reviewer, controller, operator |
 | `.autoship/issues/<id>/reviews/review-NN.md` | deliver-spec-reviewer | Controller, operator |
+| `.autoship/issues/<id>/reviews/decomposition-review-NN.md` | deliver-decomposition-reviewer | Controller, operator |
 | `.autoship/issues/<id>/manifest.json` | Controller | Controller, operator, remote runner |
 | `.autoship/issues/<id>/pr.md` | Controller | Controller, operator, remote runner |
 | `.autoship/audits/<run-id>/assessment.md` | audit-auditor | audit-reviewer, controller |
@@ -231,7 +240,7 @@ Repo or org standards are a different layer. Preferred hosting, CI, observabilit
 Always read these first. Then branch by mode:
 
 - **audit** → read `.claude/skills/autoship-audit/SKILL.md` plus the worker agent definitions (`audit-auditor`, `audit-reviewer`)
-- **deliver** → resolve the RunRequest per § How I Receive Work (reading `.autoship/defaults.yaml` if flags are insufficient), plus the worker agent definitions (`deliver-pre-groomer`, `deliver-spec-reviewer`, `deliver-oracle-writer`, `deliver-implementation`)
+- **deliver** → resolve the RunRequest per § How I Receive Work (reading `.autoship/defaults.yaml` if flags are insufficient), plus the worker agent definitions (`deliver-pre-groomer`, `deliver-spec-reviewer`, `deliver-decomposition-reviewer`, `deliver-oracle-writer`, `deliver-implementation`)
 
 Per-track phase machines and state-transition detail are in `docs/architecture/audit-architecture.md` and `docs/architecture/deliver-architecture.md`. Read the relevant one when procedure below references it.
 
@@ -436,12 +445,13 @@ Invocation shapes (each resolves to the same RunRequest):
 - `deliver <issue-id> --dry-run` → plan the build but do not push/PR
 - `deliver --unattended` → strict machine mode; operate only on issues already eligible under `states.build`; inference paths gated
 - `deliver <issue-id> --unattended --auto` → strict automatic mode for one issue; with a valid runner handoff, groom from the explicit issue, review, commit the spec ledger, open/update the draft PR envelope, and continue to build only if the reviewed spec is build-worthy and validation is available
+- `materialize <issue-id>` → materialize phase for one umbrella issue. Read latest commit on `autoship/<id>` branch, parse `decomposition.md`, and create Linear sub-issues per the V1 contract in § Materialize phase below.
 
 ### State
 
 All state lives under `<testbed>/.autoship/`:
 
-- `issues/<id>/` — per-issue artifacts (`issue.md`, `spec.md`, `reviews/review-NN.md`, `manifest.json`, `oracle/result.md`, `implementation/result.md`, `verification/result.md`, `pr.md`)
+- `issues/<id>/` — per-issue artifacts. Either bounded path (`issue.md`, `spec.md`, `reviews/review-NN.md`, `manifest.json`, `oracle/result.md`, `implementation/result.md`, `verification/result.md`, `pr.md`) or umbrella path (`issue.md`, `decomposition.md`, `reviews/decomposition-review-NN.md`, `manifest.json`).
 - `runs/<run-id>/` — run-scoped logs (`decisions.log` prose, `inferences.jsonl` structured), plus `invocation.txt` + `run.json`
 - `worktrees/<id>/` — per-issue git worktree
 
@@ -449,13 +459,14 @@ Create missing dirs on first invocation. Record the active deliver run id in `.a
 
 ### Per-issue state
 
-Derived from filesystem artifacts per §4 above. The outer Linear state is set per the Linear policy table — see § Linear policy below for the full milestone → state mapping. Two states carry the human↔agent baton: `Spec Ready` (build-worthy spec, awaiting `autoship deliver <id>`) and `Needs Attention` (typed blocker, awaiting human resolution).
+Derived from filesystem artifacts per §4 above. The outer Linear state is set per the Linear policy table — see § Linear policy below for the full milestone → state mapping. Three states carry the human↔agent baton from the agent side: `Spec Ready` (build-worthy spec, awaiting `autoship deliver <id>`), `Decomposition Proposed` (umbrella decomposed, awaiting human review of slice plan), and `Needs Attention` (typed blocker, awaiting human resolution).
 
-Build-worthiness (APPROVED spec from review → which Linear state):
+Outcome → Linear state mapping (after APPROVED review):
 
-- `Feature + design-status: drafted` → `Spec Ready`
-- `Bug + reproduction-status: confirmed` → `Spec Ready`
-- `Refactor + preservation-status: ready | needs-coverage-first` → `Spec Ready`
+- `Feature + design-status: drafted` (bounded) → `Spec Ready`
+- `Bug + reproduction-status: confirmed` (bounded) → `Spec Ready`
+- `Refactor + preservation-status: ready | needs-coverage-first` (bounded) → `Spec Ready`
+- `decomposition` (umbrella) → `Decomposition Proposed`
 - any `need-info` variant → `Needs Attention`
 - `Bug + reproduction-status: cannot-reproduce` → `Needs Attention`
 
@@ -509,10 +520,13 @@ Per-issue terminals (`Spec Ready`, `Needs Attention`, `In Review`) are issue-lev
 
 Dispatch workers via fresh subprocess sessions from the autoship root. Each dispatch pre-injects the inputs declared in the worker's agent definition.
 
-- **deliver-pre-groomer** — when no `spec.md` exists, or after a REJECTED review
-- **deliver-spec-reviewer** — after every pre-groom/regroom pass
-- **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`
+- **deliver-pre-groomer** — when neither `spec.md` nor `decomposition.md` exists, or after a REJECTED review (spec-review or decomposition-review). The pre-groomer's output type depends on umbrella detection: bounded issues produce `spec.md`; umbrella issues produce `decomposition.md` (see `.claude/skills/deliver-grooming/SKILL.md` § Umbrella detection).
+- **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`
+- **deliver-decomposition-reviewer** — after every pre-groom/regroom pass that produced `decomposition.md`
+- **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Decomposition outcomes do not progress to oracle; the parent issue's terminal is `Decomposition Proposed` until the operator manually creates child sub-issues.)
 - **deliver-implementation** — `oracle/result.md` exists + no `implementation/result.md`
+
+Reviewer routing is mechanical: presence of `spec.md` → `deliver-spec-reviewer`; presence of `decomposition.md` → `deliver-decomposition-reviewer`. The two artifacts are mutually exclusive — never both for the same issue in the same run.
 
 Accepted outcomes for each worker are in its agent definition. Any other return parks the issue at `needs-human-input`.
 
@@ -527,7 +541,9 @@ The `dispatches/` directory must exist before the call (`mkdir -p` it once at ru
 
 ### Regroom
 
-On REJECTED review: increment regroom count. If within `max_regroom_cycles` (default 3), dispatch deliver-pre-groomer again with the latest review objections. If exceeded, park at `needs-human-input`.
+On REJECTED review (either spec-review or decomposition-review): increment regroom count. If within `max_regroom_cycles` (default 3), dispatch deliver-pre-groomer again with the latest review objections. If exceeded, park at `needs-human-input`.
+
+The pre-groomer may switch artifact type on regroom — for example, after a REJECT on a spec where the reviewer flags "this is actually multi-slice umbrella," the regroom can produce `decomposition.md` instead of a re-drafted `spec.md`. When the artifact type changes, the controller routes to the matching reviewer; review history (`reviews/review-NN.md` for spec, `reviews/decomposition-review-NN.md` for plan) is append-only and preserves both lineages.
 
 No Linear comments for intermediate regroom passes. Grooming writes local artifacts. When `--post` is set, mirror the final per-issue handoff to Linear with one concise comment and best-effort state transition.
 
@@ -592,17 +608,121 @@ dry_run: true | false
 - <only if failed or dry-run stops before PR; otherwise write `(none)`>
 ```
 
+### Terminal-outcome handler
+
+When grooming reaches a per-issue terminal state, the controller chooses how to persist the work product. Two factors decide the persistence shape:
+
+1. **Was this a remote run?** Detect via the presence of a `runner_handoff` envelope on the RunRequest (§ How I Receive Work). Remote runs have ephemeral worktrees (trigger.dev tears them down) — the artifact must persist to a branch + draft PR. Local runs persist artifacts directly to `.autoship/issues/<id>/` on the operator's filesystem and do not open a PR.
+2. **Was this meaningful agent analysis?** A spec, a decomposition, or a typed blocker report is meaningful — the operator may want to review it. A capability halt (Linear unauth, missing default branch) or a runner-handoff identity error is not — there's no analysis to review, only an environment failure to fix.
+
+The persistence matrix:
+
+| Outcome | Local run | Remote run |
+|---|---|---|
+| Buildable spec (APPROVED + build-worthy status) | Persist to disk. `Spec Ready` state. | Commit ledger + open `[Spec]` draft PR. `Spec Ready` state. |
+| Decomposition required | Persist to disk. `Decomposition Proposed` state. | Commit ledger + open `[Decomposition]` draft PR. `Decomposition Proposed` state. |
+| Need-info (any `*-status: need-info`) | Persist to disk. `Needs Attention` state. | Commit ledger + open `[Need-Info]` draft PR. `Needs Attention` state. |
+| Blocked (typed blocker via blocker-escalation) | Persist to disk. `Needs Attention` state. | Commit ledger + open `[Blocked]` draft PR. `Needs Attention` state. |
+| Cannot-reproduce (`Bug + reproduction-status: cannot-reproduce`) | Persist to disk. `Needs Attention` state. | Commit ledger + open `[Cannot-Reproduce]` draft PR. `Needs Attention` state. |
+| Capability halt (Linear unauth, no default branch, missing test infra) | Halt + Linear comment when `--post`. No artifact, no PR. | Halt + Linear comment when `--post`. **No PR.** |
+| Runner-handoff identity error (untrusted source, missing fields) | n/a | Halt + Linear comment. **No PR.** |
+| Pure "could not start" (auth, repo clone, base-branch fetch failure) | Halt + Linear comment when `--post`. | Halt + Linear comment when `--post`. **No PR.** |
+
+The integrity invariant: **on remote runs, no meaningful agent analysis exists only in a Linear comment or trigger log.** The ephemeral worktree forces the durability discipline; capability halts are exempt because there's no analysis to persist.
+
+For Linear comments and state transitions, follow the per-outcome rows in § Linear policy regardless of local/remote — comments and best-effort state moves fire when `--post` is set or when remote-runner policy passes `--post`.
+
+For any remote meaningful-analysis outcome, follow the PR Work Envelope procedure below.
+
 ### PR Work Envelope
 
-For remote automatic runs, the issue branch and draft PR are the durable work envelope. The controller's goal is an addressable, resumable branch that contains the reviewed spec before implementation starts, not a hidden local-only handoff.
+On remote runs, the issue branch and draft PR are the durable work envelope. The controller's goal is an addressable, resumable branch that contains the analysis the operator might review, not a hidden local-only handoff.
 
-After grooming reaches an APPROVED review, ensure the issue branch exists, commit the spec ledger, and open or update a draft PR marked as spec-first (for example, `[Spec] FRD-162 ...`). The committed ledger includes:
+After grooming reaches a meaningful-analysis terminal outcome (any row from the matrix above other than capability halts), ensure the issue branch exists, commit the artifact ledger, and open or update a draft PR with the outcome-specific title prefix and labels. The artifact ledger varies by outcome:
 
-- `.autoship/issues/<id>/spec.md`
-- latest `.autoship/issues/<id>/reviews/review-NN.md`
-- `.autoship/issues/<id>/manifest.json`
+| Outcome | Branch contents (committed) | PR title prefix | Labels |
+|---|---|---|---|
+| Buildable spec | `spec.md`, latest `reviews/review-NN.md`, `manifest.json` | `[Spec] FRD-NNN: <issue title>` (renames to `[Build]` once build phase starts) | `autoship`, `autoship:spec` |
+| Decomposition | `decomposition.md`, latest `reviews/decomposition-review-NN.md`, `manifest.json` | `[Decomposition] FRD-NNN: <issue title>` | `autoship`, `autoship:decomposition` |
+| Need-info | `spec.md` (with `*-status: need-info`), `questions.md` (open questions surfaced), latest `reviews/review-NN.md`, `manifest.json` | `[Need-Info] FRD-NNN: <issue title>` | `autoship`, `autoship:need-info` |
+| Blocked | `spec.md` (when one was written before the blocker), `blocker-report.md` (per blocker-escalation skill), `manifest.json` | `[Blocked] FRD-NNN: <issue title>` | `autoship`, `autoship:blocked` |
+| Cannot-reproduce | `spec.md` (with `reproduction-status: cannot-reproduce`), `repro-attempts.md`, `manifest.json` | `[Cannot-Reproduce] FRD-NNN: <issue title>` | `autoship`, `autoship:cannot-reproduce` |
 
-Build resumes from the same branch and updates the same draft PR. Before changing code, reconcile `manifest.json`, the PR branch, PR state, and the latest base branch; if they disagree in a way that changes scope or trust in the spec, park the issue in `Needs Attention` rather than guessing.
+Build resumes from the same branch and updates the same draft PR. The `[Spec]` prefix renames to `[Build]` at build-phase transition; non-buildable prefixes stay as terminal markers until the operator closes the PR.
+
+Before changing code, reconcile `manifest.json`, the PR branch, PR state, and the latest base branch; if they disagree in a way that changes scope or trust in the spec, park the issue in `Needs Attention` rather than guessing.
+
+**Auto-close:** none in 0.4.0. Non-buildable PRs stay open until the operator closes them — that's the human signal that the analysis has been acted on.
+
+See [docs/architecture/decomposition.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decomposition.md) for the decomposition outcome's full lifecycle.
+
+### Materialize phase
+
+Triggered by `autoship materialize <issue-id>`. The verb invocation *is* the operator's explicit consent for tracker mutation — same shape as `autoship deliver <id>` for build. No paired `Decomposition Approved` state lookup; running the verb is enough.
+
+**Precondition checks (halt-on-fail):**
+
+- Issue branch `autoship/<id>` exists and has been checked out at the latest commit. If branch missing, halt with capability error pointing the operator at running grooming first.
+- `decomposition.md` exists at the latest commit and parses (frontmatter present, slices section non-empty, every slice has a `slice-id` field). Malformed → halt with `Needs Attention` transition; operator must fix the artifact.
+- Linear connectivity (CLI or MCP) authenticated. Capability halt if not.
+
+**Source of truth:**
+
+- Read `decomposition.md` from the latest commit on `autoship/<id>`. Do not read from main, stage, or any other branch. If the operator amended the artifact after review, that's tacit approval — V1 does not separately track "reviewed sha vs latest sha."
+- Read `manifest.json` from the same commit if present. Use it for run-id lineage; absence is non-fatal.
+
+**Per-slice idempotent loop.** For each slice in `decomposition.md`:
+
+1. **Detect existing child.** Query Linear for issues parented to `<id>` (parent-link query first via `linear` CLI or `mcp__plugin_linear_linear__list_issues` with parent filter). For each candidate child, extract `slice-id` from the body's `Slice: <slice-id>` line; fall back to title prefix `[<slice-id>]` if body line absent. Match against the current slice's `slice-id`.
+2. **If exists:** skip. Log `slice <slice-id>: already exists, skipped`.
+3. **If missing:** create child. Title format: `[<slice-id>] <slice title>`. Body format:
+   ```
+   <slice scope from decomposition.md, copied verbatim from the Scope: line>
+
+   ---
+   Parent: <parent-id>
+   Slice: <slice-id>
+   Source decomposition: <PR url> @ <commit sha>
+   ```
+   Set parent-link to `<parent-id>`. Default state on creation: workspace-default `Backlog` (or whatever Linear assigns). Log `slice <slice-id>: created as <new-issue-id>`.
+
+**Failure handling.**
+
+- **Retryable failures (rate limit, transient network, 5xx):** stop the loop at the failing slice, do NOT roll back created children. Post a status comment to Linear and on the `[Decomposition]` PR:
+  ```
+  Materialize partial: created N of M, pending P slice(s), error: <message>.
+  Re-run `autoship materialize <id>` to resume; existing children will be skipped.
+  ```
+  Parent state stays `Decomposition Proposed` (the retry signal is implicit). Exit non-zero.
+- **Real blockers (auth missing, malformed decomposition discovered mid-run, parent issue missing in Linear):** transition parent to `Needs Attention` with a typed blocker comment. Operator must fix the underlying issue before retrying. Exit non-zero.
+- **Idempotent retry:** re-running materialize re-enters the per-slice loop. Already-created children are detected and skipped (counted in `created_already`). Repeat until all slices are created.
+
+**Full success.**
+
+When every slice in the decomposition has a corresponding Linear child (either freshly created this run or already-existing from a prior run):
+
+1. Post a final summary comment to Linear and to the `[Decomposition]` PR. Format:
+   ```
+   Materialize complete: N children created (M new, K already-existing).
+
+   Created:
+     - <slice-id>: <child-issue-url>
+     - <slice-id>: <child-issue-url>
+     ...
+
+   Source decomposition: <PR url> @ <commit sha>
+   ```
+2. **Close the `[Decomposition]` PR (no merge).** Use `gh pr close <pr-number>` or the equivalent. The closed PR + commit SHA in child bodies is sufficient archive for V1.
+3. Apply a `decomposed` label or umbrella convention to the parent issue if the workspace has one (best-effort; no new state required).
+4. Update `manifest.json` phase to `decomposed`.
+5. Exit zero.
+
+**What materialize does NOT do (V1):**
+
+- No closure of the parent issue. Parent stays open; the team's umbrella convention decides when to close.
+- No automatic dispatch of children. Children stay in `Backlog` (default Linear state) until the operator transitions them to `Ready for Autoship` individually.
+- No PR merge. Closes without merge.
+- No state-trigger automation (transition parent to `Decomposition Approved` → auto-materialize). That requires a paired `Decomposition Approved` state and is deferred.
 
 ### Manifest
 
@@ -629,10 +749,14 @@ The manifest is a ledger, not a substitute for the artifacts. The controller sho
 
 ### Worktree + branch
 
-One worktree and one branch per issue:
+One worktree and one branch per issue. The branch is **issue-scoped, not run-scoped** — re-runs of the same issue reuse the same branch and append commits.
 
 - worktree: `<testbed>/.autoship/worktrees/<id>/`
-- branch: `<branch-prefix><id>-<slug>`
+- branch: `<branch-prefix><id>` (default branch_prefix: `autoship/`, e.g. `autoship/FRD-162`). Existing 0.3.x branches that include a `-<slug>` suffix are matched by `<branch-prefix><id>*` glob on resume and reused as-is — never create a parallel branch for the same issue.
+
+**Commit mode on re-run: append.** When the branch already exists, fetch latest, check it out, and add new commits on top. The PR commit history then shows iteration — useful when a second pass refines something the first pass got wrong (sharper slice boundaries, revised spec, narrowed validation gate). One PR per issue. Never open `<branch>-v2`.
+
+**Force-push is reserved** for intentional rebase or repair (e.g. squashing fixup commits, rewriting a malformed prior commit). When force-push is used, the commit message must flag it explicitly: `autoship: rebase <reason>` or `autoship: repair <reason>`. It is not the default re-run path.
 
 Record the chosen paths in `oracle/result.md`. Reuse on resume; never create a second worktree for the same issue.
 
@@ -659,14 +783,17 @@ Single writer to Linear. State change + one comment with @mention of the assigne
 | Milestone | Set state to | Comment payload |
 |---|---|---|
 | autoship picks up an issue (groom phase) | `transitions.working` (default `In Progress`) | `Autoship grooming started.` |
-| grooming complete, spec APPROVED | `transitions.spec_ready` (default `Spec Ready`) | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md or the draft PR work envelope. Run \`autoship deliver <id>\` to build.` (with @mention of assignee) |
-| automatic spec PR opens | `transitions.spec_ready` (default `Spec Ready`) | `Spec PR ready: <url>. Autoship will continue automatically only because \`--auto\` was explicitly requested.` |
+| grooming complete, spec APPROVED (bounded) | `transitions.spec_ready` (default `Spec Ready`) | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md or the draft PR work envelope. Run \`autoship deliver <id>\` to build.` (with @mention of assignee) |
+| automatic spec PR opens (bounded) | `transitions.spec_ready` (default `Spec Ready`) | `Spec PR ready: <url>. Autoship will continue automatically only because \`--auto\` was explicitly requested.` |
+| grooming complete, decomposition APPROVED (umbrella) | `transitions.decomposition_proposed` (default `Decomposition Proposed`) | `Decomposition proposed: N slices. See .autoship/issues/<id>/decomposition.md or the draft \`[Decomposition]\` PR. Review and create child issues to materialize.` (with @mention) |
 | grooming hit blocker (`needs-human-input`) | `transitions.blocked` (default `Needs Attention`) | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 | build starts (`autoship deliver <id>`) | `transitions.working` (default `In Progress`) | `Build started — branch <branch>, worktree <path>.` |
 | draft PR opens | `transitions.pr_open` (default `In Review`) | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
 | build hit blocker | `transitions.blocked` (default `Needs Attention`) | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-The default state names assume three states have been created in the Linear workspace beyond the universal `Todo` / `In Progress` / `In Review` set: `Ready for Autoship` (remote automation consent), `Spec Ready` (between Todo and In Progress, type `unstarted`), and `Needs Attention` (parallel column, type `unstarted`). They carry the "agent may start", "your turn — read spec", and "your turn — unblock me" baton signals.
+The default state names assume four states have been created in the Linear workspace beyond the universal `Todo` / `In Progress` / `In Review` set: `Ready for Autoship` (remote automation consent), `Spec Ready` (between Todo and In Progress, type `unstarted`), `Decomposition Proposed` (parallel to Spec Ready, type `unstarted`), and `Needs Attention` (parallel column, type `unstarted`). They carry the "agent may start", "your turn — read spec", "your turn — review decomposition", and "your turn — unblock me" baton signals.
+
+State and label are orthogonal axes: state answers "what should happen next?" (baton); the `autoship:<outcome>` PR labels answer "what kind of artifact is this?" (kind filter). Don't conflate them.
 
 **State transitions are best-effort:** if a named target state doesn't exist in the workspace, post the comment anyway and skip the state change. Never fail a run because of state-mapping gaps. The comment carries the canonical detail; missing state changes degrade kanban-glance UX but do not break the run.
 
@@ -697,8 +824,9 @@ On re-invocation, derive in-flight state from the filesystem and resume unfinish
 Per-issue terminal outcomes (deliver), each mapping to a Linear state per § Linear policy:
 
 1. **`Spec Ready`** — grooming + review succeeded; spec is build-worthy. In supervised mode it awaits `autoship deliver <id>`; in automatic mode it is the manifest phase that authorizes the build half to continue.
-2. **`Needs Attention`** — reviewed outcome or build execution hit a typed blocker. Awaiting human resolution.
-3. **`In Review`** — build + validation succeeded; the controller opened a draft PR. Awaiting code review.
+2. **`Decomposition Proposed`** — grooming + decomposition-review succeeded on an umbrella issue. Awaiting human review of the proposed slice plan and `autoship materialize <id>` to create the child sub-issues.
+3. **`Needs Attention`** — reviewed outcome or build execution hit a typed blocker (need-info, cannot-reproduce, or any blocker-escalation report). Awaiting human resolution.
+4. **`In Review`** — build + validation succeeded; the controller opened a draft PR. Awaiting code review.
 
 Those are **issue terminal states**, not run terminal states.
 

@@ -2,7 +2,7 @@
 title: "System Overview"
 ---
 
-**Status:** Operational · **Last updated:** 2026-04-28
+**Status:** Operational · **Last updated:** 2026-04-29
 
 ## In plain English
 
@@ -89,8 +89,9 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 | **autoship-controller** | Core | Resolves triggers into RunRequests, dispatches workers, owns tracker mutations. | Operational |
 | **audit-auditor** | Audit | Inspects the repo and writes the audit artifact plus bounded issue candidates. | Scaffolded |
 | **audit-reviewer** | Audit | Fresh-context skeptic that judges groundedness, severity, tracker annotations, and issue-candidate quality. | Scaffolded |
-| **deliver-pre-groomer** | Deliver | Writes the spec from an approved issue. | Operational |
+| **deliver-pre-groomer** | Deliver | Writes the spec from an approved issue. Switches to writing `decomposition.md` for umbrella issues. | Operational |
 | **deliver-spec-reviewer** | Deliver | Judges the spec. Separate agent from the one that wrote it. | Operational |
+| **deliver-decomposition-reviewer** | Deliver | Judges the decomposition for umbrella issues. Separate agent from the one that wrote it. | Operational (0.4.0) |
 | **deliver-oracle-writer** | Deliver | Writes the frozen test oracle from the approved spec. | Operational |
 | **deliver-implementation** | Deliver | Writes the code; forbidden from editing the oracle. | Operational |
 | **Validation agents** | Validate | Check security, quality, and outcome against stated intent. | Coming soon |
@@ -103,6 +104,7 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 - **Judgment goes to reviewers.** Groundedness, scope, severity, and implementation-worthiness require a fresh evaluator.
 - **Strict ownership.** The controller never writes code. Workers never touch tracker state.
 - **Sharp policy/execution seam.** Operators own the *bar* (what counts as production-ready, what counts as passing, when humans must approve) via `standards.yaml` and explicit overrides in `defaults.yaml`. The controller owns the *path* (how to discover, how to execute, how to verify). Routine path-picking is inferred from repo evidence, logged structurally to `runs/<run-id>/inferences.jsonl`, and announced at run start — operators get an audit trail without having to restate evidence as config.
+- **Durable artifact for every meaningful remote outcome.** On remote runs, every grooming outcome that produced agent analysis (spec, decomposition, need-info, blocked, cannot-reproduce) persists as a draft PR with the artifact tree on a branch. Trigger.dev's ephemeral worktree cannot be the only home for analysis — if the run produced something the operator might review, it is captured durably. Capability halts are exempt because they have no analysis to persist.
 
 ## State And Configuration
 
@@ -130,7 +132,7 @@ When autoship integrates with Linear:
 
 ### State-as-baton handoff
 
-In deliver, the Linear workflow-state column carries the human ↔ agent baton. Cards in `In Progress` mean autoship is working; cards anywhere else mean it's the operator's turn. Two operator-created states extend the universal set: `Spec Ready` (unstarted, between Todo and In Progress) for "spec written, your turn to approve and run `autoship deliver <id>`", and `Needs Attention` (unstarted, parallel column) for "autoship halted on a typed blocker." Each milestone fires a state change + @mention comment by default — kanban for the glance, Inbox for the notification. State transitions are best-effort: if a target state is missing in the workspace, the comment still posts. See [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for the full transition table.
+In deliver, the Linear workflow-state column carries the human ↔ agent baton. Cards in `In Progress` mean autoship is working; cards anywhere else mean it's the operator's turn. Three operator-created states extend the universal set with distinct "what happens next" semantics: `Spec Ready` (unstarted, between Todo and In Progress) for "buildable spec ready, your turn to dispatch build", `Decomposition Proposed` (unstarted, parallel to Spec Ready) for "umbrella decomposed, your turn to review the slice plan", and `Needs Attention` (unstarted, parallel column) for "autoship halted on a typed blocker." Each milestone fires a state change + @mention comment by default — kanban for the glance, Inbox for the notification. State transitions are best-effort: if a target state is missing in the workspace, the comment still posts. See [deliver-architecture.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/deliver-architecture.md) for the full transition table.
 
 ## Current Implementation Status
 

@@ -16,6 +16,7 @@ Usage:
   autoship audit [args...]             Run audit via the controller (interactive — output streams)
   autoship groom [scope...]            Groom issues and write local specs
   autoship deliver [args...]           Run deliver via the controller (interactive — output streams)
+  autoship materialize <issue-id>      Create Linear sub-issues from an approved decomposition.md
   autoship interactive                 Open an interactive controller chat with no starting prompt
 
 Prompt/audit/groom/deliver default to INTERACTIVE mode — output streams as the
@@ -33,6 +34,7 @@ Examples:
   autoship deliver FRD-162                 # approve current spec and build one issue
   autoship deliver FRD-162 --unattended --auto --post
   autoship deliver build FRD-162 --dry-run # plan/build path, no push/PR
+  autoship materialize FRD-161             # create child issues from FRD-161's decomposition
 
 Docs: https://github.com/Calibrax-ai/autoship
 `);
@@ -138,6 +140,12 @@ async function runGroom(args = []) {
 	await spawnController({ prompt, mode: flags.print ? 'headless' : 'interactive' });
 }
 
+async function runMaterialize(args = []) {
+	const { forwarded, flags } = splitArgs(args);
+	const prompt = buildPrompt('materialize', forwarded);
+	await spawnController({ prompt, mode: flags.print ? 'headless' : 'interactive' });
+}
+
 async function runPrompt(args = []) {
 	const { forwarded, flags } = splitArgs(args);
 	const prompt = forwarded.join(' ');
@@ -153,6 +161,7 @@ const commands = {
 	audit: runAudit,
 	groom: runGroom,
 	deliver: runDeliver,
+	materialize: runMaterialize,
 	interactive: runInteractive,
 	help: printHelp,
 	'--help': printHelp,

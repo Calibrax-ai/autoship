@@ -66,20 +66,37 @@ Type-specific sections:
 - **Feature** — Design Rationale (with Alternatives, Picked + Reason; conditional subsections based on blast-radius characteristics)
 - **Refactor** — Behavior Preservation (What must be preserved, Preservation Proof, Structure Improvement); Design Rationale is optional
 
-## Feature scope classification
+## Umbrella detection (before any drafting)
 
-Before drafting a Feature spec, classify scope:
+Before deciding whether to write a spec, classify the issue's shape. Scope classification applies to all types — Feature, Bug, Refactor — though the heuristics weigh differently.
 
-- **Single-slice** — one coherent unit of work with a clear acceptance boundary. Surfaces either co-located in one file/module, or fan out across surfaces that share one enforcement chokepoint (middleware, single handler).
-- **Multi-slice** — genuinely independent surfaces whose correctness can only be verified separately, OR open questions that resolve differently per surface. Indicators live in the issue, not in the projected spec: multiple "Requested outcomes" that don't share a skeleton; open questions that branch the design tree (e.g., "per-user vs per-team vs role+entity") such that the fork drives different file sets.
+- **Bounded** — one coherent unit of work with a clear acceptance boundary. Surfaces either co-located in one file/module, or fan out across surfaces that share one enforcement chokepoint (middleware, single handler). Output: `spec.md`.
+- **Umbrella** — multi-slice scope where slices are bounded changes individually but the parent is too large for one spec. Output: `decomposition.md`.
 
-If multi-slice: do not draft a unified spec. Output `design-status: need-info` with:
+Umbrella signals (any one is enough; they compound):
 
-- **Proposed decomposition** — named sub-issues (e.g., `FRD-143a data model`, `FRD-143b enforcement`) with one-line scopes
-- **Why it can't be single-sliced** — rationale citing the issue's open questions or independent surfaces
-- **What each sub-issue would cover** — enough detail for the operator to split and re-dispatch
+- **Scope words.** Issue body uses "rework," "migrate every," "redesign across," "all routes," "across the entire X," or similar bulk-application phrasing.
+- **Independent surfaces.** Multiple "Requested outcomes" that don't share a skeleton, or open questions that branch the design tree (e.g., "per-user vs per-team vs role+entity") such that the fork drives different file sets.
+- **Aggregate line-count threshold.** The set of files that would change exceeds a sane single-spec budget. Heuristic: > ~3000 LOC across the change set, or > ~5 unrelated route/page surfaces.
+- **Multiple unrelated touchpoints.** Blast-radius mapping returns a high count of files with no shared module ancestor — e.g., 8 route files in different feature folders.
+- **Existing pattern of decomposition.** Parent issue references prior child issues, or carries a label like `umbrella` / `epic` / `decompose-me` / `redesign`.
 
-The operator splits on Linear and re-dispatches per sub-issue. Do not groom multi-slice issues as one.
+When umbrella shape is detected, switch artifact type immediately. Do not draft a partial `spec.md` and then convert; the artifacts are mutually exclusive.
+
+## Decomposition outcome
+
+For umbrella issues, the deliver-pre-groomer writes `decomposition.md` instead of `spec.md`. The artifact uses `type: decomposition` in frontmatter — see `assets/decomposition-template.md`.
+
+After writing `decomposition.md`, the controller dispatches `deliver-decomposition-reviewer` (not `deliver-spec-reviewer`). The reviewer applies four checks (Groundedness, Slice sizing, Dependency correctness, Surfaced concerns load-bearing) — see `references/decomposition-review-rubric.md`.
+
+Once the decomposition is approved, the controller commits the artifact tree, opens the `[Decomposition]` draft PR, and parks the parent issue at `Decomposition Proposed`. The operator reviews the PR and runs `autoship materialize <id>` to create child sub-issues in Linear. The full lifecycle lives in `docs/architecture/decomposition.md`.
+
+Discipline:
+
+- **One umbrella per pre-groom run.** If the issue is an umbrella, write the decomposition. Do not also write a `spec.md` for the umbrella; do not pre-write specs for the slices.
+- **Slices are not yet specs.** Each slice description in `decomposition.md` is a one-sentence scope, not a full spec. Per-slice grooming happens after `autoship materialize <id>` creates the Linear sub-issues and the operator dispatches them individually.
+- **Recursive decomposition is forbidden.** A child issue that turns out to also be an umbrella triggers a decomposition of its own (next run). Do not multi-level decompose in one artifact.
+- **Slice-ids are stable.** Each slice carries a `slice-id` field used by materialize for idempotent retry. Once assigned, a slice-id does not change across re-grooming.
 
 ## Groundedness criteria
 
