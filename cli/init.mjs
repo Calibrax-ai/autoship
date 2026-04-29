@@ -52,9 +52,20 @@ export async function init(args = []) {
 	}
 
 	const noInteractive = args.includes('--no-interactive');
-	const unknown = args.filter((a) => a !== '--no-interactive');
+	const upgradeFramework = args.includes('--upgrade-framework');
+	const allowed = new Set(['--no-interactive', '--upgrade-framework']);
+	const unknown = args.filter((a) => !allowed.has(a));
 	if (unknown.length) {
 		throw new Error(`Unknown init option: ${unknown.join(', ')}`);
+	}
+
+	// --upgrade-framework refreshes package-owned files (.claude/agents,
+	// .claude/skills, docs/architecture) without touching operator-owned
+	// .autoship/ config. Designed for runners that want every dispatch to
+	// pick up the latest published agents, while preserving operator edits
+	// to standards.yaml / defaults.yaml.
+	if (upgradeFramework) {
+		return upgradeFrameworkOnly(cwd);
 	}
 
 	// If .autoship/ already exists, init becomes advisory: print what current
@@ -92,8 +103,10 @@ export async function init(args = []) {
 	// Copy core agents + skills.
 	copyAgentFiles(CORE_AGENTS, cwd);
 	copySkillDirs(CORE_SKILLS, cwd);
+	copyArchitectureDocs(cwd);
 	console.log('  ✓ core agents → .claude/agents/');
 	console.log('  ✓ core skills → .claude/skills/');
+	console.log('  ✓ architecture docs → docs/architecture/');
 
 	// Create .autoship/
 	const autoshipDir = join(cwd, '.autoship');
@@ -125,6 +138,28 @@ export async function init(args = []) {
 	console.log('  ✓ .gitignore updated');
 
 	printNextSteps(answers);
+}
+
+// `autoship init --upgrade-framework` refreshes only the package-owned files
+// (.claude/agents, .claude/skills, docs/architecture). Skips wizard, leaves
+// .autoship/ untouched. Idempotent and safe to call on every runner dispatch.
+function upgradeFrameworkOnly(cwd) {
+	console.log('\nautoship init --upgrade-framework\n');
+	console.log('Refreshing framework files (.autoship/ left untouched)...');
+
+	copyAgentFiles(CORE_AGENTS, cwd);
+	copySkillDirs(CORE_SKILLS, cwd);
+	copyArchitectureDocs(cwd);
+
+	console.log('  ✓ .claude/agents/ refreshed');
+	console.log('  ✓ .claude/skills/ refreshed');
+	console.log('  ✓ docs/architecture/ refreshed');
+
+	if (!existsSync(join(cwd, '.autoship'))) {
+		console.log(
+			'\nNote: .autoship/ does not exist. Run `autoship init` (without --upgrade-framework) to bootstrap user config.'
+		);
+	}
 }
 
 // Re-running `autoship init` on an existing .autoship/ prints an advisory:
@@ -461,6 +496,15 @@ function copySkillDirs(dirs, cwd) {
 			join(cwd, '.claude', 'skills', dir)
 		);
 	}
+}
+
+function copyArchitectureDocs(cwd) {
+	const src = join(PKG_ROOT, 'docs', 'architecture');
+	if (!existsSync(src)) {
+		throw new Error('Packaged architecture docs are missing.');
+	}
+
+	copyDir(src, join(cwd, 'docs', 'architecture'));
 }
 
 function copyDir(src, dest) {

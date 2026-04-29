@@ -14,8 +14,9 @@ npx @cs-calibrax/autoship init
 
 Run from the root of a git repo. The CLI:
 
-- Copies 7 core autoship agents into `.claude/agents/`
+- Copies 8 core autoship agents into `.claude/agents/`
 - Copies 4 core skill packs into `.claude/skills/`
+- Copies live architecture docs into `docs/architecture/` so installed agents can read their required contracts
 - Writes `.autoship/standards.yaml` with high-confidence repo policy inferred from evidence (next/prisma/sentry/github-actions/etc.). Each inferred value is annotated with `# inferred from <evidence>`.
 - Writes a commented `.autoship/defaults.yaml` overrides template — autoship infers source, scope, and validation at runtime, so this file is for explicit overrides only
 - Adds autoship runtime state to `.gitignore`
