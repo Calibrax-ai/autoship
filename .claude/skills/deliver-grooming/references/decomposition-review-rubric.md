@@ -70,6 +70,7 @@ Do operator questions reduce execution uncertainty without blocking materializat
 
 - Every question in `Operator questions` must have `type: blocking | defaulted | slice-local`.
 - `blocking` questions must be answered before approval. An APPROVED decomposition with unresolved blocking questions is invalid.
+- **Scope-determining blocking questions cannot ship.** If a `blocking` question's answer would change *which slices exist* (not just slice contents) — for example, "is this an IA-only redesign or also a visual refresh?" where the second answer would require a different umbrella with different slices — REJECT, even if the answer field is filled in by the agent. Scope-determining questions must be resolved *before* the decomposition is drafted: either resolve from codebase evidence and record the resolution, or halt grooming with the existing `need-info` outcome surfacing only that question and regroom after the operator answers. A decomposition contingent on an unresolved umbrella-shape question is invalid even when every slice is internally coherent.
 - `defaulted` questions must include a concrete default and explain its effect on slices, dependencies, or child issue contents. If no safe default exists, the question is blocking.
 - `slice-local` questions must name the child slice(s) that should inherit the question. A question that changes parent slice boundaries is not slice-local.
 - Broad preference questions that do not change execution are `FAIL`; move them to `Notes`.

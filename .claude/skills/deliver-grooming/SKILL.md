@@ -40,6 +40,8 @@ Every claim grounded in observed output, grep'd code, or cited issue content. Fi
 
 Evidence-first for features means evidence from codebase patterns, not runtime error output. Find the smallest design that solves the stated problem by following existing patterns. Novelty is a cost; fit is a feature. The spec covers the stated problem, not its adjacent imaginable extensions.
 
+For frontend/UI features, include an `Intended Layout` section in the spec. Use a concise ASCII sketch to expose hierarchy, navigation, tab/sidebar placement, empty states, and primary action placement. Keep it schematic, not pixel-perfect. Omit this section for backend-only work.
+
 ### Refactor — conservational
 
 Preserve observable behavior. Improve structure (coupling, readability, testability, complexity, performance, security) without changing what the code does externally. Tests are the contract — what existing tests cover defines what is preserved; what they don't cover must be filled by regression tests before the refactor lands.
@@ -58,7 +60,7 @@ Do not invent `ready`, `proposed`, `in-progress`, `draft`, or any other label. I
 
 The full spec template, including frontmatter, all universal sections, and type-specific sections, lives at `assets/spec-template.md`. The deliver-pre-groomer fills it; the reviewer checks conformance against it.
 
-Universal sections (all types): Outcome, Acceptance Criteria, Scope Fence, Rabbit-Hole Patches, Blast-Radius Manifest, Skeleton Position, Concrete Example. Optional: Failure Modes, Assumptions. `Assumptions` exists to surface product judgment the groomer made on its own — auth scope, thresholds, intent calls — so the human gate at Ready→Building can override. Hidden product judgment (made silently in body text instead of called out here) is a scope failure.
+Universal sections (all types): Outcome, Acceptance Criteria, Scope Fence, Rabbit-Hole Patches, Blast-Radius Manifest, Skeleton Position, Concrete Example. Optional: Failure Modes, Assumptions. Frontend/UI specs also include Intended Layout. `Assumptions` exists to surface product judgment the groomer made on its own — auth scope, thresholds, intent calls — so the human gate at Ready→Building can override. Hidden product judgment (made silently in body text instead of called out here) is a scope failure.
 
 Type-specific sections:
 
@@ -98,6 +100,7 @@ Discipline:
 - **Recursive decomposition is forbidden.** A child issue that turns out to also be an umbrella triggers a decomposition of its own (next run). Do not multi-level decompose in one artifact.
 - **Slice-ids are stable.** Each slice carries a `slice-id` field used by create-issues for idempotent retry. Once assigned, a slice-id does not change across re-grooming.
 - **Questions are typed.** Only ask questions that change execution. Use `blocking` only when no safe child issue creation exists without an answer; those must be answered before approval. Use `defaulted` when autoship can proceed with a stated default. Use `slice-local` when the question belongs in a child issue.
+- **Scope-determining questions never ship in a decomposition.** A `blocking` question whose answer would reshape *which slices exist* (not just slice contents) cannot appear in a shippable artifact, even when the agent self-fills the answer. Resolve it from codebase evidence before drafting, or halt grooming with the existing `need-info` outcome surfacing only that question and regroom after the operator answers. The decomposition-review rubric (Check 5) REJECTs such artifacts even when every slice is internally coherent.
 
 ## Groundedness criteria
 

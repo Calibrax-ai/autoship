@@ -47,6 +47,9 @@ OR
 # Concrete Example
 <input → output, evidence snippet, or before/after code>
 
+# Intended Layout                  [Frontend/UI only]
+<concise ASCII sketch of the main screen, panel, or component arrangement; expose hierarchy, navigation, tab/sidebar placement, empty states, and primary actions>
+
 # Failure Modes                    [optional — include when runtime risk exists]
 <bulleted list of failure scenarios the change must handle or explicitly defer>
 

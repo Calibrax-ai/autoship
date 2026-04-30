@@ -109,7 +109,7 @@ The controller writes `invocation.txt` + `run.json` to the run dir for reproduci
 
 In automatic mode, Autoship uses the draft PR branch as the durable work envelope: grooming commits `spec.md`, the latest review, and `manifest.json`, opens or updates a spec-first draft PR, then continues into oracle/build only when the reviewed spec is build-worthy. If the spec needs clarification, Autoship parks the issue in `Needs Attention` and does not dispatch build workers.
 
-Completed build PRs include a `Human Review Checklist` so the developer knows what to inspect before merge. For UI/frontend changes, the checklist calls out the visual state to review and includes screenshot or preview evidence when available.
+Completed build PRs include a `Human Review Checklist` so the developer knows what to inspect before merge. For UI/frontend changes, Autoship links preview deployments when available and calls out the visual state to review. Screenshot capture is best-effort; if screenshots are missing but a preview exists, the PR says so explicitly.
 
 For remote automatic runs, the runner-selected issue and `Ready to Groom` state are the selection authority. The controller may groom/spec from that handoff without a full Linear defaults block, but code changes still require configured or safely inferred validation. If validation is missing or ambiguous, Autoship should leave a reviewed spec/draft handoff and park the issue in `Needs Attention` instead of building.
 
