@@ -25,18 +25,22 @@ After the repo evolves, re-run `autoship init` against the existing repo. It wil
 
 ### One-time Linear setup (deliver users)
 
-Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. Remote automation should wake on the explicit `Ready for Autoship` state, not on broad `Todo`. This needs four states beyond the universal `Todo` / `In Progress` / `In Review` set:
+Deliver uses Linear's workflow-state column as the human ↔ agent baton: a card in `In Progress` means autoship is working it; anywhere else means it's your turn. Remote automation should wake on the explicit `Ready to Groom` state, not on broad `Todo`. The recommended magic flow needs four states beyond the universal `Todo` / `In Progress` / `In Review` set:
 
-- **Ready for Autoship** — type `unstarted`, used by the remote runner as the explicit "Autoship may start on this issue" signal. `Todo` remains a human/local grooming bucket.
-- **Spec Ready** — type `unstarted`, position between `Todo` and `In Progress`. Set when grooming finishes and a reviewed buildable spec is waiting on you to run `autoship deliver <id>`. In automatic remote runs, it is also the manifest phase that lets Autoship continue into build after an approved spec review.
-- **Decomposition Proposed** — type `unstarted`, parallel to `Spec Ready`. Set when grooming detects an umbrella issue and produces a reviewed `decomposition.md`. Run `autoship materialize <id>` to create the child sub-issues.
+- **Ready to Groom** — type `unstarted`, used by the remote runner as the explicit "agent may analyze and, if bounded/clear, build" signal. `Todo` remains a human/local grooming bucket.
+- **Breakdown Proposed** — type `unstarted`. Set when grooming detects an umbrella issue and opens a reviewed `[Breakdown]` PR.
+- **Breakdown Approved** — type `unstarted`. Move the parent here after reviewing the breakdown PR; autoship creates child issues and starts dependency-free slices.
 - **Needs Attention** — type `unstarted`, parallel column. Set when autoship halts on a typed blocker.
 
-State and label are orthogonal: state answers "what should happen next?" (baton); PR labels (`autoship`, `autoship:spec`, `autoship:decomposition`, `autoship:need-info`, `autoship:blocked`, `autoship:cannot-reproduce`) answer "what kind of artifact is this?".
+`Spec Ready` remains supported for supervised/manual installations, but it is no longer part of the recommended remote happy path.
+
+State and label are orthogonal: state answers "what should happen next?" (baton); PR labels (`autoship`, `autoship:spec`, `autoship:breakdown`, `autoship:need-info`, `autoship:blocked`, `autoship:cannot-reproduce`) answer "what kind of artifact is this?".
 
 Create these manually in your Linear workspace settings (Workflow → States). `autoship init`'s next-steps printout reminds you with the exact names; this is the one piece of setup the CLI can't do for you.
 
 State transitions are best-effort: if a state is missing, autoship still posts the milestone comment and skips the state change rather than failing the run. The kanban-glance UX degrades, but nothing breaks.
+
+For umbrella issues, the magic moment is not the breakdown table; it is the clerical handoff disappearing. Autoship opens a `[Breakdown]` PR with a reviewed work graph, you approve the boundary by moving the issue to `Breakdown Approved` or running `autoship create-issues <id>`, then autoship creates the child Linear issues and moves dependency-free children to `Ready to Groom`. Questions in `decomposition.md` are typed: `blocking` questions must be answered before approval, `defaulted` questions proceed with the stated default unless amended, and `slice-local` questions are copied into the relevant child issue.
 
 ## Run autoship
 
@@ -55,7 +59,8 @@ autoship groom FRD-162 --post          # write local spec and mirror summary to 
 autoship deliver FRD-162               # approve current spec and build one issue
 autoship deliver FRD-162 --unattended --auto --post
 autoship deliver build FRD-162 --dry-run
-autoship materialize FRD-161           # create child issues from an approved decomposition
+autoship create-issues FRD-161         # create child issues from an approved breakdown
+autoship materialize FRD-161           # compatibility alias
 ```
 
 Default mode is interactive — the CLI opens a Claude Code session with the controller agent loaded and your prompt as the first user message. Output streams as the controller runs; the session stays open after for follow-ups. Disk-backed state under `.autoship/` means re-running picks up where it left off.
@@ -104,7 +109,9 @@ The controller writes `invocation.txt` + `run.json` to the run dir for reproduci
 
 In automatic mode, Autoship uses the draft PR branch as the durable work envelope: grooming commits `spec.md`, the latest review, and `manifest.json`, opens or updates a spec-first draft PR, then continues into oracle/build only when the reviewed spec is build-worthy. If the spec needs clarification, Autoship parks the issue in `Needs Attention` and does not dispatch build workers.
 
-For remote automatic runs, the runner-selected issue and `Ready for Autoship` state are the selection authority. The controller may groom/spec from that handoff without a full Linear defaults block, but code changes still require configured or safely inferred validation. If validation is missing or ambiguous, Autoship should leave a reviewed spec/draft handoff and park the issue in `Needs Attention` instead of building.
+Completed build PRs include a `Human Review Checklist` so the developer knows what to inspect before merge. For UI/frontend changes, the checklist calls out the visual state to review and includes screenshot or preview evidence when available.
+
+For remote automatic runs, the runner-selected issue and `Ready to Groom` state are the selection authority. The controller may groom/spec from that handoff without a full Linear defaults block, but code changes still require configured or safely inferred validation. If validation is missing or ambiguous, Autoship should leave a reviewed spec/draft handoff and park the issue in `Needs Attention` instead of building.
 
 Per-repo overrides live in `.autoship/defaults.yaml`. Flags on the invocation always win — `--report-only` and `--tracker=none` override stickies. By default, query/batch runs proceed immediately after the preview; set `deliver.confirm: true` per-repo to require a `[y/N]` pause, or use the per-run `--yes` flag as the one-shot opposite.
 

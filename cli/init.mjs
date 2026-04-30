@@ -337,7 +337,8 @@ async function collectLinearAnswers() {
 	console.log('\nLinear work selection defaults:');
 	console.log('  owner: me');
 	console.log('  groom states: Todo');
-	console.log('  build states: Spec Ready  (create this state in Linear — see Done section)\n');
+	console.log('  remote trigger state: Ready to Groom  (create this state in Linear — see Done section)');
+	console.log('  optional supervised build handoff: Spec Ready\n');
 
 	return {
 		team: teamName,
@@ -346,7 +347,6 @@ async function collectLinearAnswers() {
 		owner: 'me',
 		states: {
 			groom: ['Todo'],
-			build: ['Spec Ready'],
 		},
 	};
 }
@@ -356,7 +356,7 @@ async function collectLinearAnswersManual() {
 	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by linear CLI):' })).trim();
 	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
 
-	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, build=Spec Ready.\n');
+	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, remote trigger=Ready to Groom.\n');
 
 	return {
 		team,
@@ -365,7 +365,6 @@ async function collectLinearAnswersManual() {
 		owner: 'me',
 		states: {
 			groom: ['Todo'],
-			build: ['Spec Ready'],
 		},
 	};
 }
@@ -420,7 +419,9 @@ function describeAnswers(answers) {
 		parts.push(`team=${answers.linear.teamKey || answers.linear.team}`);
 		parts.push(`owner=${answers.linear.owner || 'me'}`);
 		parts.push(`groom=${(answers.linear.states?.groom || ['Todo']).join('+')}`);
-		parts.push(`build=${(answers.linear.states?.build || ['Building']).join('+')}`);
+		if (answers.linear.states?.build) {
+			parts.push(`build=${answers.linear.states.build.join('+')}`);
+		}
 	}
 	if (answers.validation) parts.push(`validation=${answers.validation}`);
 	return parts.join(', ');
@@ -438,19 +439,19 @@ function printNextSteps(answers) {
 
 	if (answers && answers.tracker === 'linear') {
 		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
-		const buildStates = (answers.linear?.states?.build || ['Spec Ready']).join(' / ');
-		lines.push(`  2. In Linear, create four workflow states for the full remote flow (Settings → Workflow → Add status):`);
-		lines.push(`       • "Ready for Autoship"      (type: unstarted; remote runner wake-up state)`);
-		lines.push(`       • "Spec Ready"              (type: unstarted, position between Todo and In Progress)`);
-		lines.push(`       • "Decomposition Proposed"  (type: unstarted, parallel to Spec Ready)`);
+		lines.push(`  2. In Linear, create four workflow states for the recommended remote flow (Settings → Workflow → Add status):`);
+		lines.push(`       • "Ready to Groom"          (type: unstarted; remote runner wake-up state)`);
+		lines.push(`       • "Breakdown Proposed"      (type: unstarted; review the breakdown PR)`);
+		lines.push(`       • "Breakdown Approved"      (type: unstarted; create child issues and start dependency-free slices)`);
 		lines.push(`       • "Needs Attention"         (type: unstarted, parallel column)`);
 		lines.push(`     These carry the handoff baton:`);
-		lines.push(`       Ready for Autoship → "agent please pick this up"`);
-		lines.push(`       Spec Ready          → "buildable spec ready, your turn to dispatch build"`);
-		lines.push(`       Decomposition Proposed → "umbrella decomposed, your turn to review the slice plan"`);
+		lines.push(`       Ready to Groom      → "agent may analyze and, if clear, build"`);
+		lines.push(`       Breakdown Proposed  → "review the breakdown PR"`);
+		lines.push(`       Breakdown Approved  → "create child issues and start dependency-free slices"`);
 		lines.push(`       Needs Attention     → "autoship halted on a blocker, your turn to unblock"`);
-		lines.push(`     PR labels are an orthogonal axis: \`autoship\` + \`autoship:<outcome>\` (spec, decomposition, need-info, blocked, cannot-reproduce) tag artifact kind. State answers "what next?"; label answers "what kind?".`);
-		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Ready for Autoship. ${buildStates} is the build-eligible state autoship transitions to after the spec is reviewed.`);
+		lines.push(`     PR labels are an orthogonal axis: \`autoship\` + \`autoship:<outcome>\` (spec, breakdown, need-info, blocked, cannot-reproduce) tag artifact kind. State answers "what next?"; label answers "what kind?".`);
+		lines.push(`     Optional supervised mode may also use a "Spec Ready" handoff, but it is not part of the default remote happy path.`);
+		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Ready to Groom.`);
 	}
 
 	lines.push('');
@@ -564,6 +565,12 @@ function renderDefaultsTemplate() {
 #
 # Safety note: keep audit.create_issues: false unless you actually want every
 # audit run to write into the tracker. Use --approve to opt in per-run.
+#
+# Recommended remote Linear states:
+#   Ready to Groom       # runner may analyze and, if clear, build
+#   Breakdown Proposed   # review the breakdown PR
+#   Breakdown Approved   # create child issues and start dependency-free slices
+#   Needs Attention      # human unblock
 
 # audit:
 #   tracker: linear            # linear | none (GitHub audit sync is not implemented in v1)
@@ -589,15 +596,18 @@ function renderDefaultsTemplate() {
 #   #   owner: me                # "me" means the authenticated Linear user
 #   #   states:
 #   #     # Eligibility (which Linear states autoship picks up from)
-#   #     # Local/human grooming often uses ["Todo"]. Remote runners should wake
-#   #     # from the explicit "Ready for Autoship" state instead.
+#   #     # Local/human grooming often uses ["Todo"]. Remote runners wake
+#   #     # from the explicit "Ready to Groom" state instead.
 #   #     groom: ["Todo"]
+#   #     # Optional supervised-mode compatibility only. Default remote flow
+#   #     # uses --auto from Ready to Groom and does not require Spec Ready.
 #   #     build: ["Spec Ready"]
 #   #     # Transitions (which states autoship sets at handoffs)
 #   #     # State changes are best-effort: missing target states fall back to comment-only.
 #   #     working: "In Progress"      # autoship has the baton (grooming or building)
+#   #     # Optional supervised-mode handoff:
 #   #     spec_ready: "Spec Ready"    # bounded spec complete, awaiting human approval
-#   #     decomposition_proposed: "Decomposition Proposed"  # umbrella decomposed, awaiting human review
+#   #     breakdown_proposed: "Breakdown Proposed"  # umbrella breakdown ready for review
 #   #     blocked: "Needs Attention"  # autoship halted, awaiting human unblock
 #   #     pr_open: "In Review"        # draft PR opened, awaiting code review
 #
@@ -653,16 +663,19 @@ function renderDefaultsConfigured(answers) {
 			lines.push(`    owner: ${answers.linear.owner || 'me'}`);
 			lines.push('    states:');
 			lines.push('      # Eligibility (which Linear states autoship picks up from)');
-			lines.push('      # Local/human grooming often uses ["Todo"]. Remote runners should wake');
-			lines.push('      # from the explicit "Ready for Autoship" state instead.');
+			lines.push('      # Local/human grooming often uses ["Todo"]. Remote runners wake');
+			lines.push('      # from the explicit "Ready to Groom" state instead.');
 			lines.push(`      groom: [${(answers.linear.states?.groom || ['Todo']).map(quote).join(', ')}]`);
-			lines.push(`      build: [${(answers.linear.states?.build || ['Spec Ready']).map(quote).join(', ')}]`);
+			lines.push('      # Optional supervised-mode compatibility only. Default remote flow');
+			lines.push('      # uses --auto from Ready to Groom and does not require Spec Ready.');
+			lines.push('      # build: ["Spec Ready"]');
 			lines.push('      # Transitions (which states autoship sets at handoffs).');
 			lines.push('      # Best-effort — if a target state does not exist in the workspace,');
 			lines.push('      # autoship falls back to comment-only at that handoff.');
 			lines.push('      working: "In Progress"      # autoship has the baton (grooming or building)');
-			lines.push('      spec_ready: "Spec Ready"    # bounded spec complete, awaiting human approval');
-			lines.push('      decomposition_proposed: "Decomposition Proposed"  # umbrella decomposed, awaiting human review');
+			lines.push('      # Optional supervised-mode handoff:');
+			lines.push('      # spec_ready: "Spec Ready"  # bounded spec complete, awaiting human approval');
+			lines.push('      breakdown_proposed: "Breakdown Proposed"  # umbrella breakdown ready for review');
 			lines.push('      blocked: "Needs Attention"  # autoship halted, awaiting human unblock');
 			lines.push('      pr_open: "In Review"        # draft PR opened, awaiting code review');
 		} else {

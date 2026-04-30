@@ -20,7 +20,7 @@ slice-count: <integer ≥ 2; see decomposition-review-rubric Check 2>
  each slice has a stable `slice-id` field: the parent issue id with
  a single-letter suffix (e.g. FRD-161a, FRD-161b, ...). slice-ids are
  stable across re-grooming — once assigned, a slice-id does not change.
- the materialize step uses slice-ids to detect already-created children
+ the create-issues step uses slice-ids to detect already-created children
  on retry.>
 
 ## <slice-id> — <slice title>
@@ -74,30 +74,52 @@ flowchart LR
 
 - **<excluded surface>** — <rationale>
 
-# Open questions
-<for the operator. each question must be answerable yes/no or
- one-of-a-list, not free-form essay. blocking questions go here;
- nice-to-knows go in `notes:` of the decomposition-review verdict instead.>
+# Operator questions
+<Only include questions that change execution. Nice-to-knows belong in
+`notes:` of the decomposition-review verdict, not here.
 
-- **Q1.** <yes/no question>
-- **Q2.** <one-of-list question with options>
+Every question must be typed. Use exactly one of:
+- `blocking` — must be answered in this artifact before reviewer approval
+- `defaulted` — create-issues may proceed using the stated default
+- `slice-local` — defer to the named child issue; create-issues copies it there
 
-# Materialization
+An APPROVED decomposition must have no unresolved `blocking` questions.>
 
-After this decomposition is approved (review APPROVED + parent at
-`Decomposition Proposed`), the operator runs:
+## Q1 — <short question title>
+type: blocking | defaulted | slice-local
+status: unresolved | answered | default-applied | deferred-to-slice
+applies-to: create-issues | <slice-id>[, <slice-id>...]
+default: <required when type: defaulted; otherwise `none`>
+answer: <required before approval when type: blocking; otherwise optional>
+effect: <what changes in slices/dependencies/materialization based on the answer>
+question: <yes/no or one-of-list question, not free-form essay>
+
+## Q2 — <short question title>
+...
+
+# Child Issue Creation
+
+After this breakdown is approved (review APPROVED + parent at
+`Breakdown Proposed`), the operator either moves the parent issue to
+`Breakdown Approved` or runs:
 
 ```
-autoship materialize <parent-id>
+autoship create-issues <parent-id>
 ```
 
-The materialize step is per-slice idempotent: it queries Linear for
+The create-issues step is per-slice idempotent: it queries Linear for
 existing children parented to <parent-id>, matches by slice-id (Slice:
 <slice-id> in the child body, falling back to title prefix
 `[<slice-id>]`), skips already-created slices, and creates the missing
 ones. Partial failure (rate-limit, network) leaves the PR open with a
-status comment; re-running resumes. Full success closes the PR with
-links to all children. See `docs/architecture/decomposition.md` § Materialize V1 contract for the full lifecycle.
+status comment; re-running resumes. If any `blocking` question is still
+unanswered, create-issues creates no children and halts with the missing
+question ids. `defaulted` questions proceed with their defaults; `slice-local`
+questions are copied into the relevant child issue body. Full success moves
+dependency-free children to `Ready to Groom`, leaves dependent children in
+Todo/default with dependency context, and closes the PR with links to all
+children. See `docs/architecture/decomposition.md` § Create-issues contract
+for the full lifecycle.
 
 Created child issues use:
 

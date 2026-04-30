@@ -83,20 +83,21 @@ Umbrella signals (any one is enough; they compound):
 
 When umbrella shape is detected, switch artifact type immediately. Do not draft a partial `spec.md` and then convert; the artifacts are mutually exclusive.
 
-## Decomposition outcome
+## Breakdown outcome
 
 For umbrella issues, the deliver-pre-groomer writes `decomposition.md` instead of `spec.md`. The artifact uses `type: decomposition` in frontmatter — see `assets/decomposition-template.md`.
 
-After writing `decomposition.md`, the controller dispatches `deliver-decomposition-reviewer` (not `deliver-spec-reviewer`). The reviewer applies four checks (Groundedness, Slice sizing, Dependency correctness, Surfaced concerns load-bearing) — see `references/decomposition-review-rubric.md`.
+After writing `decomposition.md`, the controller dispatches `deliver-decomposition-reviewer` (not `deliver-spec-reviewer`). The reviewer applies five checks (Groundedness, Slice sizing, Dependency correctness, Surfaced concerns load-bearing, Question discipline) — see `references/decomposition-review-rubric.md`.
 
-Once the decomposition is approved, the controller commits the artifact tree, opens the `[Decomposition]` draft PR, and parks the parent issue at `Decomposition Proposed`. The operator reviews the PR and runs `autoship materialize <id>` to create child sub-issues in Linear. The full lifecycle lives in `docs/architecture/decomposition.md`.
+Once the breakdown is approved, the controller commits the artifact tree, opens the `[Breakdown]` draft PR, and parks the parent issue at `Breakdown Proposed`. The operator reviews the PR and either moves the parent to `Breakdown Approved` or runs `autoship create-issues <id>` to create child issues in Linear and start dependency-free slices. The full lifecycle lives in `docs/architecture/decomposition.md`.
 
 Discipline:
 
 - **One umbrella per pre-groom run.** If the issue is an umbrella, write the decomposition. Do not also write a `spec.md` for the umbrella; do not pre-write specs for the slices.
-- **Slices are not yet specs.** Each slice description in `decomposition.md` is a one-sentence scope, not a full spec. Per-slice grooming happens after `autoship materialize <id>` creates the Linear sub-issues and the operator dispatches them individually.
+- **Slices are not yet specs.** Each slice description in `decomposition.md` is a one-sentence scope, not a full spec. Per-slice grooming happens after `autoship create-issues <id>` creates the Linear child issues; dependency-free children may be moved straight to `Ready to Groom`.
 - **Recursive decomposition is forbidden.** A child issue that turns out to also be an umbrella triggers a decomposition of its own (next run). Do not multi-level decompose in one artifact.
-- **Slice-ids are stable.** Each slice carries a `slice-id` field used by materialize for idempotent retry. Once assigned, a slice-id does not change across re-grooming.
+- **Slice-ids are stable.** Each slice carries a `slice-id` field used by create-issues for idempotent retry. Once assigned, a slice-id does not change across re-grooming.
+- **Questions are typed.** Only ask questions that change execution. Use `blocking` only when no safe child issue creation exists without an answer; those must be answered before approval. Use `defaulted` when autoship can proceed with a stated default. Use `slice-local` when the question belongs in a child issue.
 
 ## Groundedness criteria
 

@@ -1,6 +1,6 @@
-# Decomposition Review Rubric
+# Breakdown Review Rubric
 
-Use this rubric when `deliver-decomposition-reviewer` judges `decomposition.md`.
+Use this rubric when `deliver-decomposition-reviewer` judges the breakdown artifact in `decomposition.md`.
 
 ## Required inputs
 
@@ -64,6 +64,17 @@ Non-load-bearing (FAIL when present):
 
 Surfaced concerns that are load-bearing but ungrounded fail Check 1, not Check 4. Surfaced concerns that are out-of-scope speculation fail Check 4.
 
+### Check 5 — Question discipline
+
+Do operator questions reduce execution uncertainty without blocking materialization unnecessarily?
+
+- Every question in `Operator questions` must have `type: blocking | defaulted | slice-local`.
+- `blocking` questions must be answered before approval. An APPROVED decomposition with unresolved blocking questions is invalid.
+- `defaulted` questions must include a concrete default and explain its effect on slices, dependencies, or child issue contents. If no safe default exists, the question is blocking.
+- `slice-local` questions must name the child slice(s) that should inherit the question. A question that changes parent slice boundaries is not slice-local.
+- Broad preference questions that do not change execution are `FAIL`; move them to `Notes`.
+- The handoff language must match the question state. Do not say "block create-issues" when all remaining questions are defaulted or slice-local.
+
 ## Output format
 
 ```markdown
@@ -90,6 +101,9 @@ verdict: APPROVED | REJECTED
 
 ## Check 4 — Surfaced concerns load-bearing: PASS | FAIL
 <one paragraph, naming any non-load-bearing concerns>
+
+## Check 5 — Question discipline: PASS | FAIL
+<one paragraph, confirming no unresolved blocking questions remain and that defaulted/slice-local questions are correctly typed>
 
 ## Notes (non-blocking observations)
 (none)

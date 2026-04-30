@@ -17,7 +17,7 @@ Asking an AI to *"just implement the ticket"* tends to produce code that looks r
 - A **spec** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the spec is weak, work doesn't start.
 - A **draft pull request** with the code change, the tests, and the evidence that the change actually works.
 
-In supervised mode, grooming parks the issue in `Spec Ready` and hands the baton back to the human. The human runs `autoship deliver <id>` only when the spec is trustworthy. In automatic remote mode, the same reviewed spec boundary exists, but `--auto` lets Autoship continue into build without a human pause when the reviewer approves the spec. Any blocker lands in `Needs Attention`.
+In supervised mode, grooming can park the issue in `Spec Ready` and hand the baton back to the human. In the recommended remote mode, `Ready to Groom` is the explicit consent state: Autoship grooms, opens/updates the durable PR envelope, and continues into build when the spec reviewer approves and validation is available. Umbrella issues route to a reviewed `[Breakdown]` PR; `Breakdown Approved` creates child issues and starts only dependency-free slices. Any blocker lands in `Needs Attention`.
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
 >
@@ -61,7 +61,7 @@ flowchart LR
       PG --> BR
     end
 
-    HA["Approval boundary<br/>Spec Ready → deliver or --auto"]
+    HA["Approval boundary<br/>Spec Ready (supervised)<br/>or Ready to Groom + --auto"]
 
     subgraph BUILD ["Build · oracle frozen"]
       direction TB
@@ -140,29 +140,33 @@ stateDiagram-v2
 
 The inner filesystem state machine is the agents' source of truth. The outer Linear workflow-state column is the **human-facing baton**: a card in `In Progress` means autoship is currently working it; a card anywhere else means it's the operator's turn.
 
-Four operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
+Four recommended operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
 
-- **`Ready for Autoship`** — type `unstarted`. Remote runners use this as explicit automation consent for one issue. `Todo` remains a human/local grooming bucket, not a webhook trigger.
-- **`Spec Ready`** — type `unstarted`, position between `Todo` and `In Progress`. In supervised mode, signals "buildable spec is written and reviewed; your turn to approve and run `autoship deliver <id>`." In automatic mode, records that the reviewed spec boundary was satisfied.
-- **`Decomposition Proposed`** — type `unstarted`, parallel to `Spec Ready`. Signals "umbrella decomposed and reviewed; your turn to review the slice plan and run `autoship materialize <id>`."
+- **`Ready to Groom`** — type `unstarted`. Remote runners use this as explicit automation consent for one issue. `Todo` remains a human/local grooming bucket, not a webhook trigger.
+- **`Breakdown Proposed`** — type `unstarted`. Signals "umbrella breakdown reviewed; your turn to review the `[Breakdown]` PR."
+- **`Breakdown Approved`** — type `unstarted`. Signals "create child issues and start dependency-free slices."
 - **`Needs Attention`** — type `unstarted`, parallel column. Signals "autoship halted on a typed blocker; your turn to unblock."
+
+`Spec Ready` remains supported for supervised/manual installations but is no longer part of the default remote happy path.
 
 The controller is the single writer to Linear when posting is enabled. At each posted milestone it fires both a best-effort state change and a comment with @mention of the assignee — the state change is the kanban-glance baton, the comment is the Inbox notification. The canonical transition table:
 
 | Milestone | Linear state | Comment payload |
 |---|---|---|
 | autoship picks up an issue (groom phase) | `In Progress` | `Autoship grooming started.` |
-| grooming complete, spec APPROVED (bounded) | `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
-| automatic spec PR opens (bounded) | `Spec Ready` | `Spec PR ready: <url>. Autoship will continue automatically only because \`--auto\` was explicitly requested.` |
-| grooming complete, decomposition APPROVED (umbrella) | `Decomposition Proposed` | `Decomposition proposed: N slices. See .autoship/issues/<id>/decomposition.md or the draft \`[Decomposition]\` PR. Run \`autoship materialize <id>\` to create child issues.` (with @mention) |
-| materialize complete (full success) | `In Progress` then `Decomposed` label | `Materialize complete: N children created (M new, K already-existing). See child links above. PR closed.` |
-| materialize partial / retryable | `Decomposition Proposed` (unchanged) | `Materialize partial: created N of M, pending P. Re-run \`autoship materialize <id>\` to resume.` |
+| grooming complete, spec APPROVED (bounded, supervised) | optional `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
+| automatic spec PR opens (bounded) | no required state change | `Spec PR ready: <url>. Autoship is continuing because the issue was triggered from Ready to Groom with \`--auto\`.` |
+| grooming complete, breakdown APPROVED (umbrella) | `Breakdown Proposed` | `Breakdown proposed: N slices. Review the draft \`[Breakdown]\` PR, then move the parent to \`Breakdown Approved\` or run \`autoship create-issues <id>\` to create child issues and start dependency-free slices.` (with @mention) |
+| create-issues complete (full success) | `In Progress` then `Decomposed` label/convention | `Created N child issues. Started X dependency-free child issue(s) by moving them to Ready to Groom; Y child issue(s) are waiting on dependencies. PR closed.` |
+| create-issues partial / retryable | `Breakdown Proposed` (unchanged) | `Child issue creation partial: created N of M, pending P. Re-run \`autoship create-issues <id>\` or move back to Breakdown Approved after fixing the retryable cause.` |
 | grooming hit blocker (`needs-human-input`) | `Needs Attention` | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 | build starts (`autoship deliver <id>`) | `In Progress` | `Build started — branch <branch>, worktree <path>.` |
-| draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>.` |
+| draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>. Review the PR's Human Review Checklist before merge.` |
 | build hit blocker | `Needs Attention` | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-State names are configurable via `transitions.{working,spec_ready,decomposition_proposed,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger state is configured separately as `AUTOSHIP_LINEAR_AUTO_STATE` and defaults to `Ready for Autoship`. Defaults assume the four states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
+State names are configurable via `transitions.{working,spec_ready,breakdown_proposed,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger states are configured separately and default to `Ready to Groom` and `Breakdown Approved`. Defaults assume the four recommended states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
+
+Build PRs are review packets, not just implementation diffs. A completed build PR includes a `Human Review Checklist` with issue-specific inspection points, validation gaps or manual checks, and risk areas. For UI/frontend changes, the checklist names the visual state to inspect and includes screenshot or preview evidence when available; if evidence is unavailable, the PR says so plainly.
 
 Local runs are local-first. `--post` opts into Linear comments and best-effort state transitions; remote runners may pass `--post` as policy. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
 
@@ -615,7 +619,7 @@ The controller-backed runtime extends `deliver` into the first end-to-end path t
 - supervised build path: explicit `autoship deliver <id>` approval or strict `states.build` eligibility → worktree + branch → oracle → implementation → verification → draft PR → `In Review`
 - automatic path: `autoship deliver <id> --unattended --auto` from a trusted runner handoff → groom/review → commit spec ledger + `manifest.json` to the issue branch → open/update a spec-first draft PR → continue to build only when the reviewed spec is build-worthy and validation is available
 
-Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or runner webhook handoff) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, `--auto`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. In remote automatic mode the runner handoff supplies selection authority for the one issue, but the controller still owns execution authority and must stop before code changes if validation is missing or ambiguous. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
+Input is a **RunRequest** normalized from the trigger (CLI flags, natural-language prompt, or runner webhook handoff) — see `.claude/agents/autoship-controller.md § How I Receive Work`. The RunRequest names the testbed, issue source, groom/build state policy, `--post`, `--yes`, `--unattended`, `--auto`, validation commands, and outer state map. Source, Linear scope, and validation commands are **inferred from repo evidence** when not explicitly set in `defaults.yaml`; each inference writes one structured record to `runs/<run-id>/inferences.jsonl` (schema: [decision-log.md](docs/architecture/decision-log.md)) and is surfaced in a human-readable announce block at run start. In remote automatic mode the runner handoff supplies selection authority for the one issue, but the controller still owns execution authority and must stop before code changes if validation is missing or ambiguous. Fresh context per sub-agent dispatch; state on disk; single-writer invariant preserved.
 
 The controller reads two distinct instruction layers:
 
@@ -791,7 +795,7 @@ autoship-deliver-0.1/
           review-02.md   # after regroom (if any)
 ```
 
-Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) — the production shape where `deliver` gets installed into a repo the way `.github/` or `.claude/` does. Run-scoped state lives under `app/.autoship/runs/<run-id>/`: `run.json` (resolved RunRequest), `invocation.txt` (raw trigger), `decisions.log` (prose audit trail of state transitions and worker dispatches), and `inferences.jsonl` (structured record of every value the controller inferred at runtime — see [decision-log.md](/Users/shyangcalibrax/Documents/Projects/autoship/docs/architecture/decision-log.md)). The optional active deliver pointer is `app/.autoship/runs/current`.
+Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) — the production shape where `deliver` gets installed into a repo the way `.github/` or `.claude/` does. Run-scoped state lives under `app/.autoship/runs/<run-id>/`: `run.json` (resolved RunRequest), `invocation.txt` (raw trigger), `decisions.log` (prose audit trail of state transitions and worker dispatches), and `inferences.jsonl` (structured record of every value the controller inferred at runtime — see [decision-log.md](docs/architecture/decision-log.md)). The optional active deliver pointer is `app/.autoship/runs/current`.
 
 ### 0.1-specific simplifications
 
