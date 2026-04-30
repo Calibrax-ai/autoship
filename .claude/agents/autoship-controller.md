@@ -758,6 +758,8 @@ Build phases add:
 - `implementation_result_sha256`
 - `verification_result_sha256`
 
+When dispatched by autoship-runner, the Runner Handoff JSON envelope includes a `sessionId` field that names the Claude Code session UUID for this issue. **Copy `sessionId` verbatim into manifest.json as `session_id` on every manifest write.** The runner reads it from the most recent manifest commit on the next dispatch and passes `claude --resume <session_id>` to skip context-rebuild. Persisting `session_id` is the load-bearing mechanism behind cross-turn session resume; do not omit it. If the handoff envelope lacks `sessionId` (local CLI invocations, legacy runner versions), omit the field — the next dispatch will treat it as a first run.
+
 The manifest is a ledger, not a substitute for the artifacts. The controller should use it to verify that the build is using the reviewed spec it thinks it is using.
 
 ### Worktree + branch

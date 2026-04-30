@@ -170,6 +170,15 @@ Build PRs are review packets, not just implementation diffs. A completed build P
 
 Local runs are local-first. `--post` opts into Linear comments and best-effort state transitions; remote runners may pass `--post` as policy. The canonical Linear policy lives in `.claude/agents/autoship-controller.md § Linear policy`.
 
+#### Cross-turn session continuity (0.6.0+)
+
+When dispatched by autoship-runner, the same Trigger.dev task spans the entire groom → review → halt → human-reply → resume cycle, and Claude's session resumes instead of cold-starting. Two mechanisms compose:
+
+1. **`session_id` lives in `manifest.json`.** The runner generates a UUID at first dispatch and threads it through the Runner Handoff envelope. The controller copies it verbatim into manifest.json on every commit. On the next dispatch, the runner reads it and spawns `claude --resume <session_id>`, which loads the prior conversation transcript so the controller skips re-deriving things it already knew.
+2. **Trigger.dev `wait.forToken()` parks the task across the human turn.** When grooming halts with `phase: needs_attention`, the runner creates a deterministic-id waitpoint (`issue-${issueId}-waitpoint-current`) and awaits it. The container is freed (no idle compute cost). When a Linear comment or state-change webhook arrives, the runner's webhook handler calls `wait.completeToken({ id: 'issue-${issueId}-waitpoint-current' }, payload)` and the parked task resumes. No new state has to be persisted to identify the right waitpoint — the issue id alone is enough.
+
+Net effect: human turn time is the only wall-clock that hurts. AI cold-start cost is gone. JSONL transcripts mirror to durable storage (Supabase Storage S3-compatible API) so resume works across container teardowns; if storage is unconfigured, resume gracefully degrades to cold-start on long parks.
+
 ### Per-type grooming flow
 
 All four types share the same overall shape: `read issue → apply type-specific procedure → map blast-radius → write spec → review`. The type-specific middle differs per type because the truth source differs.
