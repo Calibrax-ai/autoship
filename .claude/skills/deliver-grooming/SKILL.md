@@ -42,6 +42,8 @@ Evidence-first for features means evidence from codebase patterns, not runtime e
 
 For frontend/UI features, include an `Intended Layout` section in the spec. Use a concise ASCII sketch to expose hierarchy, navigation, tab/sidebar placement, empty states, and primary action placement. Keep it schematic, not pixel-perfect. Omit this section for backend-only work.
 
+Frontend/UI specs should also name executable evidence for important user-visible claims. Evidence can be existing E2E/component tests, browser/preview checks, screenshot evidence, or a documented blocker when no trustworthy automated evidence is feasible. Do not rely on "human review will check it" when the repo already has automatable behavior evidence.
+
 ### Refactor — conservational
 
 Preserve observable behavior. Improve structure (coupling, readability, testability, complexity, performance, security) without changing what the code does externally. Tests are the contract — what existing tests cover defines what is preserved; what they don't cover must be filled by regression tests before the refactor lands.
@@ -128,10 +130,12 @@ A spec is ungrounded if any claim lacks traceable evidence. These are the criter
 ### Refactor
 
 - **Existing tests list** — each listed test file exists and imports or calls the refactor target. Files that exist but do not exercise the target are ungrounded.
+- **Existing behavior tests are obligations.** If Behavior Preservation cites an existing behavior test, the spec's Verification must include a runnable command that exercises it. Cited behavior tests are not optional human-review advice.
 - **Observable invariants** in "What must be preserved" reference real behaviors — endpoint names, table names, event types that exist in the codebase.
 - **Structure Improvement → Before** cites the real current structure. Named files/functions/classes exist as described.
 - **Coverage gaps** are specific behaviors + specific regression tests to add (file + test name), not "add tests as needed."
 - If `preservation-status: needs-coverage-first`, Coverage gaps names specific tests; the spec is approvable only if those tests are specific enough to execute against.
+- `typecheck`, lint, route generation, and grep are supporting checks. They are not enough to prove behavior preservation when automatable behavior tests exist.
 
 ## Scope sanity principles
 
@@ -155,6 +159,7 @@ A spec is ungrounded if any claim lacks traceable evidence. These are the criter
 ### Refactor
 
 - **No observable behavior changes.** API responses, DB shapes, emitted events, or any externally observable behavior must not drift. Any AC or Structure Improvement description implying behavior change is a scope failure. This is the load-bearing check for Refactor — the most common way refactor specs fail.
+- **No optionalizing behavior evidence.** A refactor cannot be `preservation-status: ready` if behavior preservation is delegated to human review while repo-native executable tests/checks exist.
 - **Improvement target is concrete and measurable**, not vague. "Reduce coupling" alone fails; "Extract auth logic into `src/auth/` (currently in `routes/*.ts`)" passes.
 - **No while-we're-here additions.** Scope matches the stated structural change; scope creep into behavior improvements or adjacent refactors is a failure.
 - **Coverage-gap plan is specific.** Named test files + test names + behaviors they cover.

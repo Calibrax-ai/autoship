@@ -114,7 +114,7 @@ These invariants hold across every mode. Mode-specific procedure below obeys the
 The author of an artifact never discharges the gates that judge it. This is structural, not stylistic.
 
 - Deliver-pre-groomer writes specs. Deliver-spec-reviewer judges them.
-- Oracle writer creates the frozen test contract. Implementation executor must pass it without modifying it.
+- Oracle writer creates the frozen evidence contract. Implementation executor must pass it without modifying it.
 - Implementation executor writes the code. Verification plus the PR reviewer judges the result.
 
 Violation pattern to watch for: a stage approving its own output ("looks good to me"), or asserting that it solved the problem without a separate judge confirming. When an agent produces and also marks-as-done, stop — the judge boundary is being collapsed.
@@ -144,7 +144,8 @@ Deliver has canonically derivable local runtime states:
 - latest spec-review APPROVED and no `oracle/result.md` → `ready-for-build`
 - latest decomposition-review APPROVED, child issues not yet created → `breakdown-approved` (awaiting `autoship create-issues <id>` or `Breakdown Approved` remote trigger)
 - child issue creation completed (all slices created in Linear) → `decomposed` (terminal)
-- `oracle/result.md` exists, no `implementation/result.md` → `oracle-written`
+- `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence` → `needs_attention`
+- `oracle/result.md` says `oracle-green` or `oracle-red-expected`, no `implementation/result.md` → `oracle-written`
 - `implementation/result.md` exists, no `verification/result.md` → `implemented`
 - `verification/result.md` says passed, no `pr.md` → `ready-for-pr`
 - `pr.md` exists → `in-review`
@@ -176,7 +177,7 @@ Structured results workers return:
 - `spec-written` + design-status (from deliver-pre-groomer when output is `spec.md`)
 - `decomposition-written` + slice-count (from deliver-pre-groomer when output is `decomposition.md`)
 - `verdict: APPROVED | REJECTED` (from deliver-spec-reviewer, deliver-decomposition-reviewer, and audit-reviewer)
-- `oracle-green` / `oracle-red-expected` / `oracle-failed` (from deliver-oracle-writer)
+- `oracle-green` / `oracle-red-expected` / `oracle-failed` / `oracle-insufficient-evidence` (from deliver-oracle-writer)
 - `implementation-passed` / `implementation-failed` / `oracle-mutation-detected` (from deliver-implementation)
 - `verification-passed` / `verification-failed` / `oracle-mutation-detected` (from controller-owned verification)
 - `needs-human-input` + reason (from any worker that hits a blocking ambiguity; the reason is a filled blocker report per the `blocker-escalation` skill — `.claude/skills/blocker-escalation/assets/blocker-report-template.md`, lint-checked by `.claude/skills/blocker-escalation/scripts/validate-blocker.py`)
@@ -529,11 +530,11 @@ Dispatch workers via fresh subprocess sessions from the autoship root. Each disp
 - **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`
 - **deliver-decomposition-reviewer** — after every pre-groom/regroom pass that produced `decomposition.md`
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Breakdown outcomes do not progress to oracle; the parent issue's terminal is `Breakdown Proposed` until the operator approves child-issue creation.)
-- **deliver-implementation** — `oracle/result.md` exists + no `implementation/result.md`
+- **deliver-implementation** — `oracle/result.md` exists with `oracle-green` or `oracle-red-expected` + no `implementation/result.md`. If `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence`, park the issue at `Needs Attention` with the oracle blocker; do not dispatch implementation.
 
 Reviewer routing is mechanical: presence of `spec.md` → `deliver-spec-reviewer`; presence of `decomposition.md` → `deliver-decomposition-reviewer`. The two artifacts are mutually exclusive — never both for the same issue in the same run.
 
-Accepted outcomes for each worker are in its agent definition. Any other return parks the issue at `needs-human-input`.
+Accepted outcomes for each worker are in its agent definition. `oracle-failed` and `oracle-insufficient-evidence` are accepted oracle terminal outcomes, but they are blockers, not build authorization. Any other return parks the issue at `needs-human-input`.
 
 **Dispatch shape and observability.** Workers run as Bash-spawned `claude --agent <worker> -p <prompt>` subprocesses. Always include `--verbose` and `tee` the output to a per-dispatch log file so the operator can tail live progress:
 
@@ -581,7 +582,7 @@ After printing, halt cleanly. The session stays open in interactive mode for the
 
 When a build is approved (`deliver <id>` in human mode, strict `states.build` eligibility in unattended mode, or approved spec review in `--auto` mode), the controller owns the path to a reviewable draft PR: issue branch/worktree, oracle dispatch, implementation dispatch, full validation rerun, frozen-oracle hash verification, `verification/result.md`, commits, push, PR update, and the `In Review` state transition + comment per § Linear policy.
 
-Any failure parks the issue in `Needs Attention` (with a comment naming the blocker artifact). The controller never opens a PR against a mutated oracle or failed validation.
+Any failure parks the issue in `Needs Attention` (with a comment naming the blocker artifact). The controller never opens a PR against a mutated oracle, insufficient evidence, or failed validation.
 
 In automatic mode, the build half starts only after spec review has approved the spec and the manifest records `spec_ready`. If review returns any `need-info` / `cannot-reproduce` / blocker outcome, update the manifest to `needs_attention`, mirror that blocker when `--post` is set, and stop that issue without dispatching oracle or implementation workers.
 
@@ -589,7 +590,9 @@ Successful build PRs are human review handoffs, not just code diffs. Every compl
 
 For UI or frontend changes, include a `Preview Evidence` note before or inside the checklist. After opening or updating the PR, check the PR body, comments, and status checks for hosted preview URLs before finalizing the PR body and Linear build-complete comment. Distinguish preview URL available, screenshot evidence available, screenshot not captured, and preview unavailable after checking PR checks/comments/statuses. Never say "no preview available" only because the implementation worker did not capture screenshots. If a preview exists but screenshots were not captured, say: "Preview available; screenshots not captured by Autoship."
 
-Write `verification/result.md` after implementation validation and before any commit/push/PR:
+Before writing `verification/result.md`, parse `oracle/result.md`. Rerun the configured validation commands and every oracle-declared command under `verification` or `evidence-run` that is not already covered. Recompute every `oracle-files` hash. If any required evidence command fails, any frozen oracle file changed, or `oracle-files` is empty without an explicit `empty-oracle-rationale`, write `verification-failed` or `oracle-mutation-detected` and stop before commit/push/PR.
+
+Write `verification/result.md` after implementation validation and oracle evidence verification, before any commit/push/PR:
 
 ```markdown
 ---
@@ -600,6 +603,9 @@ verification-outcome: verification-passed | verification-failed | oracle-mutatio
 validation:
   - <command 1>
   - <command 2>
+oracle-outcome: oracle-green | oracle-red-expected
+oracle-evidence:
+  - <oracle evidence command rerun>
 oracle-hash-check: passed | failed
 dry_run: true | false
 ---
@@ -609,6 +615,9 @@ dry_run: true | false
 
 ## Validation Result
 <commands and outcomes>
+
+## Oracle Evidence Result
+<oracle evidence commands and outcomes>
 
 ## Oracle Hash Check
 <whether every oracle file from oracle/result.md still matches>

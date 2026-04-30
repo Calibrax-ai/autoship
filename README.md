@@ -2,7 +2,7 @@
 
 Turn messy software work into reviewable, reliable delivery — humans approve what matters, agents do the grinding.
 
-Autoship is a set of Claude Code agents and skills for the path from repo readiness to draft pull request: audit turns production gaps into bounded work, groom turns issues into reviewed local specs, and deliver turns one approved spec into frozen tests, implementation, and a draft PR.
+Autoship is a set of Claude Code agents and skills for the path from repo readiness to draft pull request: audit turns production gaps into bounded work, groom turns issues into reviewed local specs, and deliver turns one approved spec into a frozen evidence contract, implementation, and a draft PR.
 
 ## Install
 
@@ -108,6 +108,8 @@ autoship deliver build FRD-162 --dry-run                          # plan, no pus
 The controller writes `invocation.txt` + `run.json` to the run dir for reproducibility. Grooming writes canonical local specs under `.autoship/issues/<id>/`. Local runs are local-first; pass `--post` to mirror concise milestone summaries and best-effort Linear state changes. Remote runners may pass `--post` as policy.
 
 In automatic mode, Autoship uses the draft PR branch as the durable work envelope: grooming commits `spec.md`, the latest review, and `manifest.json`, opens or updates a spec-first draft PR, then continues into oracle/build only when the reviewed spec is build-worthy. If the spec needs clarification, Autoship parks the issue in `Needs Attention` and does not dispatch build workers.
+
+The oracle is an evidence contract, not just a generated-test step. It searches for repo-native tests, fixtures, helpers, seed scripts, sample files, and commands; uses or creates the narrowest trustworthy evidence; and records the claims, commands, files, residual risks, and frozen oracle-file hashes in `oracle/result.md`. If behavior evidence is missing or cannot be produced honestly, the oracle returns `oracle-insufficient-evidence` and Autoship stops before implementation.
 
 Completed build PRs include a `Human Review Checklist` so the developer knows what to inspect before merge. For UI/frontend changes, Autoship links preview deployments when available and calls out the visual state to review. Screenshot capture is best-effort; if screenshots are missing but a preview exists, the PR says so explicitly.
 

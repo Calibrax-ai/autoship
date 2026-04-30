@@ -34,7 +34,7 @@ Apply `SKILL.md` Groundedness criteria, universal plus the matching type section
 - Open cited files in Root Cause / Alternatives / Existing tests / Structure Improvement -> Before. Confirm quoted content matches.
 - For every file in Blast-Radius -> Expected to create, use `Glob` to confirm it does not already exist. Existing file labeled as new is `FAIL`.
 - For Feature Alternatives, confirm each cited `file:line` exists and roughly matches the claimed pattern. Strawman rejections with no cited counter-example are `FAIL`.
-- For Refactor Existing tests, confirm each listed test file exists and imports or calls the refactor target.
+- For Refactor executable behavior evidence, confirm each listed test/evidence file exists and imports, calls, or exercises the refactor target. If a refactor cites existing behavior tests but omits a runnable command that exercises them, `FAIL`.
 
 Any unverifiable claim, mismatched citation, or hallucinated invariant is `FAIL`.
 
@@ -48,6 +48,8 @@ Apply `SKILL.md` Scope sanity principles, universal plus the matching type secti
 - Feature: if the spec is single-slice but the issue has multi-slice indicators, `FAIL`.
 - Refactor: any hint of observable behavior drift is `FAIL`.
 - Refactor: coverage-gap plan must name specific test files, test names, and behaviors.
+- Refactor: typecheck, lint, route generation, and grep are supporting checks. They cannot be the only preservation proof when automatable behavior tests exist.
+- Refactor: behavior preservation delegated to human review while executable repo-native tests/checks exist is `FAIL`.
 - Hidden product judgment is a scope failure. If the body shows the groomer made a product call that a human might reasonably override (e.g. picked one of multiple plausible interpretations of user intent, decided who should have access, set a cap or threshold) and that call is not surfaced in `Assumptions`, `FAIL`. An empty `Assumptions` section on a Feature touching auth, money, customer data, or external egress is suspicious and warrants a closer read.
 
 ## Output format

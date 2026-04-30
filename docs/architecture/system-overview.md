@@ -69,7 +69,7 @@ Handles the **known repo, bounded change** problem.
 
 **Output:**
 - a trustworthy spec
-- a frozen test oracle
+- a frozen evidence oracle
 - a validated code change, shipped as a draft pull request
 
 Canonical doc: [deliver-architecture.md](docs/architecture/deliver-architecture.md)
@@ -92,7 +92,7 @@ Autoship runs on a small set of specialized agents. Each does one thing; the con
 | **deliver-pre-groomer** | Deliver | Writes the spec from an approved issue. Switches to writing `decomposition.md` for umbrella issues. | Operational |
 | **deliver-spec-reviewer** | Deliver | Judges the spec. Separate agent from the one that wrote it. | Operational |
 | **deliver-decomposition-reviewer** | Deliver | Judges the decomposition for umbrella issues, including typed question discipline. Separate agent from the one that wrote it. | Operational (0.4.2) |
-| **deliver-oracle-writer** | Deliver | Writes the frozen test oracle from the approved spec. | Operational |
+| **deliver-oracle-writer** | Deliver | Designs the frozen evidence oracle from the approved spec. | Operational |
 | **deliver-implementation** | Deliver | Writes the code; forbidden from editing the oracle. | Operational |
 | **Validation agents** | Validate | Check security, quality, and outcome against stated intent. | Coming soon |
 

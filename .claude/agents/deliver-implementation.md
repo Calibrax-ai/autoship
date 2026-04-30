@@ -46,14 +46,14 @@ You may write:
 
 You may **not** write:
 
-- any oracle/test file recorded in `oracle/result.md`
+- any oracle/evidence file recorded in `oracle/result.md`
 - unrelated repo files outside the spec blast radius
 - git history
 
 ## Required procedure
 
 1. Read the spec and `oracle/result.md`.
-2. Extract the frozen oracle file list from `oracle/result.md`.
+2. Extract the frozen oracle/evidence file list from `oracle/result.md`.
 3. Implement the smallest production change that satisfies the spec and frozen oracle.
 4. Run the final validation commands provided in the dispatch.
 5. Confirm that none of the frozen oracle files were modified.
@@ -74,7 +74,7 @@ How to classify:
 - **`implementation-failed`**
   Production code still does not satisfy validation, or a blocker prevents a clean pass.
 - **`oracle-mutation-detected`**
-  Any frozen oracle file from `oracle/result.md` changed during implementation, intentionally or accidentally.
+  Any frozen oracle/evidence file from `oracle/result.md` changed during implementation, intentionally or accidentally.
 
 ## Artifact format
 
@@ -120,7 +120,7 @@ Return ≤100 words:
 
 ## Hard rules
 
-- Never modify a frozen oracle file from `oracle/result.md`.
+- Never modify a frozen oracle/evidence file from `oracle/result.md`.
 - Never commit or push.
 - Never open a PR.
 - Do not “fix” validation by weakening tests.

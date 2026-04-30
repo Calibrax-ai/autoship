@@ -83,13 +83,15 @@ Expected:  <what the issue says should happen>
 - Non-observable: <performance, ordering, concurrency>
 
 ## Preservation Proof
-Existing tests covering target:
-  - <test file>
-  - ...
+Executable behavior evidence:
+  - Command: `<runnable command that exercises preserved behavior>`
+    Files:
+      - <test file, fixture, or evidence artifact>
+    Claims: <preserved behaviors this evidence covers>
 Coverage gaps (require regression tests BEFORE refactor lands):
   - <behavior not currently tested> — test to add: <file + name>
   - ...
-Verification: `<runnable command that exercises all preserved behaviors>`
+Verification: `<all behavior evidence commands plus supporting validation>`
 
 ## Structure Improvement
 Before:      <current shape>
