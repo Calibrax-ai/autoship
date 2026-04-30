@@ -96,7 +96,7 @@ Once the breakdown is approved, the controller commits the artifact tree, opens 
 Discipline:
 
 - **One umbrella per pre-groom run.** If the issue is an umbrella, write the decomposition. Do not also write a `spec.md` for the umbrella; do not pre-write specs for the slices.
-- **Slices are not yet specs.** Each slice description in `decomposition.md` is a one-sentence scope, not a full spec. Per-slice grooming happens after `autoship create-issues <id>` creates the Linear child issues; dependency-free children may be moved straight to `Ready to Groom`.
+- **Slices are not yet specs.** Each slice description in `decomposition.md` is a one-sentence scope, not a full spec. Per-slice grooming happens after `autoship create-issues <id>` creates the Linear child issues; dependency-free children may be moved straight to `Run Agent`.
 - **Recursive decomposition is forbidden.** A child issue that turns out to also be an umbrella triggers a decomposition of its own (next run). Do not multi-level decompose in one artifact.
 - **Slice-ids are stable.** Each slice carries a `slice-id` field used by create-issues for idempotent retry. Once assigned, a slice-id does not change across re-grooming.
 - **Questions are typed.** Only ask questions that change execution. Use `blocking` only when no safe child issue creation exists without an answer; those must be answered before approval. Use `defaulted` when autoship can proceed with a stated default. Use `slice-local` when the question belongs in a child issue.

@@ -17,7 +17,7 @@ Asking an AI to *"just implement the ticket"* tends to produce code that looks r
 - A **spec** — a plain-English plan for the change, written by AI and reviewed by a separate AI reviewer before any code is written. If the spec is weak, work doesn't start.
 - A **draft pull request** with the code change, the tests, and the evidence that the change actually works.
 
-In supervised mode, grooming can park the issue in `Spec Ready` and hand the baton back to the human. In the recommended remote mode, `Ready to Groom` is the explicit consent state: Autoship grooms, opens/updates the durable PR envelope, and continues into build when the spec reviewer approves and validation is available. Umbrella issues route to a reviewed `[Breakdown]` PR; `Breakdown Approved` creates child issues and starts only dependency-free slices. Any blocker lands in `Needs Attention`.
+In supervised mode, grooming can park the issue in `Spec Ready` and hand the baton back to the human. In the recommended remote mode, `Run Agent` is the explicit consent state: Autoship grooms, opens/updates the durable PR envelope, and continues into build when the spec reviewer approves and validation is available. Umbrella issues route to a reviewed `[Breakdown]` PR; `Breakdown Approved` creates child issues and starts only dependency-free slices. Any blocker lands in `Needs Attention`.
 
 > **The rest of this page is engineering detail.** Leadership readers can stop here and head to the [System overview](/architecture/system-overview/) or [What we've learned](/learnings/).
 >
@@ -61,7 +61,7 @@ flowchart LR
       PG --> BR
     end
 
-    HA["Approval boundary<br/>Spec Ready (supervised)<br/>or Ready to Groom + --auto"]
+    HA["Approval boundary<br/>Spec Ready (supervised)<br/>or Run Agent + --auto"]
 
     subgraph BUILD ["Build · oracle frozen"]
       direction TB
@@ -142,7 +142,7 @@ The inner filesystem state machine is the agents' source of truth. The outer Lin
 
 Four recommended operator-created states extend Linear's universal set (`Todo` / `In Progress` / `In Review`):
 
-- **`Ready to Groom`** — type `unstarted`. Remote runners use this as explicit automation consent for one issue. `Todo` remains a human/local grooming bucket, not a webhook trigger.
+- **`Run Agent`** — type `unstarted`. Remote runners use this as explicit automation consent for one issue. `Todo` remains a human/local grooming bucket, not a webhook trigger.
 - **`Breakdown Proposed`** — type `unstarted`. Signals "umbrella breakdown reviewed; your turn to review the `[Breakdown]` PR."
 - **`Breakdown Approved`** — type `unstarted`. Signals "create child issues and start dependency-free slices."
 - **`Needs Attention`** — type `unstarted`, parallel column. Signals "autoship halted on a typed blocker; your turn to unblock."
@@ -155,16 +155,16 @@ The controller is the single writer to Linear when posting is enabled. At each p
 |---|---|---|
 | autoship picks up an issue (groom phase) | `In Progress` | `Autoship grooming started.` |
 | grooming complete, spec APPROVED (bounded, supervised) | optional `Spec Ready` | `Spec written: <type>, <status>[, N Assumptions]. See .autoship/issues/<id>/spec.md. Run \`autoship deliver <id>\` to build.` (with @mention) |
-| automatic spec PR opens (bounded) | no required state change | `Spec PR ready: <url>. Autoship is continuing because the issue was triggered from Ready to Groom with \`--auto\`.` |
+| automatic spec PR opens (bounded) | no required state change | `Spec PR ready: <url>. Autoship is continuing because the issue was triggered from Run Agent with \`--auto\`.` |
 | grooming complete, breakdown APPROVED (umbrella) | `Breakdown Proposed` | `Breakdown proposed: N slices. Review the draft \`[Breakdown]\` PR, then move the parent to \`Breakdown Approved\` or run \`autoship create-issues <id>\` to create child issues and start dependency-free slices.` (with @mention) |
-| create-issues complete (full success) | `In Progress` then `Decomposed` label/convention | `Created N child issues. Started X dependency-free child issue(s) by moving them to Ready to Groom; Y child issue(s) are waiting on dependencies. PR closed.` |
+| create-issues complete (full success) | `In Progress` then `Decomposed` label/convention | `Created N child issues. Started X dependency-free child issue(s) by moving them to Run Agent; Y child issue(s) are waiting on dependencies. PR closed.` |
 | create-issues partial / retryable | `Breakdown Proposed` (unchanged) | `Child issue creation partial: created N of M, pending P. Re-run \`autoship create-issues <id>\` or move back to Breakdown Approved after fixing the retryable cause.` |
 | grooming hit blocker (`needs-human-input`) | `Needs Attention` | `Halted during groom — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 | build starts (`autoship deliver <id>`) | `In Progress` | `Build started — branch <branch>, worktree <path>.` |
 | draft PR opens | `In Review` | `Draft PR: <url>. Validation: passed. Branch: <branch>. Review the PR's Human Review Checklist before merge.` |
 | build hit blocker | `Needs Attention` | `Halted during build — <reason>. See .autoship/issues/<id>/<artifact>.` (with @mention) |
 
-State names are configurable via `transitions.{working,spec_ready,breakdown_proposed,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger states are configured separately and default to `Ready to Groom` and `Breakdown Approved`. Defaults assume the four recommended states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
+State names are configurable via `transitions.{working,spec_ready,breakdown_proposed,blocked,pr_open}` in `.autoship/defaults.yaml`; the runner's trigger states are configured separately and default to `Run Agent` and `Breakdown Approved`. Defaults assume the four recommended states above have been created in the Linear workspace; if a target state is missing, the controller posts the comment and skips the state change rather than failing the run. The repo-local mirror and, in remote automatic mode, the draft PR branch are the execution contract — comments carry one-line summaries and links, not full specs.
 
 Build PRs are review packets, not just implementation diffs. A completed build PR includes a `Human Review Checklist` with issue-specific inspection points, validation gaps or manual checks, and risk areas. For UI/frontend changes, the handoff also includes `Preview Evidence`: the controller reconciles PR comments/status checks after PR creation, links hosted previews when available, and states separately whether screenshots were captured. Missing screenshots do not imply that no preview exists.
 

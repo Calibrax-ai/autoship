@@ -16,7 +16,7 @@ Breakdown fixes that shape. When grooming detects an umbrella, the pre-groomer w
 
 The product promise is not "here is a breakdown table." The promise is **messy Linear issue -> reviewed work graph -> child issues created without clerical copying -> dependency-free slices start automatically**. The human approves boundaries; autoship performs the mechanical tracker mutation and starts only the first runnable layer.
 
-Breakdown is **not a separate mode**. It is an outcome path within deliver grooming, auto-routed when umbrella shape is detected. Operators see the same trigger they always do (`Ready to Groom`); the controller decides whether the analysis becomes a spec, a breakdown, or a typed blocker.
+Breakdown is **not a separate mode**. It is an outcome path within deliver grooming, auto-routed when umbrella shape is detected. Operators see the same trigger they always do (`Run Agent`); the controller decides whether the analysis becomes a spec, a breakdown, or a typed blocker.
 
 ## When this path triggers
 
@@ -119,7 +119,7 @@ The four recommended operator-created states each carry one distinct "what happe
 
 | State | Baton |
 |---|---|
-| `Ready to Groom` | Agent may analyze this issue and, if bounded/clear, build it |
+| `Run Agent` | Agent may analyze this issue and, if bounded/clear, build it |
 | `Breakdown Proposed` | Review the breakdown PR |
 | `Breakdown Approved` | Create child issues and start dependency-free slices |
 | `Needs Attention` | Autoship halted on a real blocker, your turn to unblock |
@@ -139,7 +139,7 @@ The artifact-only PR is intentionally not merged in 0.5.0 — its job is decisio
 
 ## Create-issues contract
 
-`autoship create-issues <issue-id>` is the explicit human consent that promotes a reviewed breakdown into Linear child issues. `autoship materialize <issue-id>` remains a compatibility alias. In remote magic mode, moving the parent issue to `Breakdown Approved` is the state-triggered consent for the same action — same shape as `Ready to Groom` for automatic groom/build.
+`autoship create-issues <issue-id>` is the explicit human consent that promotes a reviewed breakdown into Linear child issues. `autoship materialize <issue-id>` remains a compatibility alias. In remote magic mode, moving the parent issue to `Breakdown Approved` is the state-triggered consent for the same action — same shape as `Run Agent` for automatic groom/build.
 
 ### Source of truth
 
@@ -191,7 +191,7 @@ Retrying create-issues re-enters per-slice idempotent flow and skips already-cre
 
 When all slices are created on a single create-issues run (or across retries), the controller:
 
-1. Moves dependency-free children to `Ready to Groom`.
+1. Moves dependency-free children to `Run Agent`.
 2. Leaves dependent children in `Todo` / workspace default with dependency links and a comment naming the blocking slice(s).
 3. Posts a final summary comment to Linear and on the `[Breakdown]` PR listing all created child links, how many were started, and how many are waiting on dependencies.
 4. Closes the `[Breakdown]` PR (no merge) with the summary comment as the close message.
@@ -201,7 +201,7 @@ When all slices are created on a single create-issues run (or across retries), t
 ### What create-issues does not do
 
 - **No issue closure of the parent.** Parent stays open; the team's umbrella convention decides when to close.
-- **No inline build of children.** Dependency-free children are started by moving them to `Ready to Groom`; each child runs as its own issue-scoped job. Dependent children wait in `Todo` / workspace default until dependencies complete.
+- **No inline build of children.** Dependency-free children are started by moving them to `Run Agent`; each child runs as its own issue-scoped job. Dependent children wait in `Todo` / workspace default until dependencies complete.
 - **No PR merge.** PR closes without merging in V1. Revisit if artifact retention becomes important.
 - **No PR-comment approval.** `/autoship approve` remains deferred; Linear state or CLI verb is the approval surface.
 
@@ -212,7 +212,7 @@ After the `[Breakdown]` PR opens:
 1. **Read the PR.** GitHub renders `decomposition.md`. Inline comments work like any code review.
 2. **Amend if needed.** Comment inline on slice boundaries or answer typed questions. Before execution, the final answer must be reflected in `decomposition.md` by direct edit or by re-running grooming to incorporate amendments. Decomposition-reviewer re-judges.
 3. **Approve by acting.** Move the Linear parent issue to `Breakdown Approved`, or run `autoship create-issues <id>` from any terminal where autoship CLI is installed. The state transition or verb invocation is the explicit consent.
-4. **Watch the run.** The run reports per-slice progress (`creating FRD-161a... done`, `creating FRD-161b... done`). On full success, the PR closes with the summary and dependency-free children move to `Ready to Groom`; on partial failure, the PR stays open with the status comment.
+4. **Watch the run.** The run reports per-slice progress (`creating FRD-161a... done`, `creating FRD-161b... done`). On full success, the PR closes with the summary and dependency-free children move to `Run Agent`; on partial failure, the PR stays open with the status comment.
 5. **Optionally retry on partial failure.** Re-run `autoship create-issues <id>` or move back to `Breakdown Approved`; existing children skip, missing ones create.
 
 ## How operators read decomposition artifacts
@@ -254,6 +254,6 @@ Decomposition builds on substrate that already shipped:
 - **Spec-first PR pattern** (0.3.0) — the artifact-PR-as-execution-envelope is reused directly; only the artifact contents change for the decomposition path.
 - **Runner handoff envelope** (0.3.1) — detects "is this a remote run?" via the `runner_handoff` presence on the RunRequest. PR creation is gated on this for non-buildable outcomes.
 - **Decision log** (0.3.0) — `inferences.jsonl` captures *why* the controller chose decomposition for this issue (which umbrella signal fired). Audit trail comes free.
-- **State-as-baton** (0.3.1) — evolves into the action-based `Ready to Groom` / `Breakdown Proposed` / `Breakdown Approved` / `Needs Attention` flow; the pattern is unchanged.
+- **State-as-baton** (0.3.1) — evolves into the action-based `Run Agent` / `Breakdown Proposed` / `Breakdown Approved` / `Needs Attention` flow; the pattern is unchanged.
 
 The 0.5.0 contract is "every remote meaningful-analysis outcome persists as a draft PR" plus "breakdown is one such outcome with typed questions, its own reviewer, and a create-issues path that turns an approved work graph into child Linear issues." The substrate makes the magic moment cheap: the operator approves boundaries; autoship handles clerical breakdown and starts only the dependency-free first layer.

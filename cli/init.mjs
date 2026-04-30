@@ -337,7 +337,7 @@ async function collectLinearAnswers() {
 	console.log('\nLinear work selection defaults:');
 	console.log('  owner: me');
 	console.log('  groom states: Todo');
-	console.log('  remote trigger state: Ready to Groom  (create this state in Linear — see Done section)');
+	console.log('  remote trigger state: Run Agent  (create this state in Linear — see Done section)');
 	console.log('  optional supervised build handoff: Spec Ready\n');
 
 	return {
@@ -356,7 +356,7 @@ async function collectLinearAnswersManual() {
 	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by linear CLI):' })).trim();
 	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
 
-	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, remote trigger=Ready to Groom.\n');
+	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, remote trigger=Run Agent.\n');
 
 	return {
 		team,
@@ -440,18 +440,18 @@ function printNextSteps(answers) {
 	if (answers && answers.tracker === 'linear') {
 		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
 		lines.push(`  2. In Linear, create four workflow states for the recommended remote flow (Settings → Workflow → Add status):`);
-		lines.push(`       • "Ready to Groom"          (type: unstarted; remote runner wake-up state)`);
+		lines.push(`       • "Run Agent"          (type: unstarted; remote runner wake-up state)`);
 		lines.push(`       • "Breakdown Proposed"      (type: unstarted; review the breakdown PR)`);
 		lines.push(`       • "Breakdown Approved"      (type: unstarted; create child issues and start dependency-free slices)`);
 		lines.push(`       • "Needs Attention"         (type: unstarted, parallel column)`);
 		lines.push(`     These carry the handoff baton:`);
-		lines.push(`       Ready to Groom      → "agent may analyze and, if clear, build"`);
+		lines.push(`       Run Agent      → "agent may analyze and, if clear, build"`);
 		lines.push(`       Breakdown Proposed  → "review the breakdown PR"`);
 		lines.push(`       Breakdown Approved  → "create child issues and start dependency-free slices"`);
 		lines.push(`       Needs Attention     → "autoship halted on a blocker, your turn to unblock"`);
 		lines.push(`     PR labels are an orthogonal axis: \`autoship\` + \`autoship:<outcome>\` (spec, breakdown, need-info, blocked, cannot-reproduce) tag artifact kind. State answers "what next?"; label answers "what kind?".`);
 		lines.push(`     Optional supervised mode may also use a "Spec Ready" handoff, but it is not part of the default remote happy path.`);
-		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Ready to Groom.`);
+		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Run Agent.`);
 	}
 
 	lines.push('');
@@ -567,7 +567,7 @@ function renderDefaultsTemplate() {
 # audit run to write into the tracker. Use --approve to opt in per-run.
 #
 # Recommended remote Linear states:
-#   Ready to Groom       # runner may analyze and, if clear, build
+#   Run Agent       # runner may analyze and, if clear, build
 #   Breakdown Proposed   # review the breakdown PR
 #   Breakdown Approved   # create child issues and start dependency-free slices
 #   Needs Attention      # human unblock
@@ -597,10 +597,10 @@ function renderDefaultsTemplate() {
 #   #   states:
 #   #     # Eligibility (which Linear states autoship picks up from)
 #   #     # Local/human grooming often uses ["Todo"]. Remote runners wake
-#   #     # from the explicit "Ready to Groom" state instead.
+#   #     # from the explicit "Run Agent" state instead.
 #   #     groom: ["Todo"]
 #   #     # Optional supervised-mode compatibility only. Default remote flow
-#   #     # uses --auto from Ready to Groom and does not require Spec Ready.
+#   #     # uses --auto from Run Agent and does not require Spec Ready.
 #   #     build: ["Spec Ready"]
 #   #     # Transitions (which states autoship sets at handoffs)
 #   #     # State changes are best-effort: missing target states fall back to comment-only.
@@ -664,10 +664,10 @@ function renderDefaultsConfigured(answers) {
 			lines.push('    states:');
 			lines.push('      # Eligibility (which Linear states autoship picks up from)');
 			lines.push('      # Local/human grooming often uses ["Todo"]. Remote runners wake');
-			lines.push('      # from the explicit "Ready to Groom" state instead.');
+			lines.push('      # from the explicit "Run Agent" state instead.');
 			lines.push(`      groom: [${(answers.linear.states?.groom || ['Todo']).map(quote).join(', ')}]`);
 			lines.push('      # Optional supervised-mode compatibility only. Default remote flow');
-			lines.push('      # uses --auto from Ready to Groom and does not require Spec Ready.');
+			lines.push('      # uses --auto from Run Agent and does not require Spec Ready.');
 			lines.push('      # build: ["Spec Ready"]');
 			lines.push('      # Transitions (which states autoship sets at handoffs).');
 			lines.push('      # Best-effort — if a target state does not exist in the workspace,');

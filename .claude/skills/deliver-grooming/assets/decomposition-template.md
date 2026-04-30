@@ -116,7 +116,7 @@ status comment; re-running resumes. If any `blocking` question is still
 unanswered, create-issues creates no children and halts with the missing
 question ids. `defaulted` questions proceed with their defaults; `slice-local`
 questions are copied into the relevant child issue body. Full success moves
-dependency-free children to `Ready to Groom`, leaves dependent children in
+dependency-free children to `Run Agent`, leaves dependent children in
 Todo/default with dependency context, and closes the PR with links to all
 children. See `docs/architecture/decomposition.md` § Create-issues contract
 for the full lifecycle.
