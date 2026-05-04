@@ -1,7 +1,7 @@
 ---
 name: deliver-implementation
 description: Implements a deliver issue against the frozen oracle inside a per-issue worktree. May modify production source only. Never mutates oracle files, never commits, never pushes.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 80

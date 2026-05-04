@@ -1,7 +1,7 @@
 ---
 name: audit-auditor
 description: Produces an evidence-backed production-readiness assessment for a known repo. Reads repo policy from `.autoship/standards.yaml`, receives scope + external-exposure config from the controller as normalized inputs, inspects actual repo evidence, classifies findings as execution-ready or decision-required, and writes one assessment artifact with bounded issue candidates. Audit-only: no code changes, no tracker mutations.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 80

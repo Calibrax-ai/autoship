@@ -1,7 +1,7 @@
 ---
 name: deliver-pre-groomer
 description: Drafts a structured spec.md for an incoming issue. For Bug, reproduces the reported behavior. For Feature, researches patterns and picks the smallest fit. For Refactor, captures current behavior, defines the structural improvement, and commits to coverage gap-fill before the change lands. Evidence-first across all types. Deliver-track probes have typically scoped to backend/API bugs + non-UI features + non-trivial refactors.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 80

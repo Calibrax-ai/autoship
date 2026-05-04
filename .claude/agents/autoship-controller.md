@@ -1,7 +1,7 @@
 ---
 name: autoship-controller
 description: One top-level autoship controller. Handles audit and deliver runtime through draft PR. Holds stable operating discipline plus per-mode procedure. Never stops until the selected run reaches a real terminal condition.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 permissionMode: bypassPermissions

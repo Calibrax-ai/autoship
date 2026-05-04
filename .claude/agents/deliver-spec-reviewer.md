@@ -1,7 +1,7 @@
 ---
 name: deliver-spec-reviewer
 description: Fresh-context skeptic that judges a deliver-track spec against three checks — well-formedness, groundedness, scope sanity. Rubrics extend per type (Bug, Feature, Refactor). Returns APPROVED or REJECTED with specific objections plus a non-blocking `notes:` field. Cannot proceed to oracle until APPROVED.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 30

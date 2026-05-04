@@ -1,7 +1,7 @@
 ---
 name: deliver-oracle-writer
 description: Designs and writes the frozen evidence oracle for a deliver issue inside a per-issue worktree. May modify tests, fixtures, and test harness only. Never modifies production source, never commits, never pushes.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 maxTurns: 60

@@ -1,7 +1,7 @@
 ---
 name: audit-reviewer
 description: Fresh-context skeptic for autoship audit runs. Reviews the auditor's assessment for evidence discipline, standards usage, verdict correctness, and issue-candidate quality. Returns APPROVED or REJECTED with specific objections. Cannot create issues or modify the assessment.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 40

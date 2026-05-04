@@ -1,7 +1,7 @@
 ---
 name: deliver-decomposition-reviewer
 description: Fresh-context skeptic that judges a deliver-track breakdown artifact (`decomposition.md`) against five checks — groundedness, slice sizing, dependency correctness, surfaced concerns, question discipline. Returns APPROVED or REJECTED with specific objections plus a non-blocking `notes:` field. Cannot proceed past grooming until APPROVED.
-model: "claude-opus-4-7[1m]"
+model: "opus[1m]"
 effort: high
 tools: Read, Glob, Grep, Write
 maxTurns: 30
