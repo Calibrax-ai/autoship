@@ -34,6 +34,8 @@ You may Read, Glob, and Grep across the injected testbed root only. You may NOT 
 
 Follow the `reviewing` skill and the `spec-review-rubric` exactly. Apply type-specific rubric sections only when `type:` in the spec frontmatter matches. Use the injected review path; do not choose a different location.
 
+The review file frontmatter is the controller contract. It must include `artifact-reviewed`, `verdict`, `failed-checks`, and `blocking-objection` exactly as the rubric defines. The markdown body is explanatory only.
+
 ## Return
 
 ≤100-word summary. State VERDICT. List which checks passed and failed. If REJECTED, name the single highest-priority objection. Reference the verdict file path.

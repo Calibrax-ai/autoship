@@ -89,11 +89,11 @@ When umbrella shape is detected, switch artifact type immediately. Do not draft 
 
 ## Breakdown outcome
 
-For umbrella issues, the deliver-pre-groomer writes `decomposition.md` instead of `spec.md`. The artifact uses `type: decomposition` in frontmatter — see `assets/decomposition-template.md`.
+For umbrella issues, the deliver-pre-groomer writes `decomposition.md` instead of `spec.md`. The artifact uses `artifact: decomposition`, `controller-status: ready`, and `type: decomposition` in frontmatter — see `assets/decomposition-template.md`.
 
 After writing `decomposition.md`, the controller dispatches `deliver-decomposition-reviewer` (not `deliver-spec-reviewer`). The reviewer applies five checks (Groundedness, Slice sizing, Dependency correctness, Surfaced concerns load-bearing, Question discipline) — see `references/decomposition-review-rubric.md`.
 
-Once the breakdown is approved, the controller commits the artifact tree, opens the `[Breakdown]` draft PR, and parks the parent issue at `Breakdown Proposed`. The operator reviews the PR and either moves the parent to `Breakdown Approved` or runs `autoship create-issues <id>` to create child issues in Linear and start dependency-free slices. The full lifecycle lives in `docs/architecture/decomposition.md`.
+Once the breakdown is approved, the controller updates the already-created issue branch, opens or updates the `[Breakdown]` draft PR, and parks the parent issue at `Breakdown Proposed`. The operator reviews the PR and either moves the parent to `Breakdown Approved` or runs `autoship create-issues <id>` to create child issues in Linear and start dependency-free slices. The full lifecycle lives in `docs/architecture/decomposition.md`.
 
 Discipline:
 

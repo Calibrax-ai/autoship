@@ -39,6 +39,8 @@ You may Read, Glob, and Grep across the injected testbed root only. You may NOT 
 
 Follow the `reviewing` skill and the `decomposition-review-rubric` exactly. Use the injected review path; do not choose a different location.
 
+The review file frontmatter is the controller contract. It must include `artifact-reviewed`, `verdict`, `failed-checks`, and `blocking-objection` exactly as the rubric defines. The markdown body is explanatory only.
+
 The five checks (full criteria in the rubric):
 
 1. **Groundedness** — every slice must cite specific files, line counts, or observable patterns. A slice with no `file:line` evidence is a smell. Surfaced concerns must be load-bearing facts (state lies, missing primitives), not speculation.

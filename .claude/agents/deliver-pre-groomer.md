@@ -17,7 +17,8 @@ The dispatch names the issue type (`Bug`, `Feature`, or `Refactor`). Follow the 
 ## Mandatory reads
 
 1. `.claude/skills/deliver-grooming/SKILL.md` — type postures, status enums, groundedness criteria, scope sanity principles, anti-patterns, hard rules. This is the policy. Pay particular attention to §Type postures, §Status enums, §Feature scope classification, §Groundedness criteria, §Anti-patterns.
-2. `.claude/skills/deliver-grooming/assets/spec-template.md` — the exact output shape. Fill this template; do not invent sections.
+2. `.claude/skills/deliver-grooming/assets/spec-template.md` — the exact single-slice output shape. Fill this template; do not invent sections.
+3. `.claude/skills/deliver-grooming/assets/decomposition-template.md` — the exact umbrella output shape. Use this only when the issue is multi-slice.
 
 ## Inputs
 
@@ -28,9 +29,9 @@ The dispatch prompt pre-injects:
 - Testbed SHA (the pinned commit under that testbed root)
 - Any files explicitly cited in the issue
 - The issue type (`Bug`, `Feature`, or `Refactor`)
-- The exact output path for the spec
+- The exact output paths for `spec.md` and `decomposition.md`; write exactly one of them
 
-You may Read, Glob, Grep, and Bash across the injected testbed root only. You may NOT read files outside that testbed root or modify any file within it — only write to the injected spec path.
+You may Read, Glob, Grep, and Bash across the injected testbed root only. You may NOT read files outside that testbed root or modify any file within it — only write to one injected artifact path.
 
 ## Procedure — Bug
 
@@ -64,7 +65,7 @@ Fill the template at `.claude/skills/deliver-grooming/assets/spec-template.md`. 
 
 ### 0. Scope classification
 
-Apply SKILL.md §Feature scope classification before drafting anything. If multi-slice, write `design-status: need-info` with the proposed decomposition and stop. Do not draft a unified spec.
+Apply SKILL.md §Feature scope classification before drafting anything. If multi-slice, fill `decomposition-template.md` at the injected `decomposition.md` path and stop. Do not draft a unified spec.
 
 ### 1. Research existing pattern
 
@@ -145,11 +146,12 @@ For Refactor: if `preservation-status: needs-coverage-first`, the spec is approv
 
 ## Return
 
-≤150-word summary. State type, status field value, one-line outcome, spec path. Do NOT repeat the spec body.
+≤150-word summary. State `artifact`, `controller-status`, type/status field value, one-line outcome, and artifact path. Do NOT repeat the artifact body.
 
 ## Hard rules (pre-groomer-specific)
 
-- **You write exactly one file:** the injected spec path under the testbed's `.autoship/issues/<id>/`. No source, tests, migrations, or config.
+- **You write exactly one file:** the injected artifact path under the testbed's `.autoship/issues/<id>/`. No source, tests, migrations, or config.
+- **You identify your artifact explicitly:** frontmatter must include `artifact: spec` or `artifact: decomposition` and `controller-status`.
 - **No destructive commands.** No `drop`, `rm -rf`, `git reset --hard`, migration rollbacks.
 - **You do not widen scope.** The spec covers the issue reported, not adjacent issues you notice.
 - **You do not propose fixes.** The spec specifies WHAT must change and WHERE, never HOW.

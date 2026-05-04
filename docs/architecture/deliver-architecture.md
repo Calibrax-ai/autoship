@@ -672,7 +672,7 @@ The core handoff boundaries should stay explicit:
    An issue is created or selected in the outer workflow surface (a tracker) and becomes eligible for grooming.
 
 2. **Agent -> human or reviewer-agent**
-   After grooming, the agent writes the spec and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. When Linear is the outer surface, `ready-for-oracle` maps to `Spec Ready` and `needs-human-input` maps to `Needs Attention`.
+   After grooming, the agent writes the spec and review evidence, then hands off at `ready-for-oracle` or `needs-human-input`. In supervised Linear installs, `ready-for-oracle` may map to `Spec Ready`; in the default remote flow, `Run Agent + --auto` continues to build when validation is available and parks in `Needs Attention` when it is not. `needs-human-input` maps to `Needs Attention`.
 
 3. **Approval boundary**
    In supervised mode, a human promotes work out of `Spec Ready` by running `autoship deliver <id>`; the controller transitions the issue to `In Progress` and dispatches the build half.
@@ -698,7 +698,7 @@ Current implemented runtime:
 - pre-groom
 - spec review
 - regroom up to limit
-- park at `Spec Ready` (or `Needs Attention` on blocker), or in automatic mode commit the spec ledger and open/update a spec-first draft PR
+- park at optional supervised `Spec Ready` (or `Needs Attention` on blocker), or in automatic mode commit the spec ledger and open/update a spec-first draft PR
 - write `manifest.json` for PR-envelope runs so later phases can verify issue, phase, base SHA, branch/PR, and artifact hashes
 - after explicit `autoship deliver <id>` approval, strict build-state eligibility, or approved `--auto` spec review: controller transitions to `In Progress`, creates worktree + branch
 - oracle result
@@ -812,9 +812,9 @@ Per-issue artifacts live inside the testbed repo (`app/.autoship/issues/<id>/`) 
 
 Each graduates to a richer shape when observed need justifies it.
 
-- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → spec parked at `Spec Ready` (or `Needs Attention` on blocker). Automatic mode may commit the spec ledger and open a spec-first draft PR before build. After explicit `autoship deliver <id>` approval, strict build-state eligibility, or approved `--auto` spec review: worktree → oracle → implementation → verification → draft PR update → `In Review`.
+- **Controller scope stays staged.** Current runtime reaches draft PR, but still stops short of merge/deploy. The controller owns selection → pre-groom → review → optional supervised spec pause at `Spec Ready` (or `Needs Attention` on blocker). Automatic mode may commit the spec ledger and open a spec-first draft PR before build. After explicit `autoship deliver <id>` approval, strict build-state eligibility, or approved `--auto` spec review: worktree → oracle → implementation → verification → draft PR update → `In Review`.
 - **Shared reviewer discipline lives in one skill; rubrics stay domain-specific.** The spec schema, status enums, type postures, groundedness checks, and anti-patterns live in `deliver-grooming/SKILL.md` because both `deliver-pre-groomer` and `deliver-spec-reviewer` need them. Universal evaluator posture lives in `reviewing/SKILL.md`. The spec-specific reviewer checks live in `deliver-grooming/references/spec-review-rubric.md`.
-- **State derived from artifacts.** `spec.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` with `oracle-green` or `oracle-red-expected` → `oracle-written`; `oracle/result.md` with `oracle-failed` or `oracle-insufficient-evidence` → `needs_attention`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. Remote automatic runs also write `manifest.json` as a machine-readable ledger with legal phases `grooming`, `spec_ready`, `needs_attention`, `building`, and `in_review`.
+- **State derived from artifacts.** `spec.md` exists → `proposed`; `reviews/review-NN.md` REJECTED → `changes-requested`; APPROVED → `ready-for-build`; `oracle/result.md` with `oracle-green` or `oracle-red-expected` → `oracle-written`; `oracle/result.md` with `oracle-failed` or `oracle-insufficient-evidence` → `needs_attention`; `implementation/result.md` exists → `implemented`; `verification/result.md` passed → `ready-for-pr`. Remote automatic runs also write `manifest.json` as a machine-readable ledger with legal phases `grooming`, `breakdown_proposed`, `decomposed`, `needs_attention`, `building`, and `in_review`; legacy `spec_ready` manifests are treated as `needs_attention` on the next update.
 - **No calibration set at start.** `calibration/` directory is not created until the first operator override produces a real labeled case.
 - **Reproduction outcome is a spec field, not a separate artifact.** A bug that cannot be reproduced is a `spec.md` with `reproduction-status: cannot-reproduce`; the reviewer's groundedness check flags it.
 - **Non-functional type deferred.** Only Bug, Feature, and Refactor are designed; Non-functional grooming is implemented when probe-0.2+ has real data to inform it.

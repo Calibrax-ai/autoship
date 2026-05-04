@@ -58,9 +58,12 @@ Apply `SKILL.md` Scope sanity principles, universal plus the matching type secti
 ---
 issue: <id>
 review-of: spec.md
+artifact-reviewed: spec.md
 reviewed-at: <ISO timestamp>
 reviewer-sha: <testbed SHA>
 verdict: APPROVED | REJECTED
+failed-checks: [<Well-formedness | Groundedness | Scope sanity; empty array when APPROVED>]
+blocking-objection: null | "<highest-priority objection>"
 ---
 
 # Spec Review NN - <ISO date>
@@ -85,3 +88,5 @@ verdict: APPROVED | REJECTED
 ## What the deliver-pre-groomer must do next (only if REJECTED)
 - <specific regroom instruction>
 ```
+
+The controller parses only the frontmatter fields for routing. The markdown body explains the verdict for humans.

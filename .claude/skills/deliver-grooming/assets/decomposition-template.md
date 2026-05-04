@@ -3,6 +3,8 @@ issue: <id>
 issue-rev: <short hash or timestamp of issue body at time of pre-groom>
 groomed-at: <ISO timestamp>
 trigger: first-groom | regroom
+artifact: decomposition
+controller-status: ready
 type: decomposition
 slice-count: <integer ≥ 2; see decomposition-review-rubric Check 2>
 # A decomposition is mutually exclusive with a spec for the same issue.

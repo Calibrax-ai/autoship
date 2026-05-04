@@ -121,6 +121,8 @@ claims-verified:
     evidence: <command/file/artifact that proves it>
 evidence-run:
   - command: <exact command run>
+    exit-code: <integer>
+    status: passed | failed
     purpose: <why this command matters>
     files:
       - <relative/path>
@@ -157,6 +159,15 @@ empty-oracle-rationale: <only when oracle-files is []>
 ```
 
 The `oracle-files` list is load-bearing. It includes changed/created oracle files and existing behavior-evidence files that must remain frozen. The implementation executor must not modify those files.
+
+Keep frontmatter bounded and parseable:
+
+- `claims-verified`: max 5 entries
+- `evidence-run`: max 5 entries
+- `evidence-not-run`: max 5 entries
+- `residual-risk`: max 3 entries
+
+The controller parses only frontmatter for routing and hash capture. The markdown body is human explanation.
 
 ## Return
 

@@ -82,9 +82,12 @@ Do operator questions reduce execution uncertainty without blocking materializat
 ---
 issue: <id>
 review-of: decomposition.md
+artifact-reviewed: decomposition.md
 reviewed-at: <ISO timestamp>
 reviewer-sha: <testbed SHA>
 verdict: APPROVED | REJECTED
+failed-checks: [<Groundedness | Slice sizing | Dependency correctness | Surfaced concerns | Question discipline; empty array when APPROVED>]
+blocking-objection: null | "<highest-priority objection>"
 ---
 
 # Plan Review NN — <ISO date>
@@ -115,3 +118,5 @@ verdict: APPROVED | REJECTED
 ## What the deliver-pre-groomer must do next (only if REJECTED)
 - <specific regroom instruction>
 ```
+
+The controller parses only the frontmatter fields for routing. The markdown body explains the verdict for humans.

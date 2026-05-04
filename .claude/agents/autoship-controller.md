@@ -87,7 +87,7 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 ### Hard rules
 
 - Never require a run-config file. Flags, NL prompts, and `defaults.yaml` cover all cases.
-- For audit and deliver runs, write `invocation.txt` and `run.json` in the run dir at run start, before dispatching any worker.
+- For audit and deliver runs, run preflight first. After preflight passes, write `invocation.txt` and `run.json` in the run dir before dispatching any worker.
 - Workers receive normalized inputs (injected in dispatch). Workers do not read trigger/config files directly.
 - In human prompt/query mode, always show the selected issue set as a preview. By default the preview is informational and the run proceeds immediately — operators can interrupt the session if the resolved scope surprised them. If `deliver.confirm` is true (operator-set in `.autoship/defaults.yaml`) and `--yes` was not passed, the preview becomes the authorization boundary: pause for confirmation before broad work.
 - In unattended mode, reject natural-language scope and require strict configured eligibility. Generic local `deliver --unattended` without a trusted runner handoff gates inference paths — no human in the loop, no announce affordance, so source/scope/validation must be explicit in `defaults.yaml`.
@@ -152,7 +152,20 @@ Deliver has canonically derivable local runtime states:
 
 `spec.md` and `decomposition.md` are mutually exclusive — a single issue produces one or the other, never both.
 
-Remote automatic runs also write `.autoship/issues/<id>/manifest.json` as the machine-readable execution ledger. The manifest records the current phase and artifact hashes; it does not replace reviewer judgment or validation. Legal manifest phases are `grooming`, `spec_ready`, `breakdown_proposed`, `decomposed`, `needs_attention`, `building`, and `in_review`. Accept existing `decomposition_proposed` manifests as compatibility aliases and rewrite them to `breakdown_proposed` on the next controller-owned update.
+Remote automatic runs also write `.autoship/issues/<id>/manifest.json` as the machine-readable execution ledger. The manifest records the current phase and artifact hashes; it does not replace reviewer judgment or validation. Legal remote manifest phases are `grooming`, `breakdown_proposed`, `decomposed`, `needs_attention`, `building`, and `in_review`. `spec_ready` is a deprecated compatibility alias for `needs_attention` in remote runs; rewrite it to `needs_attention` on the next controller-owned update. Accept existing `decomposition_proposed` manifests as compatibility aliases and rewrite them to `breakdown_proposed` on the next controller-owned update.
+
+Remote durable checkpoint rule: the issue branch plus `manifest.json` and committed artifacts are correctness state. Claude session memory, trigger logs, Linear comments, and local run dirs are conveniences only.
+
+For remote runs:
+
+- Create or reuse the issue branch before the first worker dispatch.
+- Before every worker dispatch, commit and push `manifest.json` with `phase`, `step`, `step_status: in_progress`, known artifact hashes, and any idempotency keys for the step about to run.
+- After every worker returns, validate the expected artifact, parse only the structured/frontmatter fields needed for routing, then commit and push the artifact plus `manifest.json` with `step_status: completed` or `blocked`.
+- Before every external mutation beyond the checkpoint push itself (PR open/update, PR comment, Linear state/comment, Linear child creation), write the intended action and idempotency key into `manifest.json`, commit, and push.
+- After every external mutation, write the resulting external id or URL into `manifest.json`, commit, and push.
+- On rerun, reconstruct from the issue branch, `manifest.json`, committed artifacts, existing PR by branch, and Linear issue/slice identifiers. If an `in_progress` step has no completed artifact, rerun that step idempotently.
+
+`session_id` is optional resume acceleration. It is never the source of truth for correctness.
 
 ### 5. Mechanical gates, not judgment in the outer loop
 
@@ -170,19 +183,21 @@ Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, deliver-decomposition-
 
 - Write their own artifacts to known paths
 - Return a concise structured result to the controller
-- Never call Linear MCP, GitHub API, or any external-system mutation directly
+- Never call Linear MCP, GitHub API, or any external-system mutation directly. This restriction is for leaf workers. The controller may use Linear CLI/MCP and `gh` for controller-owned tracker and PR handoffs.
 
 Structured results workers return:
 
-- `spec-written` + design-status (from deliver-pre-groomer when output is `spec.md`)
-- `decomposition-written` + slice-count (from deliver-pre-groomer when output is `decomposition.md`)
-- `verdict: APPROVED | REJECTED` (from deliver-spec-reviewer, deliver-decomposition-reviewer, and audit-reviewer)
+- `artifact: spec` + `controller-status` (from deliver-pre-groomer when output is `spec.md`)
+- `artifact: decomposition` + `controller-status` + `slice-count` (from deliver-pre-groomer when output is `decomposition.md`)
+- `verdict: APPROVED | REJECTED` + `failed-checks` + `blocking-objection` (from deliver-spec-reviewer, deliver-decomposition-reviewer, and audit-reviewer)
 - `oracle-green` / `oracle-red-expected` / `oracle-failed` / `oracle-insufficient-evidence` (from deliver-oracle-writer)
 - `implementation-passed` / `implementation-failed` / `oracle-mutation-detected` (from deliver-implementation)
 - `verification-passed` / `verification-failed` / `oracle-mutation-detected` (from controller-owned verification)
 - `needs-human-input` + reason (from any worker that hits a blocking ambiguity; the reason is a filled blocker report per the `blocker-escalation` skill — `.claude/skills/blocker-escalation/assets/blocker-report-template.md`, lint-checked by `.claude/skills/blocker-escalation/scripts/validate-blocker.py`)
 
-The controller parses these, updates local state, optionally mirrors summaries to Linear when `--post` or build policy requires it, and dispatches the next worker.
+The controller parses frontmatter/structured fields only. Markdown bodies are human explanation, not routing state. The controller updates local state, optionally mirrors summaries to Linear when `--post` or build policy requires it, commits remote checkpoints, and dispatches the next worker.
+
+Frozen oracle integrity is controller-owned. After oracle writing, the controller records hashes for every `oracle-files` entry. Before and after implementation, the controller re-hashes those files itself and trusts its own hash result over worker attestation.
 
 ### 8. Approval boundaries are explicit and typed
 
@@ -396,7 +411,7 @@ Two categories of preflight:
 
 **Capability halts** — environment must satisfy these; cannot be inferred from repo evidence:
 
-1. **Linear connectivity (when source resolves to `deliver.linear`).** `linear` CLI is on PATH (`which linear`) **or** Linear MCP tools are available, **and** authenticated (`linear auth list` shows a workspace). Either gap → halt with the install/auth fix instruction.
+1. **Linear connectivity (when source resolves to `deliver.linear`).** `linear` CLI is on PATH (`which linear`) **or** Linear MCP tools are available. Confirm the selected path with a concrete read probe before relying on it (`linear auth list` / issue read for CLI, or an issue read via MCP). Either gap → halt with the install/auth fix instruction.
 2. **Repo default branch detectable.** `git symbolic-ref refs/remotes/origin/HEAD` or `git rev-parse --abbrev-ref HEAD` resolves with a sensible value. Failure → halt on build-reaching invocations.
 
 **Inference paths** — derive from repo evidence when not in `defaults.yaml`; halt only when inference itself is ambiguous or impossible:
@@ -405,7 +420,7 @@ Two categories of preflight:
 4. **Linear scope (when source = linear, no `team_key`/`team` in defaults).** Run `linear team list --json`. Auto-pick when exactly one team; write one inference record (with `evidence` naming the team). Halt with `kind: halt-on-ambiguity` record when 2+ teams (operator must choose). `project` remains optional; `owner` defaults to `me`; `states.groom` defaults to `["Todo"]`. `states.build` is optional supervised-mode compatibility and defaults to `["Spec Ready"]` only when the run explicitly asks for strict build eligibility (these baked-in defaults do not write records).
 5. **Validation commands (build phase only).** If `deliver.validation.commands` is set, use it (no inference, no record). Otherwise detect: `package.json` scripts (`test` / `check` / `validate`), `Makefile` targets, `pyproject.toml` test config, `Cargo.toml`. Pick the most-conventional match for the detected runner; baseline-test it on the current branch. If the picked command is red on baseline, narrow the gate before halting (e.g. drop the failing pre-existing-broken sub-command and try a tighter scope). Write one inference record describing the gate plus baseline result. Halt with `kind: halt-on-ambiguity` record when no test infrastructure is detectable at all.
 
-Each successful inference (cases 3, 4, 5) writes one record to `inferences.jsonl` and contributes to the announce block. Each halt-on-ambiguity case writes one terminal record (per § Logging and the halt-on-ambiguity record shape in `docs/architecture/decision-log.md`) and emits the halt format below.
+Each successful inference (cases 3, 4, 5) writes one record to `inferences.jsonl` after the run dir exists and contributes to the announce block. If a halt-on-ambiguity happens before the run dir exists, include the same record shape in the halt output instead of writing a file.
 
 **Warnings — proceed but surface at run start:**
 
@@ -584,7 +599,7 @@ When a build is approved (`deliver <id>` in human mode, strict `states.build` el
 
 Any failure parks the issue in `Needs Attention` (with a comment naming the blocker artifact). The controller never opens a PR against a mutated oracle, insufficient evidence, or failed validation.
 
-In automatic mode, the build half starts only after spec review has approved the spec and the manifest records `spec_ready`. If review returns any `need-info` / `cannot-reproduce` / blocker outcome, update the manifest to `needs_attention`, mirror that blocker when `--post` is set, and stop that issue without dispatching oracle or implementation workers.
+In automatic mode, the build half starts only after spec review has approved the spec and the manifest can advance directly to `building`. If validation is unavailable or review returns any `need-info` / `cannot-reproduce` / blocker outcome, update the manifest to `needs_attention`, mirror that blocker when `--post` is set, and stop that issue without dispatching oracle or implementation workers. Do not use remote `phase: spec_ready`.
 
 Successful build PRs are human review handoffs, not just code diffs. Every completed build PR and matching Linear build-complete comment must include a `Human Review Checklist` with 3-7 issue-specific bullets naming what the developer should inspect before merge: changed surfaces/files/routes, validation gaps or manual checks, and risk areas from the spec, oracle, implementation, or verification artifacts. Keep it specific; no generic boilerplate.
 
@@ -600,12 +615,15 @@ issue: <id>
 artifact: verification
 written-at: <ISO timestamp>
 verification-outcome: verification-passed | verification-failed | oracle-mutation-detected
-validation:
-  - <command 1>
-  - <command 2>
+validation-run:
+  - command: <exact command run>
+    exit-code: <integer>
+    status: passed | failed
 oracle-outcome: oracle-green | oracle-red-expected
-oracle-evidence:
-  - <oracle evidence command rerun>
+oracle-evidence-run:
+  - command: <exact oracle evidence command rerun>
+    exit-code: <integer>
+    status: passed | failed
 oracle-hash-check: passed | failed
 dry_run: true | false
 ---
@@ -637,7 +655,7 @@ The persistence matrix:
 
 | Outcome | Local run | Remote run |
 |---|---|---|
-| Buildable spec (APPROVED + build-worthy status) | Persist to disk. Optional supervised `Spec Ready` state. | Commit ledger + open `[Spec]` draft PR. In `--auto`, continue to build if validation is available; otherwise optional supervised `Spec Ready`. |
+| Buildable spec (APPROVED + build-worthy status) | Persist to disk. Optional supervised `Spec Ready` state. | Commit ledger + open `[Spec]` draft PR. In `--auto`, continue to build if validation is available; otherwise park in `Needs Attention` with the concrete validation blocker. Do not write remote `phase: spec_ready`. |
 | Breakdown required | Persist to disk. `Breakdown Proposed` state. | Commit ledger + open `[Breakdown]` draft PR. `Breakdown Proposed` state. |
 | Need-info (any `*-status: need-info`) | Persist to disk. `Needs Attention` state. | Commit ledger + open `[Need-Info]` draft PR. `Needs Attention` state. |
 | Blocked (typed blocker via blocker-escalation) | Persist to disk. `Needs Attention` state. | Commit ledger + open `[Blocked]` draft PR. `Needs Attention` state. |
@@ -654,9 +672,9 @@ For any remote meaningful-analysis outcome, follow the PR Work Envelope procedur
 
 ### PR Work Envelope
 
-On remote runs, the issue branch and draft PR are the durable work envelope. The controller's goal is an addressable, resumable branch that contains the analysis the operator might review, not a hidden local-only handoff.
+On remote runs, the issue branch is created before worker dispatch and is the durable work envelope from the start. The draft PR is the human review surface once there is meaningful analysis or build output to review. The controller's goal is an addressable, resumable branch that contains the analysis the operator might review, not a hidden local-only handoff.
 
-After grooming reaches a meaningful-analysis terminal outcome (any row from the matrix above other than capability halts), ensure the issue branch exists, commit the artifact ledger, and open or update a draft PR with the outcome-specific title prefix and labels. The artifact ledger varies by outcome:
+After grooming reaches a meaningful-analysis terminal outcome (any row from the matrix above other than capability halts), update the existing issue branch, commit the artifact ledger, and open or update a draft PR with the outcome-specific title prefix and labels. The artifact ledger varies by outcome:
 
 | Outcome | Branch contents (committed) | PR title prefix | Labels |
 |---|---|---|---|
@@ -748,17 +766,24 @@ When every slice in the decomposition has a corresponding Linear child (either f
 
 ### Manifest
 
-Write `.autoship/issues/<id>/manifest.json` whenever the controller creates or advances a PR work envelope. Required fields:
+Write `.autoship/issues/<id>/manifest.json` as the remote run ledger. For remote runs, write it before and after each worker dispatch and each external mutation. Required fields:
 
 - `issue_id`
 - `phase`
+- `step`
+- `step_status` (`in_progress`, `completed`, or `blocked`)
 - `mode`
 - `run_id`
 - `branch`
-- `pr_number`
 - `base_sha`
-- `spec_sha256`
-- `review_sha256`
+- `artifact_hashes` (object; include hashes only for artifacts that exist)
+- `idempotency_keys` (object; include keys for external actions that may be retried)
+- `external_ids` (object; include PR numbers, PR URLs, Linear comment ids, child issue ids when known)
+
+PR phases add:
+
+- `pr_number`
+- `pr_url`
 
 Build phases add:
 
@@ -767,7 +792,7 @@ Build phases add:
 - `implementation_result_sha256`
 - `verification_result_sha256`
 
-When dispatched by autoship-runner, the Runner Handoff JSON envelope includes a `sessionId` field that names the Claude Code session UUID for this issue. **Copy `sessionId` verbatim into manifest.json as `session_id` on every manifest write.** The runner reads it from the most recent manifest commit on the next dispatch and passes `claude --resume <session_id>` to skip context-rebuild. Persisting `session_id` is the load-bearing mechanism behind cross-turn session resume; do not omit it. If the handoff envelope lacks `sessionId` (local CLI invocations, legacy runner versions), omit the field — the next dispatch will treat it as a first run.
+When dispatched by autoship-runner, the Runner Handoff JSON envelope includes a `sessionId` field that names the Claude Code session UUID for this issue. Copy `sessionId` verbatim into manifest.json as `session_id` on every manifest write when present. The runner may use it to pass `claude --resume <session_id>` and avoid rebuilding context. `session_id` is an optimization only: rerun correctness comes from the branch, manifest, artifacts, PR lookup by branch, and Linear idempotency keys. If the handoff envelope lacks `sessionId` (local CLI invocations, legacy runner versions), omit the field.
 
 The manifest is a ledger, not a substitute for the artifacts. The controller should use it to verify that the build is using the reviewed spec it thinks it is using.
 
@@ -786,7 +811,7 @@ Record the chosen paths in `oracle/result.md`. Reuse on resume; never create a s
 
 ### PR artifact
 
-After a draft PR is opened or updated, write `pr.md`:
+Before opening a PR, query GitHub for an existing PR whose head branch is the issue branch and reuse it. Do this even when `pr.md` is missing; `pr.md` is a cache, not the source of truth. After a draft PR is opened or updated, write `pr.md`:
 
 ```markdown
 ---
@@ -849,7 +874,7 @@ On re-invocation, derive in-flight state from the filesystem and resume unfinish
 
 Per-issue terminal outcomes (deliver), each mapping to a Linear state per § Linear policy:
 
-1. **`Spec Ready`** — optional supervised-mode terminal: grooming + review succeeded; spec is build-worthy and awaits `autoship deliver <id>`. In automatic mode this is an internal manifest boundary, not a required Linear state.
+1. **`Spec Ready`** — optional supervised-mode terminal only: grooming + review succeeded; spec is build-worthy and awaits `autoship deliver <id>`. In remote automatic mode, `spec_ready` is deprecated; use `Needs Attention` when build cannot proceed and `building` / `in_review` when it can.
 2. **`Breakdown Proposed`** — grooming + decomposition-review succeeded on an umbrella issue. Awaiting human review of the breakdown PR, then `Breakdown Approved` or `autoship create-issues <id>` to create child issues.
 3. **`Needs Attention`** — reviewed outcome or build execution hit a typed blocker (need-info, cannot-reproduce, or any blocker-escalation report). Awaiting human resolution.
 4. **`In Review`** — build + validation succeeded; the controller opened a draft PR. Awaiting code review.

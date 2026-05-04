@@ -88,9 +88,10 @@ written-at: <ISO timestamp>
 worktree: <absolute path>
 branch: <branch name>
 implementation-outcome: implementation-passed | implementation-failed | oracle-mutation-detected
-validation:
-  - <command 1>
-  - <command 2>
+validation-run:
+  - command: <exact command run>
+    exit-code: <integer>
+    status: passed | failed
 frozen-oracle-files:
   - <relative/path>
   - <relative/path>
@@ -109,6 +110,8 @@ frozen-oracle-files:
 ## Blockers
 - <only if implementation-failed or oracle-mutation-detected; otherwise write `(none)`>
 ```
+
+The controller parses only frontmatter for routing. It independently re-hashes `frozen-oracle-files` before and after implementation; if controller hashing disagrees with your `implementation-outcome`, the controller's hash result wins.
 
 ## Return
 

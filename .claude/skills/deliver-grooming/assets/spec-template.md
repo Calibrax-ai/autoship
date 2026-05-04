@@ -3,6 +3,8 @@ issue: <id>
 issue-rev: <short hash or timestamp of issue body at time of pre-groom>
 groomed-at: <ISO timestamp>
 trigger: first-groom | regroom
+artifact: spec
+controller-status: ready | need-info
 type: Bug | Feature | Refactor
 # Bug only:
 reproduction-status: confirmed | cannot-reproduce | need-info
@@ -10,8 +12,11 @@ reproduction-status: confirmed | cannot-reproduce | need-info
 design-status: drafted | need-info
 # Refactor only:
 preservation-status: ready | needs-coverage-first | need-info
-# The status enums above are strictly binary/ternary — no other values are valid.
-# Do not invent `ready`, `proposed`, `in-progress`, or any other label.
+# `controller-status` is for controller routing:
+# - ready when downstream review/build can continue
+# - need-info when the issue must park in Needs Attention
+# The type-specific status enums above are strictly binary/ternary — no other values are valid.
+# Do not invent `ready`, `proposed`, `in-progress`, or any other label for the type-specific fields.
 ---
 
 # Outcome
