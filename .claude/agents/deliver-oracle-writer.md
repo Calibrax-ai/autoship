@@ -59,12 +59,12 @@ You may **not** write:
 3. Search the worktree for repo-native evidence before creating anything: existing tests, fixtures, helpers, seed/reset scripts, package scripts, Playwright/Vitest/Jest config, sample files, and repo policy docs.
 4. Infer the smallest trustworthy evidence shape that matches the claims:
    - API/backend issue -> targeted unit/integration tests or existing endpoint tests.
-   - UI issue -> E2E/browser/component evidence, preview/screenshot evidence when available, or a blocker if no trustworthy UI evidence can be produced.
+   - UI issue -> E2E/browser/component evidence, Playwright CLI evidence against a local dev server, screenshots, short screen recordings for interaction-heavy flows, hosted preview evidence when local capture is not feasible, or a blocker if no trustworthy UI evidence can be produced.
    - Refactor with existing behavior tests -> run those tests and freeze the files as oracle evidence.
    - Refactor with `preservation-status: needs-coverage-first` -> create or repair regression tests that capture current behavior.
    - File upload behavior -> prefer real user/system path evidence: browser upload, real parser/backend path, persisted result, UI confirmation. Use existing fixtures/helpers first; generate minimal realistic fixtures when grounded; mock only when the claim is specifically UI wiring or real integration is not feasible.
 5. Write or repair tests, fixtures, or harness files only when needed for the evidence contract.
-6. Run the narrowest evidence commands needed to classify the result honestly.
+6. Run the narrowest evidence commands needed to classify the result honestly. For frontend/UI issues where the app can run locally, use Playwright CLI against the local dev server to capture at least one screenshot artifact. Capture a short screen recording when correctness depends on interaction, animation, multi-step flow, hover/focus state, or responsive transition. Be adaptable: use the repo's native dev/start commands, seeded data, existing auth/dev-bypass paths, or a hosted preview when local capture is not feasible. If capture fails, record the exact attempted command and blocker under `evidence-not-run`.
 7. Compute hashes for every oracle file that must remain frozen: changed/created tests and fixtures, plus existing tests/fixtures used as behavioral evidence.
 8. Write the `oracle/result.md` artifact exactly once, after verification is complete.
 
@@ -95,7 +95,7 @@ Do not force red just because you expect implementation later. If the correct ho
 - No `oracle-green` if the spec names or cites existing behavior tests and they were not run or replaced with a concrete stronger equivalent.
 - No `oracle-green` when behavior preservation is claimed but the only evidence is typecheck, lint, route generation, or grep.
 - No `oracle-green` when skipped automatable behavior evidence is deferred to human review.
-- UI/frontend behavior needs at least one behavioral or visual evidence layer: E2E, component test, browser/preview check, screenshot evidence, or a documented blocker.
+- UI/frontend behavior needs at least one behavioral or visual evidence layer: E2E, component test, browser/preview check, screenshot evidence, screen recording evidence for interaction-heavy flows, or a documented blocker.
 - `oracle-files: []` is valid only for documentation-only, metadata-only, planning-only, or truly non-executable changes, and only with an explicit `empty-oracle-rationale`.
 - Typecheck, lint, route generation, and grep are supporting evidence. They are not a behavioral oracle by themselves.
 - Mocks can prove UI wiring. Fixtures or integration evidence prove real behavior. Do not mock away the behavior under test and call it green.

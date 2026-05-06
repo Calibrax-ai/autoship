@@ -38,7 +38,8 @@ Important boundaries:
 - `.claude/agents/audit-auditor.md`, `.claude/agents/audit-reviewer.md` — generator-evaluator pair for readiness assessment and issue-candidate review.
 - `.claude/agents/deliver-pre-groomer.md`, `.claude/agents/deliver-spec-reviewer.md` — generator-evaluator pair for bounded-issue grooming.
 - `.claude/agents/deliver-decomposition-reviewer.md` — fresh-context judge of `decomposition.md` for umbrella issues (auto-routed from grooming when umbrella shape is detected).
-- `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-implementation.md` — frozen-oracle and implementation workers for deliver.
+- `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-oracle-reviewer.md` — generator-evaluator pair for the frozen oracle artifact.
+- `.claude/agents/deliver-implementation.md` — implementation worker for deliver.
 - `.claude/skills/autoship-audit/` — audit protocol, assessment template, review rubric, and safe external exposure reference.
 - `.claude/skills/deliver-grooming/` — deliver spec schema and review rubric.
 - `.claude/skills/reviewing/` — shared reviewer discipline.
@@ -96,7 +97,7 @@ test -f .autoship/defaults.yaml
 test ! -e .autoship/program.md
 ```
 
-Expected default install: 8 agents, 4 skills, standards/defaults present, no `program.md`.
+Expected default install: 9 agents, 4 skills, standards/defaults present, no `program.md`.
 
 Controller smoke:
 

@@ -42,7 +42,7 @@ Evidence-first for features means evidence from codebase patterns, not runtime e
 
 For frontend/UI features, include an `Intended Layout` section in the spec. Use a concise ASCII sketch to expose hierarchy, navigation, tab/sidebar placement, empty states, and primary action placement. Keep it schematic, not pixel-perfect. Omit this section for backend-only work.
 
-Frontend/UI specs should also name executable evidence for important user-visible claims. Evidence can be existing E2E/component tests, browser/preview checks, screenshot evidence, or a documented blocker when no trustworthy automated evidence is feasible. Do not rely on "human review will check it" when the repo already has automatable behavior evidence.
+Frontend/UI specs should also name executable evidence for important user-visible claims. Evidence can be existing E2E/component tests, browser/preview checks, screenshots, screen recordings for interaction-heavy flows, or a documented blocker when no trustworthy automated evidence is feasible. Do not rely on "human review will check it" when the repo already has automatable behavior evidence.
 
 ### Refactor — conservational
 

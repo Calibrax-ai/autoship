@@ -32,6 +32,7 @@ const CORE_AGENTS = [
 	'deliver-spec-reviewer.md',
 	'deliver-decomposition-reviewer.md',
 	'deliver-oracle-writer.md',
+	'deliver-oracle-reviewer.md',
 	'deliver-implementation.md',
 ];
 

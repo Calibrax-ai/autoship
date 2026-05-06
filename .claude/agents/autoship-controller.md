@@ -140,12 +140,13 @@ Deliver has canonically derivable local runtime states:
 - `issue.md` exists, neither `spec.md` nor `decomposition.md` → `new`
 - `spec.md` exists, no `reviews/review-NN.md` → `proposed`
 - `decomposition.md` exists, no `reviews/decomposition-review-NN.md` → `decomposition-proposed`
-- latest review verdict REJECTED (spec-review or decomposition-review) → `changes-requested`
+- latest review verdict REJECTED (spec-review, decomposition-review, or oracle-review) → `changes-requested`
 - latest spec-review APPROVED and no `oracle/result.md` → `ready-for-build`
 - latest decomposition-review APPROVED, child issues not yet created → `breakdown-approved` (awaiting `autoship create-issues <id>` or `Breakdown Approved` remote trigger)
 - child issue creation completed (all slices created in Linear) → `decomposed` (terminal)
 - `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence` → `needs_attention`
-- `oracle/result.md` says `oracle-green` or `oracle-red-expected`, no `implementation/result.md` → `oracle-written`
+- `oracle/result.md` says `oracle-green` or `oracle-red-expected`, no `reviews/oracle-review-NN.md` covers the latest oracle → `oracle-proposed`
+- latest `reviews/oracle-review-NN.md` is APPROVED and no `implementation/result.md` → `oracle-written` (build-eligible)
 - `implementation/result.md` exists, no `verification/result.md` → `implemented`
 - `verification/result.md` says passed, no `pr.md` → `ready-for-pr`
 - `pr.md` exists → `in-review`
@@ -179,7 +180,7 @@ Every worker dispatch inlines the exact context that worker needs: issue body, r
 
 ### 7. Workers produce artifacts + structured results. The controller acts on them.
 
-Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, deliver-decomposition-reviewer, oracle/implementation workers, audit-auditor, audit-reviewer) must:
+Leaf workers (deliver-pre-groomer, deliver-spec-reviewer, deliver-decomposition-reviewer, deliver-oracle-reviewer, oracle/implementation workers, audit-auditor, audit-reviewer) must:
 
 - Write their own artifacts to known paths
 - Return a concise structured result to the controller
@@ -189,7 +190,7 @@ Structured results workers return:
 
 - `artifact: spec` + `controller-status` (from deliver-pre-groomer when output is `spec.md`)
 - `artifact: decomposition` + `controller-status` + `slice-count` (from deliver-pre-groomer when output is `decomposition.md`)
-- `verdict: APPROVED | REJECTED` + `failed-checks` + `blocking-objection` (from deliver-spec-reviewer, deliver-decomposition-reviewer, and audit-reviewer)
+- `verdict: APPROVED | REJECTED` + `failed-checks` + `blocking-objection` (from deliver-spec-reviewer, deliver-decomposition-reviewer, deliver-oracle-reviewer, and audit-reviewer)
 - `oracle-green` / `oracle-red-expected` / `oracle-failed` / `oracle-insufficient-evidence` (from deliver-oracle-writer)
 - `implementation-passed` / `implementation-failed` / `oracle-mutation-detected` (from deliver-implementation)
 - `verification-passed` / `verification-failed` / `oracle-mutation-detected` (from controller-owned verification)
@@ -545,7 +546,8 @@ Dispatch workers via fresh subprocess sessions from the autoship root. Each disp
 - **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`
 - **deliver-decomposition-reviewer** — after every pre-groom/regroom pass that produced `decomposition.md`
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Breakdown outcomes do not progress to oracle; the parent issue's terminal is `Breakdown Proposed` until the operator approves child-issue creation.)
-- **deliver-implementation** — `oracle/result.md` exists with `oracle-green` or `oracle-red-expected` + no `implementation/result.md`. If `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence`, park the issue at `Needs Attention` with the oracle blocker; do not dispatch implementation.
+- **deliver-oracle-reviewer** — after every oracle-write/rewrite that produced `oracle/result.md` with `oracle-green` or `oracle-red-expected`, and no `reviews/oracle-review-NN.md` covers the latest oracle. Pre-injects oracle path, spec path, latest spec-review path, every `oracle-files:` path, testbed root, and the exact review output path (`reviews/oracle-review-NN.md`). (`oracle-failed` / `oracle-insufficient-evidence` short-circuit to `Needs Attention` without review — the writer already declared the oracle untrustworthy.)
+- **deliver-implementation** — `oracle/result.md` exists with `oracle-green` or `oracle-red-expected`, latest `reviews/oracle-review-NN.md` is APPROVED, and no `implementation/result.md`. If `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence`, park the issue at `Needs Attention` with the oracle blocker; do not dispatch implementation.
 
 Reviewer routing is mechanical: presence of `spec.md` → `deliver-spec-reviewer`; presence of `decomposition.md` → `deliver-decomposition-reviewer`. The two artifacts are mutually exclusive — never both for the same issue in the same run.
 
@@ -562,9 +564,9 @@ The `dispatches/` directory must exist before the call (`mkdir -p` it once at ru
 
 ### Regroom
 
-On REJECTED review (either spec-review or decomposition-review): increment regroom count. If within `max_regroom_cycles` (default 3), dispatch deliver-pre-groomer again with the latest review objections. If exceeded, park at `needs-human-input`.
+On REJECTED review (spec-review, decomposition-review, or oracle-review): increment regroom count for that artifact type. If within `max_regroom_cycles` (default 3), re-dispatch the matching generator — `deliver-pre-groomer` for spec/decomposition, `deliver-oracle-writer` for oracle — with the latest review objections injected as input. Re-dispatch is fresh: each cycle is a new subprocess receiving the current spec + latest review objections, never a session-resume of the previous attempt. Fresh dispatch forces a real rewrite instead of anchoring on the prior draft. If exceeded, park at `needs-human-input` with a `blocker-escalation` report naming the disagreement.
 
-The pre-groomer may switch artifact type on regroom — for example, after a REJECT on a spec where the reviewer flags "this is actually multi-slice umbrella," the regroom can produce `decomposition.md` instead of a re-drafted `spec.md`. When the artifact type changes, the controller routes to the matching reviewer; review history (`reviews/review-NN.md` for spec, `reviews/decomposition-review-NN.md` for plan) is append-only and preserves both lineages.
+The pre-groomer may switch artifact type on regroom — for example, after a REJECT on a spec where the reviewer flags "this is actually multi-slice umbrella," the regroom can produce `decomposition.md` instead of a re-drafted `spec.md`. When the artifact type changes, the controller routes to the matching reviewer; review history (`reviews/review-NN.md` for spec, `reviews/decomposition-review-NN.md` for plan, `reviews/oracle-review-NN.md` for oracle) is append-only and preserves all lineages.
 
 No Linear comments for intermediate regroom passes. Grooming writes local artifacts. When `--post` is set, mirror the final per-issue handoff to Linear with one concise comment and best-effort state transition.
 
@@ -603,7 +605,7 @@ In automatic mode, the build half starts only after spec review has approved the
 
 Successful build PRs are human review handoffs, not just code diffs. Every completed build PR and matching Linear build-complete comment must include a `Human Review Checklist` with 3-7 issue-specific bullets naming what the developer should inspect before merge: changed surfaces/files/routes, validation gaps or manual checks, and risk areas from the spec, oracle, implementation, or verification artifacts. Keep it specific; no generic boilerplate.
 
-For UI or frontend changes, include a `Preview Evidence` note before or inside the checklist. After opening or updating the PR, check the PR body, comments, and status checks for hosted preview URLs before finalizing the PR body and Linear build-complete comment. Distinguish preview URL available, screenshot evidence available, screenshot not captured, and preview unavailable after checking PR checks/comments/statuses. Never say "no preview available" only because the implementation worker did not capture screenshots. If a preview exists but screenshots were not captured, say: "Preview available; screenshots not captured by Autoship."
+For UI or frontend changes, include a `Preview Evidence` section in the PR body and mirror the same concise evidence links in the Linear build-complete comment when posting is enabled. Treat local Playwright CLI capture against a local dev server as the default evidence path; hosted preview evidence is a fallback when local capture is not feasible. After opening or updating the PR, check the PR body, comments, status checks, `oracle/result.md`, and `implementation/result.md` before finalizing the PR body and Linear comment. Distinguish preview URL available, screenshot evidence available, screen recording evidence available, visual evidence not captured, and preview unavailable after checking PR checks/comments/statuses. Prefer durable links when available; otherwise include the repo/run artifact paths recorded in `oracle/result.md` or `implementation/result.md`. Never say "no preview available" only because the implementation worker did not capture visual evidence. If capture fails, state the exact blocker: local boot failed, auth/dev-bypass missing, browser install failed, preview protected, missing preview URL, or another concrete cause.
 
 Before writing `verification/result.md`, parse `oracle/result.md`. Rerun the configured validation commands and every oracle-declared command under `verification` or `evidence-run` that is not already covered. Recompute every `oracle-files` hash. If any required evidence command fails, any frozen oracle file changed, or `oracle-files` is empty without an explicit `empty-oracle-rationale`, write `verification-failed` or `oracle-mutation-detected` and stop before commit/push/PR.
 

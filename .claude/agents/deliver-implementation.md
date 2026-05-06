@@ -56,8 +56,9 @@ You may **not** write:
 2. Extract the frozen oracle/evidence file list from `oracle/result.md`.
 3. Implement the smallest production change that satisfies the spec and frozen oracle.
 4. Run the final validation commands provided in the dispatch.
-5. Confirm that none of the frozen oracle files were modified.
-6. Write `implementation/result.md` exactly once, after verification is complete.
+5. For frontend/UI changes where the app can run locally, use Playwright CLI against the local dev server to capture post-implementation visual evidence: at least one screenshot, plus a short screen recording when correctness depends on interaction, animation, multi-step flow, hover/focus state, or responsive transition. Be adaptable: use the repo's native dev/start commands, seeded data, existing auth/dev-bypass paths, or a hosted preview when local capture is not feasible. If capture fails, record the exact attempted command and blocker in `implementation/result.md`.
+6. Confirm that none of the frozen oracle files were modified.
+7. Write `implementation/result.md` exactly once, after verification is complete.
 
 ## Outcome rules
 
@@ -95,6 +96,11 @@ validation-run:
 frozen-oracle-files:
   - <relative/path>
   - <relative/path>
+visual-evidence:
+  - path: <relative/path-or-url>
+    kind: screenshot | screen-recording | preview
+    status: captured | not-captured
+    reason: <only when not-captured>
 ---
 
 # Implementation Summary
@@ -106,6 +112,9 @@ frozen-oracle-files:
 
 ## Validation Result
 <which commands passed or failed>
+
+## Visual Evidence
+- <frontend/UI only: screenshot, screen recording, preview URL, or why capture was not feasible; write `(not applicable)` for non-UI changes>
 
 ## Blockers
 - <only if implementation-failed or oracle-mutation-detected; otherwise write `(none)`>
