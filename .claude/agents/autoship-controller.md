@@ -794,7 +794,13 @@ Build phases add:
 - `implementation_result_sha256`
 - `verification_result_sha256`
 
+Needs-attention parks add:
+
+- `parked_question` — verbatim markdown of the question(s) posted to Linear when parking. On every transition to `phase: needs_attention`, write the same body that goes into the `Needs Attention` Linear comment into `parked_question` *before* committing the manifest. Overwrite on each subsequent park. Set to `null` (or omit) when the manifest leaves `needs_attention` for any other phase.
+
 When dispatched by autoship-runner, the Runner Handoff JSON envelope includes a `sessionId` field that names the Claude Code session UUID for this issue. Copy `sessionId` verbatim into manifest.json as `session_id` on every manifest write when present. The runner may use it to pass `claude --resume <session_id>` and avoid rebuilding context. `session_id` is an optimization only: rerun correctness comes from the branch, manifest, artifacts, PR lookup by branch, and Linear idempotency keys. If the handoff envelope lacks `sessionId` (local CLI invocations, legacy runner versions), omit the field.
+
+`parked_question` is the durable record of what's blocking — needed because the runner's workers are ephemeral, so a follow-up run after a human reply will not have Claude's prior conversational memory to fall back on. The runner reads `parked_question` from the prior manifest and re-injects it alongside the human reply so the resumed Claude turn has full context without depending on `--resume` succeeding.
 
 The manifest is a ledger, not a substitute for the artifacts. The controller should use it to verify that the build is using the reviewed spec it thinks it is using.
 
