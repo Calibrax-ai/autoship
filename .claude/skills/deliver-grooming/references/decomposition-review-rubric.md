@@ -26,9 +26,18 @@ The reviewer verifies, not re-derives:
 
 Any unverifiable claim, hallucinated file path, or surfaced concern that can't be grepped to confirmation is `FAIL`.
 
-### Check 2 — Slice sizing
+### Check 2 — Slice sizing & cut justification
 
-Is each slice a bounded change a competent implementer can ship in one PR?
+Is the decomposition's cut honestly justified, and is each slice a bounded change a competent implementer can ship in one PR?
+
+**Cut justification (umbrella level):**
+
+- `decomposition-rationale` frontmatter field must exist and name a specific constraint (context window, validation budget, observability dependency, independent acceptance boundaries). Generic "this is a big feature" rationale is `FAIL`.
+- **Cuts considered** section must exist with two distinct cuts named and one picked. A decomposition with only one cut shown — or two cuts where one is an obvious strawman — is `FAIL` (this is the artifact-as-rationalization smell the rubric exists to catch). The picked cut's "Reason" must cite a specific constraint that breaks the alternative; "simpler" or "fits better" without specifics is `FAIL`.
+- **Shippability test on picked cut** must be present and honest. For each slice, the artifact states whether shipping it alone (and the others never shipping) leaves the product better, same, or worse. A slice that leaves the product worse than today is wrongly cut → `FAIL` (the slice boundary breaks the user-visible contract).
+- Per-slice `Alternative considered:` line must exist for every slice. Either name a real alternative cut and why this one won, or state `none` with a one-line reason the boundary is forced. Blank or boilerplate ("none considered") is `FAIL`.
+
+**Slice sizing:**
 
 - Wildly oversized slices ("migrate every route at once," "rewrite the auth subsystem") are `FAIL`. The threshold is judgment, not a number — but a slice that touches 10+ files across unrelated modules is a smell.
 - Wildly undersized slices ("rename a single function" as its own slice when it's part of a larger structural change) are `FAIL`. The threshold is whether it deserves its own ticket lifecycle, not its own commit.
@@ -97,8 +106,8 @@ blocking-objection: null | "<highest-priority objection>"
 ## Check 1 — Groundedness: PASS | FAIL
 <one paragraph, citing specific slice citations and whether they verify>
 
-## Check 2 — Slice sizing: PASS | FAIL
-<one paragraph, naming any slice that's too big/small with reasoning>
+## Check 2 — Slice sizing & cut justification: PASS | FAIL
+<one paragraph covering both halves: (1) is the cut honestly justified — `decomposition-rationale` cites a real constraint, `Cuts considered` shows two non-strawman cuts with a named-constraint reason for the pick, shippability test is honest for each slice, every slice has a real `Alternative considered:` line; and (2) is each slice's sizing reasonable>
 
 ## Check 3 — Dependency correctness: PASS | FAIL
 <one paragraph, naming dependency edges that disagree with the codebase>

@@ -69,7 +69,15 @@ Fill the template at `.claude/skills/deliver-grooming/assets/spec-template.md`. 
 
 ### 0. Scope classification
 
-Apply SKILL.md §Scope classification before drafting anything. Answer "could one AI agent ship this in one session?" with a named constraint if you choose umbrella. If umbrella, fill `decomposition-template.md` at the injected `decomposition.md` path (including the `decomposition-rationale` frontmatter field) and stop. Do not draft a unified spec. Default toward bounded — multi-layer is not multi-session.
+Apply SKILL.md §Scope classification before drafting anything. Answer "could one AI agent ship this in one session?" with a named constraint if you choose umbrella. If umbrella, fill `decomposition-template.md` at the injected `decomposition.md` path and stop. Do not draft a unified spec. Default toward bounded — multi-layer is not multi-session.
+
+When writing the decomposition, three reasoning-trail requirements are load-bearing (the reviewer checks all three):
+
+1. `decomposition-rationale` frontmatter field — the constraint that ruled out single-session delivery (see SKILL.md §Scope classification, Decision procedure step 5).
+2. **Cuts considered** section — two distinct decompositions you considered (e.g., layered DB→API→UI vs vertical-with-flag), the one you picked, the named constraint that breaks the alternative, and a shippability test on the picked cut (each slice shipping alone leaves the product better/same/worse). A slice that leaves the product worse is wrongly cut.
+3. Per-slice `Alternative considered:` line — the road-not-taken for each slice's scope, or `none` with a one-line reason the boundary is forced.
+
+These are not optional rationalizations after the fact — they're how the reviewer can push back on artifact-as-rationalization. Write them at decomposition-time, not as decorative justification.
 
 ### 1. Research existing pattern
 

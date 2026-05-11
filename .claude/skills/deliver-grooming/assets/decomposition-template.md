@@ -16,6 +16,32 @@ decomposition-rationale: <one-sentence citation of the constraint that ruled out
 <one-line user-visible result of shipping the whole umbrella;
  e.g. "Gridfin shell + 8 page surfaces match the new design system">
 
+# Cuts considered
+<Two distinct decompositions the pre-groomer considered, with the
+ picked one named and the alternative explicitly named. Forces the
+ road-not-taken visible at review time so the reviewer can push back
+ on rationalization. See decomposition-review-rubric Check 2.
+
+ If the umbrella shape is so dominant that only one decomposition is
+ honestly defensible (e.g., 8 independent sections each its own
+ validation surface), still write the cut you rejected and one
+ sentence on why it wasn't honest to propose.>
+
+## Cut A — <one-line name, e.g. "Layered: DB → API → UI">
+<one-paragraph sketch of the slice list under this cut.>
+
+## Cut B — <one-line name, e.g. "Vertical with feature flag, then expand">
+<one-paragraph sketch of the slice list under this cut.>
+
+## Picked: Cut <A | B>
+**Reason:** <one sentence naming the specific constraint that breaks
+ the alternative — e.g. "Cut B requires shipping a flag system that
+ doesn't exist; Cut A reuses existing migration + handler patterns.">
+**Shippability:** <for each slice in the picked cut, state whether
+ shipping it alone (and the others never shipping) leaves the product
+ better, same, or worse than today. A slice that leaves the product
+ worse is wrongly cut — the reviewer REJECTs on this.>
+
 # Slices
 <ordered list. one entry per child issue. order is dispatch order
  along the DAG below, not arbitrary.
@@ -31,6 +57,7 @@ slice-id: <stable id, e.g. FRD-161a>
 **Scope:**       <one sentence: what this slice does, what it leaves out>
 **Evidence:**    <file paths + line counts or specific patterns that bound this slice>
 **Dependencies:** <other slice-ids that must complete first; or `none`>
+**Alternative considered:** <one line on a meaningfully different way this slice's scope could have been cut, and why this scope won — e.g. "could have combined with the schema slice but the recompute removal needs its own validation pass" or "none — boundary forced by the migration sequence">
 
 ## <slice-id> — <slice title>
 slice-id: <next stable id>
