@@ -29,14 +29,28 @@ A missing or placeholder required field is `FAIL`. An invented status value outs
 
 Is every claim grounded in observed output, cited code, or cited issue content?
 
-Apply `SKILL.md` Groundedness criteria, universal plus the matching type section. The reviewer verifies, not re-derives:
+Apply `SKILL.md` Groundedness criteria, universal plus the matching type section. Verification is **exhaustive, not sampled** — every `file:line` citation must be opened with `Read` and confirmed. Spot-checking is the failure mode this rubric exists to catch.
 
-- Open cited files in Root Cause / Alternatives / Existing tests / Structure Improvement -> Before. Confirm quoted content matches.
+**Mandatory citation checklist.** Before writing the verdict body, enumerate every cited `file:line` reference in `spec.md` (Root Cause, Alternatives, Existing tests, Structure Improvement -> Before, Blast-Radius -> Expected to create / Expected to change, Concrete Example, Acceptance Criteria runnable commands). For each, open the file at the cited range with `Read` and emit a checklist line in the output's `## Citation verification checklist` section:
+
+```
+- <where in spec> → `<file:line-range>` — verified ✓ (<concrete readback of content>)
+- <where in spec> → `<file:line-range>` — mismatch: <actual state>
+- <where in spec> → `<file:line-range>` — missing: file does not exist at testbed SHA
+- <Blast-Radius "Expected to create" entry> → glob check — does not exist ✓ / exists (mark FAIL)
+```
+
+A verdict without the checklist — or with fewer entries than the spec has citations — is invalid; the controller treats it as malformed and routes to regroom. Uniform "verified ✓" entries with no parenthetical readback are also invalid.
+
+**Reading discipline:** read the cited range, not just the file. A claim "Root Cause: `orders.ts:47`" requires `Read(orders.ts, offset=47, limit=N)` and confirming the quoted snippet matches.
+
+**Specific check rules:**
+
 - For every file in Blast-Radius -> Expected to create, use `Glob` to confirm it does not already exist. Existing file labeled as new is `FAIL`.
 - For Feature Alternatives, confirm each cited `file:line` exists and roughly matches the claimed pattern. Strawman rejections with no cited counter-example are `FAIL`.
 - For Refactor executable behavior evidence, confirm each listed test/evidence file exists and imports, calls, or exercises the refactor target. If a refactor cites existing behavior tests but omits a runnable command that exercises them, `FAIL`.
 
-Any unverifiable claim, mismatched citation, or hallucinated invariant is `FAIL`.
+Any unverifiable claim, mismatched citation, or hallucinated invariant is `FAIL`. Minor citation imprecision (line off by a few LOC) where the underlying claim still holds may PASS but goes in `## Notes (non-blocking observations)` with the corrected anchor.
 
 ### Check 3 - Scope sanity
 
@@ -69,6 +83,13 @@ blocking-objection: null | "<highest-priority objection>"
 # Spec Review NN - <ISO date>
 
 ## VERDICT: APPROVED | REJECTED
+
+## Citation verification checklist
+
+<exhaustive list of every cited file:line in spec.md, one line each, with verified/mismatch/missing status and a parenthetical naming what was actually read. Missing this section, or having fewer entries than the spec has citations, makes the verdict invalid — see Check 2.>
+
+- <where in spec> → `<file:line-range>` — verified ✓ (<concrete content readback>)
+- ...
 
 ## Check 1 - Well-formedness: PASS | FAIL
 <one paragraph, citing specific sections or fields>

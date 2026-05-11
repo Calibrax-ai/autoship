@@ -18,13 +18,26 @@ Use this rubric when `deliver-decomposition-reviewer` judges the breakdown artif
 
 Is every slice grounded in observed code, cited paths, and verifiable evidence?
 
-The reviewer verifies, not re-derives:
+The reviewer verifies, not re-derives. Verification is **exhaustive, not sampled** — every `file:line` citation in the artifact must be opened with `Read` and confirmed against the cited claim. Spot-checking is the failure mode this rubric exists to catch.
 
-- Open every cited file (in slice scope, surfaced concerns, dependencies). Confirm the cited path exists and roughly matches the claimed line count. A slice citing `frontend/src/routes/_authed/dashboard.tsx` as 556 lines must point at a real file of approximately that size.
-- For surfaced concerns about related issue state ("Linear says FRD-162 is Done but PageShell doesn't exist on main"), grep the testbed for the claimed primitive. Confirm the state-lie reproduces. A surfaced concern that doesn't reproduce is `FAIL`.
+**Mandatory citation checklist.** Before writing the verdict body, enumerate every cited `file:line` reference in `decomposition.md` (slice Scope, slice Evidence, slice Dependencies, surfaced concerns, decomposition-rationale, Cuts considered). For each one, open the file at the cited range with `Read` and emit a checklist line:
+
+```
+- <where in artifact> → `<file:line-range>` — verified ✓ (<what was read matches: e.g. "file is 556 lines, matches">)
+- <where in artifact> → `<file:line-range>` — mismatch: <actual state — e.g. "file is 342 lines, decomposition says ~225 LOC; relevant test block is at lines 130-225, not the whole file">
+- <where in artifact> → `<file:line-range>` — missing: file does not exist at testbed SHA
+```
+
+This checklist is a load-bearing output section of the review (see output format below). A verdict without the checklist — or with a checklist that has fewer entries than the artifact has citations — is invalid; the controller treats it as malformed and routes to regroom. Uniform "verified ✓" entries with no concrete content in the parenthetical are also invalid — the parenthetical must show what was actually read.
+
+**Reading discipline:** read the cited range, not just the file. A claim "FRD-161a evidence: `gl.tsx:1050-1057`" requires `Read(gl.tsx, offset=1050, limit=8)` and confirming the read content matches the claimed pattern (`InspectorTab` usage at that range). Reading only the file's first 50 lines and saying "verified ✓" is the failure mode.
+
+**Verdict rules:**
+
+- Any unverifiable claim, hallucinated file path, or surfaced concern that can't be grepped to confirmation is `FAIL`.
 - Speculative slices with no `file:line` evidence ("we'll probably need to refactor the auth layer") are `FAIL`.
-
-Any unverifiable claim, hallucinated file path, or surfaced concern that can't be grepped to confirmation is `FAIL`.
+- For surfaced concerns about related issue state ("Linear says FRD-162 is Done but PageShell doesn't exist on main"), grep the testbed for the claimed primitive. Confirm the state-lie reproduces. A surfaced concern that doesn't reproduce is `FAIL`.
+- Citation imprecision (line range off by a few LOC, file count approximate) where the underlying claim still holds may PASS but must be called out in `## Notes (non-blocking observations)` with the corrected anchor — the slice-pre-groomer will re-anchor on next grooming.
 
 ### Check 2 — Slice sizing & cut justification
 
@@ -103,8 +116,15 @@ blocking-objection: null | "<highest-priority objection>"
 
 ## VERDICT: APPROVED | REJECTED
 
+## Citation verification checklist
+
+<exhaustive list of every cited file:line in the artifact, one line each, with verified/mismatch/missing status and a parenthetical naming what was actually read. Missing this section, or having fewer entries than the artifact has citations, makes the verdict invalid — see Check 1.>
+
+- <where in artifact> → `<file:line-range>` — verified ✓ (<concrete content readback>)
+- ...
+
 ## Check 1 — Groundedness: PASS | FAIL
-<one paragraph, citing specific slice citations and whether they verify>
+<one paragraph summarizing what the citation checklist shows; specific objections about hallucinated paths, missing files, or state-lies that don't reproduce go here>
 
 ## Check 2 — Slice sizing & cut justification: PASS | FAIL
 <one paragraph covering both halves: (1) is the cut honestly justified — `decomposition-rationale` cites a real constraint, `Cuts considered` shows two non-strawman cuts with a named-constraint reason for the pick, shippability test is honest for each slice, every slice has a real `Alternative considered:` line; and (2) is each slice's sizing reasonable>
