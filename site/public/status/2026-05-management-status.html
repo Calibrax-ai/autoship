@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autoship — Internal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --text: #0f172a;
+      --text-soft: #475569;
+      --muted: #64748b;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --bg: #ffffff;
+      --bg-soft: #f8fafc;
+      --bg-emphasis: #f1f5f9;
+
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --accent-dark: #1e3a8a;
+
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --amber-dark: #92400e;
+
+      --emerald: #059669;
+      --emerald-soft: #d1fae5;
+
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+      --sidebar-w: 264px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 1.5rem;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      min-height: 100vh;
+    }
+
+    /* === Sidebar === */
+    aside.sidebar {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--bg-soft);
+      border-right: 1px solid var(--line);
+      padding: 2rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-brand {
+      margin-bottom: 2rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sidebar-brand .name {
+      font-size: 1.125rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .sidebar-brand .sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+      font-weight: 500;
+    }
+
+    .nav-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--soft);
+      margin: 1.25rem 0 0.5rem;
+    }
+
+    .sidebar nav {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .sidebar nav a {
+      color: var(--text-soft);
+      text-decoration: none;
+      border: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.4rem 0.75rem;
+      border-radius: 5px;
+      transition: background 0.12s, color 0.12s;
+      line-height: 1.35;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .sidebar nav a:hover {
+      background: var(--bg-emphasis);
+      color: var(--text);
+    }
+
+    .sidebar nav a.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .sidebar nav a .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--soft);
+      flex-shrink: 0;
+    }
+
+    .sidebar nav a.active .dot {
+      background: var(--accent);
+    }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--line);
+      font-size: 0.8125rem;
+    }
+
+    .sidebar-foot a {
+      display: block;
+      color: var(--text-soft);
+      text-decoration: none;
+      border: none;
+      padding: 0.3rem 0;
+      transition: color 0.12s;
+    }
+
+    .sidebar-foot a:hover { color: var(--accent); }
+
+    .sidebar-foot code {
+      font-family: var(--font-mono);
+      font-size: 0.8125em;
+    }
+
+    /* === Main === */
+    main {
+      padding: 2rem 3rem 4rem;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    main > section + section {
+      margin-top: 3.5rem;
+      padding-top: 3.5rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-inner {
+      max-width: 820px;
+    }
+
+    .section-inner.wide {
+      max-width: 1080px;
+    }
+
+    /* === Typography === */
+    .eyebrow {
+      color: var(--soft);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    p { margin-bottom: 1rem; max-width: 68ch; }
+
+    p.lead {
+      font-size: 1rem;
+      color: var(--text-soft);
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(37, 99, 235, 0.25);
+      transition: border-color 0.15s;
+    }
+    a:hover { border-bottom-color: var(--accent); }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+      background: var(--bg-emphasis);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    strong { font-weight: 600; }
+
+    /* Quote styled inline rather than full-band */
+    blockquote.thesis {
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0 0.5rem 1.25rem;
+      margin: 1.5rem 0;
+      font-size: 1.125rem;
+      font-style: italic;
+      color: var(--text);
+      max-width: 56ch;
+    }
+    blockquote.thesis cite {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-style: normal;
+      margin-top: 0.5rem;
+      font-weight: 500;
+    }
+
+    /* === Bet cards === */
+    .bet-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    .bet-card {
+      background: var(--bg-soft);
+      padding: 1.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+    }
+    .bet-card .n {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.05em;
+    }
+    .bet-card h3 {
+      font-size: 0.9375rem;
+      margin-bottom: 0.4rem;
+    }
+    .bet-card p {
+      font-size: 0.875rem;
+      color: var(--text-soft);
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    /* === OS stages (4-card variant) === */
+    .os-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    @media (max-width: 1180px) {
+      .os-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* === Diagrams === */
+    .diagram {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1.75rem 0 1rem;
+    }
+    .diagram svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .diagram-caption {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    /* === Three-path glossary === */
+    .paths {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .path {
+      padding: 1rem 1.25rem;
+      border-left: 3px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 0 6px 6px 0;
+    }
+    .path h3 {
+      color: var(--accent-dark);
+      font-size: 0.9375rem;
+      margin-bottom: 0.3rem;
+    }
+    .path p {
+      font-size: 0.8125rem;
+      margin: 0;
+      color: var(--text-soft);
+      line-height: 1.55;
+    }
+
+    /* === Matrix === */
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.875rem;
+    }
+    .matrix th, .matrix td {
+      padding: 0.75rem 0.875rem;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+    .matrix th {
+      font-weight: 600;
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      background: var(--bg-soft);
+    }
+    .matrix .shape { font-weight: 600; }
+    .matrix .tick {
+      color: var(--emerald);
+      font-weight: 600;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+    }
+    .matrix code { font-size: 0.8125em; }
+
+    /* === Stats strip (runtime numbers) === */
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 2rem 0 0.75rem;
+    }
+    .stat-tile {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.1rem 1.25rem;
+    }
+    .stat-tile .n {
+      font-family: var(--font-mono);
+      font-size: 1.625rem;
+      font-weight: 500;
+      color: var(--accent-dark);
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+    }
+    .stat-tile .label {
+      font-size: 0.8125rem;
+      color: var(--text-soft);
+      line-height: 1.5;
+    }
+    .stats-caption {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-top: 0.75rem;
+    }
+    @media (max-width: 900px) {
+      .stats-strip { grid-template-columns: 1fr; }
+    }
+
+    /* === Gaps (honest limitations) === */
+    .gaps-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .gap-card {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--amber);
+      border-radius: 0 8px 8px 0;
+      padding: 1.25rem 1.5rem;
+    }
+    .gap-card .gap-num {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      color: var(--amber);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .gap-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.6rem;
+      line-height: 1.35;
+    }
+    .gap-card p {
+      font-size: 0.875rem;
+      color: var(--text-soft);
+      line-height: 1.6;
+      margin: 0 0 0.65rem;
+    }
+    .gap-card p:last-child { margin-bottom: 0; }
+    .gap-card .symphony {
+      font-size: 0.8125rem;
+      background: #fef3c7;
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      margin: 0.75rem 0;
+      color: #78350f;
+      line-height: 1.55;
+    }
+    .gap-card .symphony strong { color: #78350f; }
+    .gap-card .closes {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      padding-top: 0.65rem;
+      border-top: 1px dashed var(--line);
+    }
+    .gap-card .closes strong { color: var(--text-soft); }
+
+    /* === Roadmap === */
+    .roadmap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 1.75rem;
+    }
+    .roadmap-col h3 {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .roadmap-col ul { list-style: none; }
+    .roadmap-col li {
+      padding: 0.5rem 0;
+      border-bottom: 1px dashed var(--line);
+      font-size: 0.875rem;
+    }
+    .roadmap-col li:last-child { border-bottom: none; }
+    .roadmap-col li strong { color: var(--text); }
+    .roadmap-col li span { color: var(--text-soft); }
+    .roadmap-col.later h3 { color: var(--soft); }
+    .roadmap-col.later li strong { color: var(--text-soft); }
+
+    /* === Immediate next step === */
+    .next-step-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1.75rem;
+    }
+    .next-step-card {
+      background: var(--accent-soft);
+      border-left: 3px solid var(--accent);
+      padding: 1.25rem;
+      border-radius: 0 8px 8px 0;
+    }
+    .next-step-card .n {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      color: var(--accent);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .next-step-card h3 {
+      font-size: 0.9375rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent-dark);
+      line-height: 1.35;
+    }
+    .next-step-card p {
+      font-size: 0.8125rem;
+      color: var(--text-soft);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .closing {
+      margin-top: 2.25rem;
+      padding: 1.4rem 1.75rem;
+      background: var(--text);
+      color: rgba(255,255,255,0.85);
+      border-radius: 12px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      line-height: 1.55;
+    }
+    .closing strong { color: white; }
+
+    /* === Responsive === */
+    @media (max-width: 900px) {
+      body { grid-template-columns: 1fr; }
+      aside.sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        padding: 1.25rem 1.5rem;
+      }
+      .sidebar nav { flex-direction: row; flex-wrap: wrap; gap: 0.25rem; }
+      .sidebar-brand { margin-bottom: 0.75rem; padding-bottom: 0.75rem; }
+      .nav-label { display: none; }
+      .sidebar-foot { display: none; }
+      main { padding: 2rem 1.5rem; }
+      .bet-grid, .paths, .roadmap, .next-step-grid, .os-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* === Print === */
+    @media print {
+      body { grid-template-columns: 1fr; }
+      aside.sidebar { display: none; }
+      main {
+        padding: 0;
+        max-width: 100%;
+      }
+      main > section + section {
+        page-break-before: auto;
+        page-break-inside: avoid;
+      }
+      a {
+        color: var(--text);
+        border-bottom: none;
+      }
+      .closing {
+        background: white;
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="name">Autoship</div>
+      <div class="sub">Internal · May 2026</div>
+    </div>
+
+    <div class="nav-label">On this page</div>
+    <nav id="page-nav">
+      <a href="#idea" data-section="idea"><span class="dot"></span>The idea</a>
+      <a href="#vision" data-section="vision"><span class="dot"></span>The broader vision</a>
+      <a href="#how" data-section="how"><span class="dot"></span>How it works</a>
+      <a href="#today" data-section="today"><span class="dot"></span>What it can do today</a>
+      <a href="#gaps" data-section="gaps"><span class="dot"></span>Today's biggest gaps</a>
+      <a href="#roadmap" data-section="roadmap"><span class="dot"></span>Roadmap</a>
+      <a href="#next-step" data-section="next-step"><span class="dot"></span>Immediate next step</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="nav-label" style="margin-top: 0;">Further reading</div>
+      <a href="../docs/learnings.md"><code>docs/learnings.md</code></a>
+      <a href="../docs/deliver-learnings.md"><code>docs/deliver-learnings.md</code></a>
+      <a href="../docs/architecture/system-overview.md"><code>architecture/system-overview.md</code></a>
+      <a href="../docs/architecture/deliver-architecture.md"><code>architecture/deliver-architecture.md</code></a>
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- ===== THE IDEA ===== -->
+    <section id="idea">
+      <div class="section-inner">
+        <div class="eyebrow">The idea</div>
+        <h2>AI accelerates code. The bottleneck shifts to human attention.</h2>
+        <p class="lead">AI agents are fast. But throughput stalls on review, not on the model — a single dev can only supervise so many sessions at once before the cost of switching exceeds the cost of doing the work. The next move isn't a faster coding tool. It's a system where long-running work runs autonomously on a managed hub, and humans <strong>manage work, not the sessions producing it</strong>.</p>
+
+        <blockquote class="thesis">
+          "The plan is the ceiling."
+          <cite>— Autoship learnings, after ten probes</cite>
+        </blockquote>
+
+        <div class="bet-grid">
+          <div class="bet-card">
+            <div class="n">01</div>
+            <h3>Human attention is the bottleneck.</h3>
+            <p>AI agents are fast. A single dev can only supervise a handful at once — not because the model is slow, but because review can't keep up. Throughput stalls on attention, not generation.</p>
+          </div>
+          <div class="bet-card">
+            <div class="n">02</div>
+            <h3>Long work runs autonomously.</h3>
+            <p>Tasks that take hours run on a managed hub — own workspace, own lifecycle, recoverable across crashes. Not pinned to a developer's laptop, not blocked on human presence.</p>
+          </div>
+          <div class="bet-card">
+            <div class="n">03</div>
+            <h3>Humans manage work, not sessions.</h3>
+            <p>The team approves intent, reviews PRs, and merges what's right. The system handles routing, execution, and validation. People sit at the merge gate, not the keyboard.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BROADER VISION ===== -->
+    <section id="vision">
+      <div class="section-inner wide">
+        <div class="eyebrow">The broader vision</div>
+        <h2>Autoship is a project operating system.</h2>
+        <p class="lead">Most agent systems are dispatch layers on top of a single tracker. Autoship's broader bet is that the system itself sits between intent and implementation — taking signals from anywhere, understanding them, prioritizing against the roadmap, and triggering the right work.</p>
+
+        <div class="os-grid">
+          <div class="bet-card">
+            <div class="n">01</div>
+            <h3>Gather</h3>
+            <p>Signals from many sources — meetings, monitoring alerts, customer feedback, scheduled research, plus traditional issue trackers.</p>
+          </div>
+          <div class="bet-card">
+            <div class="n">02</div>
+            <h3>Understand</h3>
+            <p>Raw signals become structured work items through grooming and spec review.</p>
+          </div>
+          <div class="bet-card">
+            <div class="n">03</div>
+            <h3>Prioritize</h3>
+            <p>Weigh new items against the roadmap and what's already in flight, before anything dispatches.</p>
+          </div>
+          <div class="bet-card">
+            <div class="n">04</div>
+            <h3>Work</h3>
+            <p>Ready work routes through Groom / Ask / Ship to draft PR with validation evidence.</p>
+          </div>
+        </div>
+
+        <p style="font-size: 0.875rem; color: var(--text-soft); margin-top: 1.25rem;">
+          <strong>Today:</strong> Gather from Linear, Understand via grooming, Work via the deliver loop. <strong>Next:</strong> additional Gather sources and cross-stream Prioritize — mapped in the diagram below.
+        </p>
+
+        <div class="diagram">
+          <svg viewBox="0 0 1040 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram: sources, Autoship project OS planning layer, work layer, and outputs">
+            <defs>
+              <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+              </marker>
+              <marker id="arrow-dashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+              </marker>
+              <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706"/>
+              </marker>
+              <marker id="arrow-stage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+              </marker>
+            </defs>
+
+            <!-- ===== SOURCES BAND (top) ===== -->
+            <text x="20" y="14" font-family="Inter,sans-serif" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="2">SOURCES</text>
+
+            <rect x="20" y="25" width="180" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="110" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="600" fill="#1e3a8a">Linear</text>
+            <text x="110" y="64" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#1e3a8a">issues, today's intake</text>
+
+            <rect x="225" y="25" width="180" height="50" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="315" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="500" fill="#475569">Notion</text>
+            <text x="315" y="64" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#94a3b8">meeting notes</text>
+
+            <rect x="430" y="25" width="180" height="50" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="520" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="500" fill="#475569">PostHog / NewRelic</text>
+            <text x="520" y="64" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#94a3b8">monitoring signals</text>
+
+            <rect x="635" y="25" width="180" height="50" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="725" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="500" fill="#475569">Customer feedback</text>
+            <text x="725" y="64" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#94a3b8">sheets, support tickets</text>
+
+            <rect x="840" y="25" width="180" height="50" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="930" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="500" fill="#475569">Scheduled research</text>
+            <text x="930" y="64" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#94a3b8">competitors / ideas</text>
+
+            <!-- Source-to-Autoship arrows -->
+            <line x1="110" y1="75" x2="110" y2="128" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow2)"/>
+            <line x1="315" y1="75" x2="315" y2="128" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)"/>
+            <line x1="520" y1="75" x2="520" y2="128" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)"/>
+            <line x1="725" y1="75" x2="725" y2="128" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)"/>
+            <line x1="930" y1="75" x2="930" y2="128" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-dashed)"/>
+
+            <!-- ===== PLANNING BAND ===== -->
+            <rect x="20" y="130" width="1000" height="130" rx="12" fill="#eff6ff" stroke="#1e3a8a" stroke-width="2"/>
+            <text x="520" y="153" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="#1e3a8a" letter-spacing="2">PROJECT OS · PLANNING</text>
+
+            <!-- Gather (LIVE) -->
+            <rect x="50" y="180" width="280" height="60" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+            <text x="190" y="206" text-anchor="middle" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#1e3a8a">Gather</text>
+            <text x="190" y="225" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#64748b">signals from sources</text>
+
+            <!-- Understand (LIVE) -->
+            <rect x="380" y="180" width="280" height="60" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+            <text x="520" y="206" text-anchor="middle" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#1e3a8a">Understand</text>
+            <text x="520" y="225" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#64748b">pre-groomer + spec-reviewer</text>
+
+            <!-- Prioritize (PLANNED, dashed) -->
+            <rect x="710" y="180" width="280" height="60" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="850" y="206" text-anchor="middle" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#64748b">Prioritize</text>
+            <text x="850" y="225" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#94a3b8">roadmap weighting</text>
+
+            <!-- Arrows between planning stages -->
+            <line x1="330" y1="210" x2="380" y2="210" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow-stage)"/>
+            <line x1="660" y1="210" x2="710" y2="210" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arrow-stage)"/>
+
+            <!-- Planning-to-Work arrow -->
+            <line x1="520" y1="260" x2="520" y2="293" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow2)"/>
+
+            <!-- ===== WORK BAND ===== -->
+            <rect x="20" y="295" width="1000" height="80" rx="12" fill="#eff6ff" stroke="#1e3a8a" stroke-width="2"/>
+            <text x="520" y="317" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="#1e3a8a" letter-spacing="2">PROJECT OS · WORK</text>
+            <text x="520" y="346" text-anchor="middle" font-family="Inter,sans-serif" font-size="16" font-weight="700" fill="#1e3a8a">Groom / Ask / Ship</text>
+            <text x="520" y="362" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#64748b">execution layer · Implementation Agent + frozen-oracle validation</text>
+
+            <!-- Work-to-Outputs arrows -->
+            <line x1="180" y1="375" x2="180" y2="420" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow2)"/>
+            <line x1="520" y1="375" x2="520" y2="420" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow2)"/>
+            <line x1="860" y1="375" x2="860" y2="420" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow2)"/>
+
+            <!-- ===== OUTPUTS BAND ===== -->
+            <text x="20" y="412" font-family="Inter,sans-serif" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="2">OUTPUTS</text>
+
+            <rect x="60" y="422" width="240" height="60" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="180" y="448" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#1e3a8a">GitHub draft PR</text>
+            <text x="180" y="466" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#1e3a8a">with validation evidence</text>
+
+            <rect x="400" y="422" width="240" height="60" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="520" y="448" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#1e3a8a">Linear updates</text>
+            <text x="520" y="466" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#1e3a8a">state transitions, comments</text>
+
+            <rect x="740" y="422" width="240" height="60" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="860" y="448" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#1e3a8a">Slack updates</text>
+            <text x="860" y="466" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#1e3a8a">asks, summaries</text>
+
+            <!-- GitHub PR to Human review arrow -->
+            <line x1="180" y1="482" x2="180" y2="520" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+
+            <!-- Human review -->
+            <rect x="60" y="520" width="240" height="50" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+            <text x="180" y="542" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#92400e">Human review</text>
+            <text x="180" y="558" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#92400e">approve · merge</text>
+
+            <!-- Legend -->
+            <g transform="translate(400, 544)">
+              <line x1="0" y1="0" x2="22" y2="0" stroke="#2563eb" stroke-width="2"/>
+              <text x="30" y="4" font-family="Inter,sans-serif" font-size="11" fill="#475569">Live today</text>
+              <line x1="130" y1="0" x2="152" y2="0" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+              <text x="160" y="4" font-family="Inter,sans-serif" font-size="11" fill="#475569">On the roadmap</text>
+              <rect x="280" y="-6" width="12" height="12" rx="2" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+              <text x="298" y="4" font-family="Inter,sans-serif" font-size="11" fill="#475569">Human action</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section id="how">
+      <div class="section-inner wide">
+        <div class="eyebrow">How it works</div>
+        <h2>One agent reads the issue. Specialists do the work.</h2>
+        <p class="lead">When intent enters from any spoke, the <strong>Controller Agent</strong> decides what happens next: groom the plan, ask a human, or hand off to build. Then it dispatches specialists per stage — <code>pre-groomer</code> + <code>spec-reviewer</code> for the plan, <code>oracle-writer</code> + <code>oracle-reviewer</code> for the tests, an <code>implementation</code> agent for the code. Each pair has an author and a judge — no agent grades its own homework.</p>
+
+        <div class="diagram">
+          <svg viewBox="0 0 1040 490" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Autoship flow with specialized agents per stage and a shared skills library">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+              </marker>
+              <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+              </marker>
+              <marker id="arrow-amber-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706"/>
+              </marker>
+            </defs>
+
+            <!-- ===== LEFT: Linear → Controller → Decision (centered row, y=180-220) ===== -->
+            <rect x="20" y="180" width="100" height="40" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+            <text x="70" y="200" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="500" fill="#0f172a">Linear Issue</text>
+            <text x="70" y="214" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#64748b">/ Intent</text>
+
+            <line x1="120" y1="200" x2="140" y2="200" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="140" y="180" width="130" height="40" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="205" y="200" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Controller Agent</text>
+            <text x="205" y="214" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#1e3a8a">routes work</text>
+
+            <line x1="270" y1="200" x2="295" y2="200" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <polygon points="330,180 365,200 330,220 295,200" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+            <text x="330" y="204" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#92400e">Decision</text>
+
+            <!-- ===== GROOM PATH (top row, y=60-100) ===== -->
+            <line x1="330" y1="180" x2="330" y2="80" stroke="#475569" stroke-width="1.5"/>
+            <line x1="330" y1="80" x2="410" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+            <text x="345" y="138" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#2563eb">Groom</text>
+
+            <rect x="410" y="60" width="130" height="40" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="475" y="80" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Pre-groomer</text>
+            <text x="475" y="94" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#1e3a8a">writes spec</text>
+
+            <line x1="540" y1="80" x2="565" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="565" y="60" width="140" height="40" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="635" y="80" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Spec-reviewer</text>
+            <text x="635" y="94" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#1e3a8a">judges spec</text>
+
+            <line x1="705" y1="80" x2="725" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="725" y="60" width="140" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+            <text x="795" y="80" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="500" fill="#334155">Spec / Plan</text>
+            <text x="795" y="94" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#64748b">approved</text>
+
+            <!-- ===== ASK PATH (middle row, y=180-220) ===== -->
+            <line x1="365" y1="200" x2="410" y2="200" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+            <text x="378" y="194" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#2563eb">Ask</text>
+
+            <rect x="410" y="180" width="190" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+            <text x="505" y="200" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="500" fill="#334155">Needs Human Input</text>
+            <text x="505" y="214" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#64748b">posted in Slack</text>
+
+            <!-- ===== SHIP PATH (bottom row, y=280-320) ===== -->
+            <line x1="330" y1="220" x2="330" y2="300" stroke="#475569" stroke-width="1.5"/>
+            <line x1="330" y1="300" x2="410" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+            <text x="345" y="263" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#2563eb">Ship</text>
+
+            <rect x="410" y="280" width="130" height="40" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="475" y="300" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Oracle-writer</text>
+            <text x="475" y="314" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#1e3a8a">writes tests</text>
+
+            <line x1="540" y1="300" x2="565" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="565" y="280" width="140" height="40" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="635" y="300" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Oracle-reviewer</text>
+            <text x="635" y="314" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#1e3a8a">freezes tests</text>
+
+            <line x1="705" y1="300" x2="725" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="725" y="280" width="140" height="40" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+            <text x="795" y="300" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Implementation</text>
+            <text x="795" y="314" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#1e3a8a">writes code · runs oracle</text>
+
+            <line x1="865" y1="300" x2="885" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+            <rect x="885" y="280" width="140" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+            <text x="955" y="300" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="500" fill="#334155">Draft PR</text>
+            <text x="955" y="314" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#64748b">with evidence</text>
+
+            <!-- Draft PR → Human Review (amber, down arrow) -->
+            <line x1="955" y1="320" x2="955" y2="360" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber-flow)"/>
+
+            <rect x="885" y="360" width="140" height="40" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+            <text x="955" y="380" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#92400e">Human Review</text>
+            <text x="955" y="394" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#92400e">approve + merge</text>
+
+            <!-- ===== SKILLS LIBRARY (bottom band, y=425-475) ===== -->
+            <rect x="20" y="425" width="1000" height="55" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6 4"/>
+            <text x="40" y="448" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="#475569" letter-spacing="2">SKILLS LIBRARY</text>
+            <text x="40" y="463" font-family="Inter,sans-serif" font-size="10" font-style="italic" fill="#94a3b8">shared patterns the specialized agents pull from at runtime</text>
+
+            <rect x="380" y="441" width="140" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+            <text x="450" y="457" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#334155">grooming</text>
+
+            <rect x="535" y="441" width="140" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+            <text x="605" y="457" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#334155">reviewing</text>
+
+            <rect x="690" y="441" width="140" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+            <text x="760" y="457" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#334155">audit</text>
+
+            <rect x="845" y="441" width="170" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+            <text x="930" y="457" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#334155">blocker-escalation</text>
+          </svg>
+        </div>
+        <div class="diagram-caption">Blue = agent · amber = human · grey = artifact</div>
+
+        <div class="paths">
+          <div class="path">
+            <h3>Groom</h3>
+            <p>Plan needs work. Controller routes to <code>pre-groomer</code>, which writes a spec; <code>spec-reviewer</code> judges it before any code.</p>
+          </div>
+          <div class="path">
+            <h3>Ask</h3>
+            <p>Missing human input. Autoship posts the specific question in Slack and pauses — no guessing in place of a decision.</p>
+          </div>
+          <div class="path">
+            <h3>Ship</h3>
+            <p>Controller hands off to <code>implementation</code>. A frozen oracle gates the build; the implementer cannot mutate the tests to make them pass.</p>
+          </div>
+        </div>
+
+        <p style="font-size: 0.8125rem; color: var(--muted); margin-top: 1.75rem; padding-top: 1rem; border-top: 1px dashed var(--line);">
+          <strong style="color: var(--text-soft);">Today:</strong> 6 specialists across 3 states.
+          <strong style="color: var(--text-soft);">Roadmap:</strong> a structured mini-swarm as Design, Research, and Decomposition states come online — the Controller picks the right specialist for each task.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== WHAT IT CAN DO ===== -->
+    <section id="today">
+      <div class="section-inner">
+        <div class="eyebrow">What it can do today</div>
+        <h2>Shipped four kinds of real work end-to-end.</h2>
+        <p class="lead">Five end-to-end runs on real Linear issues. In each one, Autoship produced a draft PR whose tests passed on the first try — no shortcuts, no scope creep.</p>
+
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th>Kind of work</th>
+              <th>Issue</th>
+              <th>Outcome</th>
+              <th>What this tells us</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="shape">Bug</td>
+              <td><code>FRD-157</code></td>
+              <td class="tick">All tests passed first run</td>
+              <td>Pattern works on a clean bug fix.</td>
+            </tr>
+            <tr>
+              <td class="shape">Feature</td>
+              <td><code>FRD-122</code></td>
+              <td class="tick">All tests passed first run</td>
+              <td>Works on a change touching multiple surfaces (role gate, activity log, mapper).</td>
+            </tr>
+            <tr>
+              <td class="shape">Refactor</td>
+              <td><code>REF-001</code></td>
+              <td class="tick">All tests passed; Autoship didn't shortcut by editing the tests</td>
+              <td>Even when a shortcut was tempting, the system held its boundary.</td>
+            </tr>
+            <tr>
+              <td class="shape">UI build</td>
+              <td><code>FRD-162</code></td>
+              <td class="tick">12 browser tests passed first run</td>
+              <td>UI is the newest kind of work — and it worked end-to-end.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="stats-strip">
+          <div class="stat-tile">
+            <div class="n">~36 min</div>
+            <div class="label">median run between human checkpoints</div>
+          </div>
+          <div class="stat-tile">
+            <div class="n">5 min – 1.4 h</div>
+            <div class="label">range across 15 build runs since May 4</div>
+          </div>
+          <div class="stat-tile">
+            <div class="n">~10 hours</div>
+            <div class="label">autonomous compute, across 11 issues in 2 repos</div>
+          </div>
+        </div>
+        <p class="stats-caption">Since the trigger.dev runner went live on May 4, Autoship has shipped autonomously across 11 issues. The four shape probes above proved the <em>pattern</em> works; this proves it now runs <em>unattended</em> in production.</p>
+      </div>
+    </section>
+
+    <!-- ===== TODAY'S BIGGEST GAPS ===== -->
+    <section id="gaps">
+      <div class="section-inner">
+        <div class="eyebrow">What it's not good at — yet</div>
+        <h2>Three honest gaps we haven't closed.</h2>
+        <p class="lead">All three are also things OpenAI <strong>explicitly chose not to solve</strong> in Symphony — the closest peer system. Naming them keeps us anchored to the open frontier of the field, not pretending the system is finished.</p>
+
+        <div class="gaps-grid">
+          <div class="gap-card">
+            <div class="gap-num">GAP 01</div>
+            <h3>Planning has no clean entry point.</h3>
+            <p>The path from "I have an idea" to "Autoship can run this" is sharp at the execution end and ambiguous at the planning end. No conversational refinement. No distinct PRD artifact. Today the honest answer to <em>"how do I plan a feature with Autoship?"</em> is <em>"open Claude Code, then write a Linear issue, then run <code>autoship groom</code>"</em> — which means users can rationally stop after step one.</p>
+            <div class="symphony"><strong>Symphony has the same gap.</strong> Its SPEC §2.2 explicitly declares this a <em>non-goal</em>, requiring "agent-ready issue descriptions" as a hard prerequisite. OpenAI dumped the entire intake burden on the user.</div>
+            <div class="closes"><strong>Closes with:</strong> a planning surface — a <code>plan</code> mode that walks an architect through PRD + decomposition, then hands clean child issues into the existing groom/deliver pipeline.</div>
+          </div>
+
+          <div class="gap-card">
+            <div class="gap-num">GAP 02</div>
+            <h3>New projects hit a planning barrier — our biggest adoption hurdle.</h3>
+            <p>Today's strongest results come from codebases that have done their conventionalizing work — tests, CI, project structure, coding style. Autoship reads those signals and operates inside them.</p>
+            <p>On a <strong>new project</strong>, the architect still has to pick the stack, package manager, database, auth provider, hosting, and conventions before Autoship has anything to work with. Autoship has no opinions on those decisions and can't make them. That's a planning barrier — and it's the moment most users bounce, because the path of least resistance is to stay in Claude Code or Codex until the project has shape.</p>
+            <div class="symphony"><strong>Symphony has the same constraint, more explicitly.</strong> The much-cited "500% PR increase" comes from OpenAI's own harness-engineered codebase (hermetic tests, reliable CI, agent-ready issues). Critics note Symphony "doesn't deliver the harness you need to make working software" — and neither do we, yet.</div>
+            <div class="closes"><strong>Closes with:</strong> smarter <code>init</code> that bootstraps standards from a brief description; an opinionated <em>starter</em> mode for greenfield projects.</div>
+          </div>
+
+          <div class="gap-card">
+            <div class="gap-num">GAP 03</div>
+            <h3>"Tests pass" isn't "product works."</h3>
+            <p>The frozen oracle gives us a high-confidence signal that the implementation matches the spec. It doesn't tell us the spec was right, or that the running product behaves correctly under real use. We trust the gate. We don't yet trust the outcome.</p>
+            <div class="symphony"><strong>Symphony has it worse.</strong> Symphony has no oracle at all — its stance is <em>"correctness is your CI's problem."</em> We're already ahead here (generator-evaluator, frozen oracle), but the <em>outcome</em> layer is still open for everyone.</div>
+            <div class="closes"><strong>Closes with:</strong> a runtime/preview verification step beyond the oracle.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ROADMAP ===== -->
+    <section id="roadmap">
+      <div class="section-inner">
+        <div class="eyebrow">Roadmap</div>
+        <h2>From a single delivery loop to a full intent-to-ship system.</h2>
+        <p class="lead">The Next column is what we'd build to close the three gaps and light up the intake spokes — but it's gated on what dogfooding tells us. Building more features before proving adoption is wasted leverage. (See <a href="#next-step">Immediate next step</a>.)</p>
+
+        <div class="roadmap">
+          <div class="roadmap-col">
+            <h3>Next — close the gaps, light up the spokes</h3>
+            <ul>
+              <li><strong>Planning surface (<code>plan</code> mode).</strong> <span>Conversational PRD intake — turn a rough idea into a PRD and clean child issues without leaving Autoship. <em>Closes gap #1.</em></span></li>
+              <li><strong>Greenfield bootstrap.</strong> <span>Smarter <code>init</code> that infers standards from a brief description; opinionated starter mode for new projects. <em>Closes gap #2.</em></span></li>
+              <li><strong>Outcome verification.</strong> <span>A check beyond "tests green" — does the product actually behave? <em>Closes gap #3.</em></span></li>
+              <li><strong>Specialist routing across more states.</strong> <span>Design, Research, and Decomposition states come online; controller picks the right specialist per task.</span></li>
+              <li><strong>Multi-source intake.</strong> <span>Notion, monitoring alerts, customer feedback — the "Gather" layer from the broader vision.</span></li>
+              <li><strong>Multi-LLM support.</strong> <span>Best (or cheapest) model per task — not bet on one provider.</span></li>
+              <li><strong>Parallel runs.</strong> <span>Multiple issues moving through without blocking.</span></li>
+              <li><strong>Cross-repo generalization.</strong> <span>Second testbed beyond <code>finance_backend_agent</code>.</span></li>
+            </ul>
+          </div>
+          <div class="roadmap-col later">
+            <h3>Later — closing the loop</h3>
+            <ul>
+              <li><strong>Scheduled research.</strong> <span>Bot scans competitors / surfaces ideas on a cadence.</span></li>
+              <li><strong>Approval gates for sensitive actions.</strong> <span>Billing, infra, prod-data — explicit human sign-off.</span></li>
+              <li><strong>Team-level delivery dashboard.</strong> <span>Leadership view of in-flight, blocked, shipped.</span></li>
+              <li><strong>Learning loop.</strong> <span>Shipped work feeds back into how the bot classifies new intake.</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== IMMEDIATE NEXT STEP ===== -->
+    <section id="next-step">
+      <div class="section-inner">
+        <div class="eyebrow">Immediate next step</div>
+        <h2>Stop building. Start using.</h2>
+        <p class="lead">The architecture has more headroom — planning surfaces, multi-LLM, more specialists. But shipping more features before proving the existing ones get adopted is wasted leverage. Next cycle, the focus shifts from <em>building</em> to <em>dogfooding</em>: using Autoship on our own real work, in the repos we ship from, with the people who ship.</p>
+
+        <div class="next-step-grid">
+          <div class="next-step-card">
+            <div class="n">COMMITMENT 01</div>
+            <h3>Run delivery through Autoship on real work, real repos.</h3>
+            <p>Not testbeds. Not synthetic. The issues the team would ship anyway, in the codebases they ship from.</p>
+          </div>
+          <div class="next-step-card">
+            <div class="n">COMMITMENT 02</div>
+            <h3>Track every bounce-out.</h3>
+            <p>Each time a team member abandons Autoship mid-issue and finishes in Claude Code or Codex directly, capture <em>why</em>. Bad grooming? Planning gap? Codebase not conventionalized? The bounces are the highest-signal data we'll get.</p>
+          </div>
+          <div class="next-step-card">
+            <div class="n">COMMITMENT 03</div>
+            <h3>Kill-or-continue checkpoint.</h3>
+            <p>Three honest questions: (a) does the team pick Autoship over a direct AI session? (b) does it work across our real codebases? (c) is the value worth more building? If yes — back to the roadmap with confidence. If no — pause, the work isn't wasted.</p>
+          </div>
+        </div>
+
+        <div class="closing">
+          More building is the tempting path. <strong>Adoption is the load-bearing one.</strong> We earn the next feature by using what's built.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Scroll-spy: highlight the sidebar item for whichever section
+    // is most prominently in view. No deps, ~20 lines.
+    (function () {
+      const links = document.querySelectorAll('#page-nav a');
+      const sections = Array.from(links).map(a => document.querySelector(a.getAttribute('href')));
+      const byId = {};
+      links.forEach(a => byId[a.getAttribute('href').slice(1)] = a);
+
+      const obs = new IntersectionObserver((entries) => {
+        // Pick the entry closest to the top of the viewport
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (!visible) return;
+        const id = visible.target.id;
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      }, {
+        rootMargin: '-20% 0px -55% 0px',
+        threshold: 0
+      });
+
+      sections.forEach(s => s && obs.observe(s));
+
+      // Highlight first section by default
+      if (links.length) links[0].classList.add('active');
+    })();
+  </script>
+
+</body>
+</html>

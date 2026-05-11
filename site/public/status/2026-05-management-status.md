@@ -1,0 +1,27 @@
+# Autoship — May 2026 status
+
+**Bottom line:** Autoship's delivery pattern is now proven across Bug, Feature, Refactor, and UI-build change shapes. UI build validated end-to-end last cycle (FRD-162: 12 Playwright tests green on first run, zero test mutations). Cross-repo generalization and outcome verification are the next open questions.
+
+For the full thesis and findings, see [What we've learned](../docs/learnings.md). This page is the monthly cycle delta — read `learnings.md` first if you haven't.
+
+## What's new this cycle
+
+- **UI build validated end-to-end.** Deliver probe 0.5 took FRD-162 from Linear issue → spec → frozen oracle → implementation → 12 Playwright tests green on first run. First UI build through the full deliver pattern.
+- **Build validation now spans four change shapes.** Bug (FRD-157, 6/6), Feature (FRD-122, 20/20), Refactor (REF-001, 12/12), UI build (FRD-162, 12/12). Generator-evaluator separation held in all four.
+- **First-probe Linear integration.** Probe 0.5 drove Linear state transitions directly from the agent — first probe to do so.
+- **PM bot operational reliability.** Multi-repo routing live (Delivery + Koomi), multi-user attribution, shared rotateable webhook secret. Supporting infrastructure for future agent-driven runs, not a capability claim on its own.
+
+## Open questions
+
+- **Cross-repo generalization.** All five `deliver` probes ran against one testbed (`finance_backend_agent`). Pattern needs a second testbed.
+- **Outcome verification.** "Tests green" is not "product works." Need a verification step beyond the frozen oracle.
+- **Manual vs. controller orchestration.** How much per-stage dispatch can stay manual before the controller earns its complexity.
+
+## Next cycle
+
+- Validate cross-repo generalization on a second testbed.
+- Pilot an outcome-verification step beyond the frozen-oracle gate.
+
+---
+
+For full prose: [`docs/learnings.md`](../docs/learnings.md) · For deliver-track detail: [`docs/deliver-learnings.md`](../docs/deliver-learnings.md) · Probe records: `probes/autoship-deliver-0.{1..5}/`
