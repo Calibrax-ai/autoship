@@ -7,6 +7,7 @@ artifact: decomposition
 controller-status: ready
 type: decomposition
 slice-count: <integer ≥ 2; see decomposition-review-rubric Check 2>
+decomposition-rationale: <one-sentence citation of the constraint that ruled out single-session delivery — e.g. "total ~13000 LOC across 8 sections, each with its own validation surface" or "DB migration requires bake time before API/UI layers can be safely designed". See SKILL.md §Scope classification — Decision procedure step 5.>
 # A decomposition is mutually exclusive with a spec for the same issue.
 # When `type: decomposition` is written, no spec.md is produced for this id.
 ---

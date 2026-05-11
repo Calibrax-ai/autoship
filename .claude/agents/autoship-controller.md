@@ -542,7 +542,7 @@ Per-issue terminals (`Spec Ready` in supervised mode, `Breakdown Proposed`, `Nee
 
 Dispatch workers via fresh subprocess sessions from the autoship root. Each dispatch pre-injects the inputs declared in the worker's agent definition.
 
-- **deliver-pre-groomer** — when neither `spec.md` nor `decomposition.md` exists, or after a REJECTED review (spec-review or decomposition-review). The pre-groomer's output type depends on umbrella detection: bounded issues produce `spec.md`; umbrella issues produce `decomposition.md` (see `.claude/skills/deliver-grooming/SKILL.md` § Umbrella detection).
+- **deliver-pre-groomer** — when neither `spec.md` nor `decomposition.md` exists, or after a REJECTED review (spec-review or decomposition-review). The pre-groomer's output type depends on scope classification: bounded issues produce `spec.md`; umbrella issues produce `decomposition.md` (see `.claude/skills/deliver-grooming/SKILL.md` § Scope classification — the pre-groomer defaults toward bounded and only outputs `decomposition.md` when work genuinely cannot fit in one AI-agent session).
 - **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`
 - **deliver-decomposition-reviewer** — after every pre-groom/regroom pass that produced `decomposition.md`
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Breakdown outcomes do not progress to oracle; the parent issue's terminal is `Breakdown Proposed` until the operator approves child-issue creation.)

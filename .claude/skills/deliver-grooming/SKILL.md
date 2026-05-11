@@ -70,22 +70,41 @@ Type-specific sections:
 - **Feature** — Design Rationale (with Alternatives, Picked + Reason; conditional subsections based on blast-radius characteristics)
 - **Refactor** — Behavior Preservation (What must be preserved, Preservation Proof, Structure Improvement); Design Rationale is optional
 
-## Umbrella detection (before any drafting)
+## Scope classification (before any drafting)
 
-Before deciding whether to write a spec, classify the issue's shape. Scope classification applies to all types — Feature, Bug, Refactor — though the heuristics weigh differently.
+Before deciding whether to write a spec, classify the issue. The question is **not** "does any signal trigger umbrella?" — it is **"can one AI agent ship this in one session?"** Default toward bounded. Decomposition is the rare path, not the standard one.
 
-- **Bounded** — one coherent unit of work with a clear acceptance boundary. Surfaces either co-located in one file/module, or fan out across surfaces that share one enforcement chokepoint (middleware, single handler). Output: `spec.md`.
-- **Umbrella** — multi-slice scope where slices are bounded changes individually but the parent is too large for one spec. Output: `decomposition.md`.
+- **Bounded** — work that one AI agent can plan, implement, validate, and ship as one PR in one session. May span DB + API + UI when the layers form one coherent feature with a shared acceptance boundary. Output: `spec.md`.
+- **Umbrella** — work that genuinely cannot fit in one session: too large for one model context, requires shipping + observing one slice before the next can be designed (DB migration with bake time, telemetry-gated rollout), or composed of independent outcomes without a shared acceptance boundary. Output: `decomposition.md`.
 
-Umbrella signals (any one is enough; they compound):
+### What "fits in one session" means
 
-- **Scope words.** Issue body uses "rework," "migrate every," "redesign across," "all routes," "across the entire X," or similar bulk-application phrasing.
-- **Independent surfaces.** Multiple "Requested outcomes" that don't share a skeleton, or open questions that branch the design tree (e.g., "per-user vs per-team vs role+entity") such that the fork drives different file sets.
-- **Aggregate line-count threshold.** The set of files that would change exceeds a sane single-spec budget. Heuristic: > ~3000 LOC across the change set, or > ~5 unrelated route/page surfaces.
-- **Multiple unrelated touchpoints.** Blast-radius mapping returns a high count of files with no shared module ancestor — e.g., 8 route files in different feature folders.
-- **Existing pattern of decomposition.** Parent issue references prior child issues, or carries a label like `umbrella` / `epic` / `decompose-me` / `redesign`.
+You are decomposing for an AI agent, not a human team. The executor ships full verticals (DB + API + UI) in one session — there are no skill-stack boundaries between layers and no parallel-work coordination cost between humans. The threshold that matters is **model context window and validation budget**, not surface count.
 
-When umbrella shape is detected, switch artifact type immediately. Do not draft a partial `spec.md` and then convert; the artifacts are mutually exclusive.
+Weight these signals together. No single one is decisive:
+
+- **Total estimated change size.** Bounded typically lands <1500 LOC of additions across all layers. Above ~3000 LOC the umbrella case strengthens, but only when the work also cannot be sequenced inside one session.
+- **Shared acceptance boundary.** One user-visible outcome that confirms the whole change end-to-end ("operator toggles X and sees behavior change") = bounded, even across DB+API+UI. Independent outcomes that confirm separately ("eight feature-dense pages each become a section with sub-tabs") = umbrella.
+- **Inter-slice observability dependency.** Slice 2 cannot be safely designed until slice 1 ships and is observed (DB migration bake time, telemetry-gated rollout, schema change that needs production validation before next layer) → real umbrella. "Logically separable but could ship together" → not umbrella.
+- **Validation reach.** One validation gate confirms the whole change → bounded. Different gates per slice that don't run together → umbrella.
+- **Issue body framing.** Bulk-application phrasing ("rework," "redesign across," "all routes," "across the entire X") is *evidence* of umbrella shape, not a trigger. A small feature described in bulk language is still bounded; a genuinely large refactor described as a single ask is still umbrella.
+
+### Decision procedure
+
+1. Map rough blast-radius (directory-level estimate is enough; full file-level mapping comes later).
+2. Estimate total change size in LOC of additions across all touched layers.
+3. Answer the question: *"Could one AI agent ship this in one session?"* Name the constraint that would break — context, validation, observability dependency, or none.
+4. **Yes / probably yes** → `spec.md`. Multi-layer bounded work is handled via Blast-Radius Manifest (cross-layer file list), Skeleton Position (per-layer pattern fit), and Concrete Example (end-to-end illustration). Do not split for tidiness.
+5. **No, with a named constraint** → `decomposition.md`. The artifact's frontmatter must include `decomposition-rationale: <one-sentence citation of the constraint that ruled out single-session delivery>`. The reviewer reads this; so does the operator at breakdown approval.
+
+### Anti-patterns
+
+- **OR-of-signals reflex.** Do not auto-decompose because the issue mentions "all" or because it touches three layers. Multi-layer ≠ multi-session.
+- **Decomposing to demonstrate thoroughness.** A feature that fits one PR with a clear plan does not benefit from a 3-slice breakdown that adds N+1 PRs of process for the same delivered work.
+- **Ignoring shared acceptance boundary.** Three slices that each implement part of "user toggles X and sees behavior change" is the same one bounded thing, regardless of layer count.
+- **Avoiding umbrella when one is real.** When the work genuinely cannot fit (a 13K-LOC redesign across 8 independent sections, each its own validation surface), do not collapse to a heroic single spec. The umbrella path exists for this.
+
+When umbrella shape is chosen, switch artifact type immediately. Do not draft a partial `spec.md` and then convert; the artifacts are mutually exclusive.
 
 ## Breakdown outcome
 

@@ -16,9 +16,13 @@ The dispatch names the issue type (`Bug`, `Feature`, or `Refactor`). Follow the 
 
 ## Mandatory reads
 
-1. `.claude/skills/deliver-grooming/SKILL.md` — type postures, status enums, groundedness criteria, scope sanity principles, anti-patterns, hard rules. This is the policy. Pay particular attention to §Type postures, §Status enums, §Feature scope classification, §Groundedness criteria, §Anti-patterns.
+1. `.claude/skills/deliver-grooming/SKILL.md` — type postures, status enums, groundedness criteria, scope sanity principles, anti-patterns, hard rules. This is the policy. Pay particular attention to §Type postures, §Status enums, §Scope classification, §Groundedness criteria, §Anti-patterns.
 2. `.claude/skills/deliver-grooming/assets/spec-template.md` — the exact single-slice output shape. Fill this template; do not invent sections.
 3. `.claude/skills/deliver-grooming/assets/decomposition-template.md` — the exact umbrella output shape. Use this only when the issue is multi-slice.
+
+## Default toward bounded
+
+You are grooming for an AI agent that ships full verticals (DB + API + UI) in one session — no skill-stack boundaries, no parallel-work coordination cost between humans. Decomposition into a multi-PR umbrella is the **rare path**, reserved for work that genuinely cannot fit in one session: too large for one model context, requires shipping + observing one slice before the next can be designed (DB migration with bake time, telemetry-gated rollout), or composed of independent outcomes without a shared acceptance boundary. Default toward `spec.md`. Multi-layer ≠ multi-session. Apply SKILL.md §Scope classification's decision procedure deliberately — answer "could one AI agent ship this in one session?" with a named constraint when you choose umbrella, and write that constraint into the artifact's `decomposition-rationale` frontmatter field.
 
 ## Inputs
 
@@ -65,7 +69,7 @@ Fill the template at `.claude/skills/deliver-grooming/assets/spec-template.md`. 
 
 ### 0. Scope classification
 
-Apply SKILL.md §Feature scope classification before drafting anything. If multi-slice, fill `decomposition-template.md` at the injected `decomposition.md` path and stop. Do not draft a unified spec.
+Apply SKILL.md §Scope classification before drafting anything. Answer "could one AI agent ship this in one session?" with a named constraint if you choose umbrella. If umbrella, fill `decomposition-template.md` at the injected `decomposition.md` path (including the `decomposition-rationale` frontmatter field) and stop. Do not draft a unified spec. Default toward bounded — multi-layer is not multi-session.
 
 ### 1. Research existing pattern
 

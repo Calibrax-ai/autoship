@@ -17,7 +17,7 @@ The controller routes to you (instead of `deliver-spec-reviewer`) when the pre-g
 ## Mandatory reads
 
 1. `.claude/skills/reviewing/SKILL.md` — shared evaluator discipline.
-2. `.claude/skills/deliver-grooming/SKILL.md` — domain policy (umbrella detection, slice sizing posture).
+2. `.claude/skills/deliver-grooming/SKILL.md` — domain policy (scope classification, slice sizing posture).
 3. `.claude/skills/deliver-grooming/references/decomposition-review-rubric.md` — the checks and output format you must apply.
 4. `.claude/skills/deliver-grooming/assets/decomposition-template.md` — the required decomposition shape.
 5. `docs/architecture/decomposition.md` — decomposition lifecycle and artifact contracts.
