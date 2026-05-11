@@ -155,6 +155,8 @@ Deliver has canonically derivable local runtime states:
 
 Remote automatic runs also write `.autoship/issues/<id>/manifest.json` as the machine-readable execution ledger. The manifest records the current phase and artifact hashes; it does not replace reviewer judgment or validation. Legal remote manifest phases are `grooming`, `breakdown_proposed`, `decomposed`, `needs_attention`, `building`, and `in_review`. `spec_ready` is a deprecated compatibility alias for `needs_attention` in remote runs; rewrite it to `needs_attention` on the next controller-owned update. Accept existing `decomposition_proposed` manifests as compatibility aliases and rewrite them to `breakdown_proposed` on the next controller-owned update.
 
+When the manifest phase advances to `breakdown_proposed`, also write a top-level `calibration_outcome` block initialized to `{"status": "pending", "evaluated_at": null, "evidence": null}`. This field is filled in retroactively (`clean | amended | rejected`) when slice runs complete and lets the system measure whether APPROVED decomposition-reviewer verdicts hold up at slice time. Telemetry-only — does not gate routing. See `docs/architecture/decomposition.md § Calibration outcomes`.
+
 Remote durable checkpoint rule: the issue branch plus `manifest.json` and committed artifacts are correctness state. Claude session memory, trigger logs, Linear comments, and local run dirs are conveniences only.
 
 For remote runs:

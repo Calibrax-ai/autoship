@@ -233,9 +233,34 @@ Expected workflows:
 |---|---|---|
 | `decomposition.md` | The breakdown proposal: slices, DAG, surfaced concerns, open questions | Append-revised on re-grooming |
 | `reviews/decomposition-review-NN.md` | Decomposition-reviewer verdicts, one per pass | Append-only (one new file per pass) |
-| `manifest.json` | Per-issue execution ledger; phase = `breakdown_proposed` for breakdown runs, `decomposed` post-create-issues | Frozen on write |
+| `manifest.json` | Per-issue execution ledger; phase = `breakdown_proposed` for breakdown runs, `decomposed` post-create-issues. Includes `calibration_outcome` for breakdown manifests (see § Calibration outcomes below) | Frozen on write |
 | `inferences.jsonl` | Structured run-time inference trail (existing 0.3.0 artifact) | Append-only |
 | `decisions.log` | Prose run-time log (existing) | Append-only |
+
+## Calibration outcomes
+
+Every breakdown manifest carries a `calibration_outcome` block so the system can answer empirically: *"do APPROVED decomposition-reviewer verdicts hold up at slice time?"*
+
+Shape:
+
+```json
+"calibration_outcome": {
+  "status": "pending | clean | amended | rejected",
+  "evaluated_at": "<ISO timestamp; null while pending>",
+  "evidence": "<one-line explanation; null while pending>"
+}
+```
+
+Lifecycle:
+
+- **Write at breakdown manifest creation:** the controller writes `{"status": "pending", "evaluated_at": null, "evidence": null}` when first persisting a breakdown manifest. This signals "calibration not yet evaluable."
+- **Update retroactively when slices complete:** when all child issues from a decomposition reach a terminal state (merged, abandoned, or `Needs Attention`), a later run (or operator action) updates the parent's `calibration_outcome`:
+  - `clean` — all slices shipped without scope changes from the original decomposition.
+  - `amended` — one or more slices were re-scoped at slice grooming (the slice spec differs materially from what the breakdown described, beyond clarifying detail).
+  - `rejected` — the breakdown was abandoned or fundamentally restructured before slices shipped.
+- **Used for calibration, never for routing.** The runner surfaces `calibration_outcome.status` to telemetry (`autoship.calibration_outcome` span attribute) so operators can query "what fraction of APPROVED breakdowns held up?" over time. If the reviewer is too lenient, this number lags below an expected band (~80% clean) and the rubric needs tightening.
+
+V1 fills this field manually or via a scripted scan of child issue outcomes. Auto-fill from a `create-issues`-time hook is future work and explicitly out of scope here.
 
 `decomposition.md` and `spec.md` are mutually exclusive for a given issue: an umbrella produces a breakdown; a bounded change produces a spec. The same pre-groomer writes whichever one fits, and the controller routes to the appropriate reviewer.
 
