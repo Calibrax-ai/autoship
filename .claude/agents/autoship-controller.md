@@ -696,6 +696,27 @@ Before changing code, reconcile `manifest.json`, the PR branch, PR state, and th
 
 See [docs/architecture/decomposition.md](docs/architecture/decomposition.md) for the breakdown outcome's full lifecycle.
 
+### Outcome announcement body (single template for PR + Linear)
+
+The body that goes into the PR description and the body posted to Linear when an outcome is reached should be the **same markdown content**, generated from the same source. Today the PR carries the long form and Linear gets a one-liner pointer, but the design intent is that both surfaces serve the same operator-facing content. Treating it as one template now means a future shape migration (PR → GitHub Discussion, or PR → Linear-only) is a switch on *where* to post the body, not a re-templating of *what* the body says.
+
+Render the body from these inputs, in order:
+
+1. **Header.** `Autoship <outcome-kind> for [<issue-id>](<linear-url>).` Where `<outcome-kind>` is `breakdown`, `spec`, `need-info`, `blocker`, or `cannot-reproduce` per the outcome matrix.
+2. **Outcome paragraph.** One paragraph stating the user-visible result and what the operator is being asked to do (review, approve, unblock).
+3. **Artifact body.** For `breakdown`: outcome, slices table (slice-id / title / dependencies), cuts considered + picked, surfaced concerns, operator questions with type/status/default/effect, reviewer verdict summary, decomposition-rationale. For `spec`: outcome, AC, key fences, reviewer verdict summary. Use the artifact's own structure as the source — do not re-narrate.
+4. **Operator next-steps.** A short numbered list of the exact actions available to the operator (approve via Linear state change, run the verb command, amend the artifact, etc.). Concrete, paste-ready, no "see docs."
+5. **Surface-specific addendum (PR only).** "Files in this PR" list, branch name, commit SHA. This is the *only* section that doesn't translate to a Linear comment. When posting to Linear later, omit this section.
+
+Discipline:
+
+- **Self-contained.** Do not include affordances that only work in one surface ("comment below," "click the green button"). The body should read coherently in either context.
+- **Linear-compatible markdown.** No GitHub-specific shortcodes (`:emoji:` outside common ones, `@user` mentions that depend on GitHub graph). Tables, code blocks, links, and standard markdown render in both.
+- **One source per fact.** When the body cites a number (slice count, validation status, reviewer verdict), read it from the artifact or `manifest.json` — do not synthesize.
+- **Migration-ready.** A future `--no-pr` or `--linear-only` mode posts sections 1-4 to Linear and omits section 5. No other code path changes.
+
+For non-breakdown outcomes, the section list shrinks (e.g., `spec` doesn't have slices or operator questions), but the same five-section skeleton applies — header, outcome, artifact body, next-steps, optional surface-specific addendum.
+
 ### Create-issues phase
 
 Triggered by `autoship create-issues <issue-id>` or the compatibility alias `autoship materialize <issue-id>`. In remote magic mode, a Linear state change to `Breakdown Approved` may trigger the same phase. The verb or state transition *is* the operator's explicit consent for tracker mutation — same shape as `autoship deliver <id>` for build.
