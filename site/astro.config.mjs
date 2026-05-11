@@ -50,6 +50,10 @@ export default defineConfig({
                   ],
               },
               {
+                  label: 'Status',
+                  autogenerate: { directory: 'status' },
+              },
+              {
                   label: 'Archive',
                   collapsed: true,
                   autogenerate: { directory: 'archive' },
