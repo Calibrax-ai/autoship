@@ -609,7 +609,7 @@ Successful build PRs are human review handoffs, not just code diffs. Every compl
 
 For UI or frontend changes, include a `Preview Evidence` section in the PR body and mirror the same concise evidence links in the Linear build-complete comment when posting is enabled. Treat local Playwright CLI capture against a local dev server as the default evidence path; hosted preview evidence is a fallback when local capture is not feasible. After opening or updating the PR, check the PR body, comments, status checks, `oracle/result.md`, and `implementation/result.md` before finalizing the PR body and Linear comment. Distinguish preview URL available, screenshot evidence available, screen recording evidence available, visual evidence not captured, and preview unavailable after checking PR checks/comments/statuses. Prefer durable links when available; otherwise include the repo/run artifact paths recorded in `oracle/result.md` or `implementation/result.md`. Never say "no preview available" only because the implementation worker did not capture visual evidence. If capture fails, state the exact blocker: local boot failed, auth/dev-bypass missing, browser install failed, preview protected, missing preview URL, or another concrete cause.
 
-Before writing `verification/result.md`, parse `oracle/result.md`. Rerun the configured validation commands and every oracle-declared command under `verification` or `evidence-run` that is not already covered. Recompute every `oracle-files` hash. If any required evidence command fails, any frozen oracle file changed, or `oracle-files` is empty without an explicit `empty-oracle-rationale`, write `verification-failed` or `oracle-mutation-detected` and stop before commit/push/PR.
+Before writing `verification/result.md`, parse `oracle/result.md`. Rerun the configured validation commands and every oracle-declared command under `verification` or `evidence-run` that is not already covered **three times in succession**. All three runs must exit cleanly with consistent pass/fail counts. Recompute every `oracle-files` hash. Write `verification-failed` and stop before commit/push/PR if ANY of the following hold: any required evidence command fails on any of the three runs; any frozen oracle file changed; `oracle-files` is empty without an explicit `empty-oracle-rationale`; OR the three runs disagree on pass count (insufficient entropy in fixtures, timing-dependent state, order-dependent shared state — flakiness the worker's single-run pass cannot detect). Write `oracle-mutation-detected` only for the frozen-file-changed sub-case. Record per-run pass/fail counts in `validation-run` regardless of outcome; record a `flaky` blocker note when the failure was caused by inter-run disagreement so the operator knows to re-route the next dispatch to `deliver-oracle-writer` (entropy/timing fix) rather than `deliver-implementation` (production code fix).
 
 Write `verification/result.md` after implementation validation and oracle evidence verification, before any commit/push/PR:
 
@@ -621,8 +621,11 @@ written-at: <ISO timestamp>
 verification-outcome: verification-passed | verification-failed | oracle-mutation-detected
 validation-run:
   - command: <exact command run>
+    attempt: <integer 1..3>
     exit-code: <integer>
     status: passed | failed
+    pass-count: <integer>
+    fail-count: <integer>
 oracle-outcome: oracle-green | oracle-red-expected
 oracle-evidence-run:
   - command: <exact oracle evidence command rerun>

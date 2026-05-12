@@ -55,7 +55,7 @@ You may **not** write:
 1. Read the spec and `oracle/result.md`.
 2. Extract the frozen oracle/evidence file list from `oracle/result.md`.
 3. Implement the smallest production change that satisfies the spec and frozen oracle.
-4. Run the final validation commands provided in the dispatch.
+4. Run the final validation commands provided in the dispatch **three times in succession**. All three runs must exit cleanly with consistent pass/fail counts (same passing-test count, zero failures across every attempt). If any run fails OR the three runs disagree on pass count (e.g. one shows 220/221, another shows 221/221), classify as `implementation-failed` with a `test-suite-flaky` blocker note in `implementation/result.md` and surface the per-run counts. Single-run verification cannot catch probabilistic failures (insufficient entropy in fixtures, timing-dependent assertions, order-dependent shared state); the second and third runs are the cheap safety net. The autoship-controller also re-validates independently — agreement across both layers is required to proceed.
 5. For frontend/UI changes where the app can run locally, use Playwright CLI against the local dev server to capture post-implementation visual evidence: at least one screenshot, plus a short screen recording when correctness depends on interaction, animation, multi-step flow, hover/focus state, or responsive transition. Be adaptable: use the repo's native dev/start commands, seeded data, existing auth/dev-bypass paths, or a hosted preview when local capture is not feasible. If capture fails, record the exact attempted command and blocker in `implementation/result.md`.
 6. Confirm that none of the frozen oracle files were modified.
 7. Write `implementation/result.md` exactly once, after verification is complete.
@@ -73,7 +73,7 @@ How to classify:
 - **`implementation-passed`**
   Final validation commands pass and frozen oracle files are untouched.
 - **`implementation-failed`**
-  Production code still does not satisfy validation, or a blocker prevents a clean pass.
+  Production code still does not satisfy validation, a blocker prevents a clean pass, OR three consecutive validation runs disagree on pass count (test suite is flaky — record per-run counts in Blockers under a `test-suite-flaky` label).
 - **`oracle-mutation-detected`**
   Any frozen oracle/evidence file from `oracle/result.md` changed during implementation, intentionally or accidentally.
 
