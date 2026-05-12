@@ -77,6 +77,8 @@ Valid oracle outcomes:
 - `oracle-failed`
 - `oracle-insufficient-evidence`
 
+(Canonical enum table lives in `.claude/agents/autoship-controller.md` § Enum validation. The controller validates `oracle-outcome` mechanically on your return; invented values are caught before the oracle reviewer is dispatched.)
+
 How to classify:
 
 - **`oracle-red-expected`**
@@ -99,6 +101,32 @@ Do not force red just because you expect implementation later. If the correct ho
 - `oracle-files: []` is valid only for documentation-only, metadata-only, planning-only, or truly non-executable changes, and only with an explicit `empty-oracle-rationale`.
 - Typecheck, lint, route generation, and grep are supporting evidence. They are not a behavioral oracle by themselves.
 - Mocks can prove UI wiring. Fixtures or integration evidence prove real behavior. Do not mock away the behavior under test and call it green.
+
+## Assertion discipline
+
+Every assertion you write into a frozen oracle file becomes a design lock for the implementer. The frozen-file hash check means they cannot modify your assertions without failing verification. Treat each `expect(...)` as a contract you are imposing on every future implementation.
+
+**Two-step test for every assertion:**
+
+1. **Observable behavior, or internal design?** Could an external caller — a user, an HTTP client, a downstream service, a screen reader — detect the value you are asserting?
+
+   - Behavior: response status code, response body shape, persisted DB row shape, emitted events, redirects, ARIA attributes, side-channels callers can detect.
+   - Design: specific function/class names, internal call patterns, helper organization, file structure, private state shape.
+
+   **If design, remove the assertion.** Internal design is a code review concern, not an oracle contract. The oracle is for behavior the implementation cannot get wrong without users seeing it.
+
+2. **Did the spec explicitly constrain this specific value or shape?** Pin only the part the spec promised. Loosen the rest:
+
+   - Spec says "deny" → `toBeGreaterThanOrEqual(400)` or `toBeOneOf([401, 403])`, not `toBe(403)` unless the spec named 403.
+   - Spec says "log the actor" → `toBeTruthy()` + type check, not exact UUID equality.
+   - Spec says "return JSON with field X" → `toHaveProperty('X')` + value-type check, not exact field order or sibling-field exact match.
+   - Spec says nothing about timing → no timing assertion at all.
+
+   If you cannot determine whether the spec constrained a specific value, **loosen the assertion and add a `claims-verified` entry that names the behavior actually constrained** — not the specific value.
+
+**Refactor oracles are the explicit exception.** The existing test surface IS the spec; preservation contract makes byte-level specifics (exact error strings, exact header shapes, exact ordering) part of the observable behavior. Preserve those assertions byte-for-byte. The REF-001 `c.json(...)` vs `new Response(...)` choice — preserving `charset=UTF-8` in the content-type header — was preservation discipline working correctly, not over-locking.
+
+**If you find yourself writing `expect(...).toBe(<specific value>)` and the spec did not name that specific value, you are pinning design.** Loosen or remove.
 
 ## Artifact format
 
@@ -186,3 +214,4 @@ Return <=100 words:
 - Do not hide missing evidence under `oracle-green`. If the evidence is insufficient, use `oracle-insufficient-evidence`.
 - Prefer the smallest oracle that proves the spec, not a full-suite rewrite.
 - Prefer real user/system behavior over mocks. If a mock is used, say exactly what it proves and what it does not prove.
+- **Pin behavior, never design.** Every frozen assertion is a permanent design lock. Apply the two-step test from § Assertion discipline to every `expect(...)` you write. If the spec did not constrain the specific value, loosen the assertion. Refactor oracles are the named exception — existing test specifics ARE the preservation contract.

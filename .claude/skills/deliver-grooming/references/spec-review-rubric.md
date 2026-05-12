@@ -23,7 +23,7 @@ For Feature, check conditional subsections required by blast-radius shape: migra
 
 For Refactor, check all three Behavior Preservation subsections: What must be preserved, Preservation Proof, Structure Improvement.
 
-A missing or placeholder required field is `FAIL`. An invented status value outside `SKILL.md` Status enums is `FAIL`.
+A missing or placeholder required field is `FAIL`. (Invented status values are not your check — the controller catches enum violations mechanically before you are dispatched. See `autoship-controller.md` § Enum validation.)
 
 ### Check 2 - Groundedness
 
@@ -51,6 +51,23 @@ A verdict without the checklist — or with fewer entries than the spec has cita
 - For Refactor executable behavior evidence, confirm each listed test/evidence file exists and imports, calls, or exercises the refactor target. If a refactor cites existing behavior tests but omits a runnable command that exercises them, `FAIL`.
 
 Any unverifiable claim, mismatched citation, or hallucinated invariant is `FAIL`. Minor citation imprecision (line off by a few LOC) where the underlying claim still holds may PASS but goes in `## Notes (non-blocking observations)` with the corrected anchor.
+
+**Pass A — External library citations (mandatory when `External Library Claims` section is present).** For every entry in the spec's `External Library Claims` section, verify the cited source actually grounds the claim:
+
+- **Docs URL:** open with `WebFetch` (or read the cached docs in `node_modules/<package>/README.md` / `docs/` when offline). The cited URL must be a primary source (the library's own docs, RFC, or specification — not a Stack Overflow answer or a blog post). The fetched content must literally describe the behavior the spec claims; paraphrases that don't match the source FAIL.
+- **`file:line` in vendored source / node_modules:** open with `Read` at the cited range. The code must literally implement what the claim says.
+- **Executable probe command:** record the command and the spec's claimed expected output. (Running it is not your job — that's the controller's baseline-runnability check below. Your job is to verify the command + expected output are well-formed and probe what the claim states.)
+
+A claim with no `Source:` field is `FAIL`. A claim citing a non-primary source (Stack Overflow, Medium, GitHub Discussions outside the library's own repo) is `FAIL`. A claim whose source does not literally match the claim is `FAIL`.
+
+**Pass B — Baseline runnability (mandatory).** The controller has run every runnable command the spec cites and written results to the injected `baseline-runnability.txt` path. Walk the file. For each entry:
+
+- **Refactor specs (`type: Refactor`):** any command cited under `Preservation Proof → Executable behavior evidence` that shows `FAIL` at baseline is the documented `REF-001` Groundedness blind spot — `FAIL` on Check 2 unless the spec explicitly lists this command under `Coverage gaps (require regression tests BEFORE refactor lands)` instead of as covering evidence. A spec cannot claim a test "covers" an invariant when the test does not pass at baseline.
+- **Bug specs (`type: Bug`):** the AC verification command should typically `FAIL` at baseline in a way that matches the reported symptom. If baseline is unexpectedly green, that contradicts `reproduction-status: confirmed`; `FAIL` on Check 2.
+- **Feature specs (`type: Feature`):** AC verification commands typically `FAIL` at baseline (the feature doesn't exist yet — `oracle-red-expected` shape). Unexpected baseline green is non-blocking but warrants a `Notes` entry asking whether the AC is too weak to discriminate.
+- **`NOT_RUN` entries:** if the controller flagged a command as destructive or timed out, surface it in `Notes` with the recovery instruction (sandbox / split / rewrite). Not blocking on its own.
+
+Specs that cite no runnable commands (rare; only certain doc-only or pure-typing-change refactors) skip Pass B with an explicit note.
 
 ### Check 3 - Scope sanity
 
@@ -95,7 +112,13 @@ blocking-objection: null | "<highest-priority objection>"
 <one paragraph, citing specific sections or fields>
 
 ## Check 2 - Groundedness: PASS | FAIL
-<one paragraph, citing specific claims and whether they verify>
+<one paragraph, citing specific claims and whether they verify. Then two named sub-passes:>
+
+### Pass A — External library citations
+<for each `External Library Claims` entry, name the source kind (URL / file:line / probe) and the verification result; or "(no External Library Claims section — skipped)">
+
+### Pass B — Baseline runnability
+<walk `baseline-runnability.txt` entries; call out any cited "covering" command (Refactor) that failed at baseline, or any AC command whose baseline result contradicts the spec's stated status (Bug confirmed but AC green; or Feature/Refactor with surprise outcomes). Quote the command + exit code. Specs that cite no runnable commands skip this pass with an explicit note.>
 
 ## Check 3 - Scope sanity: PASS | FAIL
 <one paragraph>

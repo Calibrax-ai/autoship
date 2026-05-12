@@ -41,6 +41,16 @@ Apply this in two passes:
 - File-existence (`ls`) check passed by an empty stub file.
 - "Refs removed" grep passed by renaming the ref while keeping the underlying behavior.
 
+**Pass C — behavior vs design discipline (mandatory).** Every frozen assertion is a permanent design lock; the implementer cannot pass verification without satisfying it. Apply the oracle-writer's two-step test (`.claude/agents/deliver-oracle-writer.md` § Assertion discipline) to each `expect(...)` in the controller-extracted assertion list (`oracle/assertions.txt` — injected with this dispatch). For every entry:
+
+1. **Observable behavior, or internal design?** If the asserted value is internal design (specific function/class names, helper organization, file structure, private state shape), FAIL Check 2 — the assertion belongs in code review, not in the oracle.
+
+2. **Spec-constrained, or pinning beyond the spec?** If the spec did not explicitly constrain the specific value (`toBe(403)` when spec said only "deny"; `toBe('User is disabled')` when spec said only "denied with reason"; `toBe(<exact UUID>)` when spec said only "log the actor"), FAIL Check 2 unless the oracle-writer cites the exact spec line constraining the specificity.
+
+Each over-pinned assertion locks the implementer into one of several valid behaviors when the spec only named the broader contract. The fix is to **loosen** (`toBeOneOf`, `toMatch`, `toBeTruthy`+type check, `toHaveProperty`) or **remove** (if internal design), not to keep the over-pin.
+
+**Refactor oracles are the named exception.** When the spec's preservation contract makes byte-level specifics observable behavior (exact error strings, header shapes, ordering), pinning specifics IS the contract — review against the spec's stated invariants, not the general two-step test. Confirm `preservation-status: ready` or `needs-coverage-first` in the spec frontmatter before applying the exception.
+
 UI/frontend issues require at least one behavioral or visual evidence layer (E2E spec, component test, browser/preview check, screenshot, screen recording) OR a documented runner-tooling blocker that names the exact missing capability. A UI feature whose entire AC set is `coverage: structural` plus typecheck is FAIL on Check 2 unless the spec explicitly accepts that floor and the writer's `evidence-not-run` section justifies it with concrete tooling claims.
 
 If the spec invokes existing test infrastructure (e.g., the customer's `frontend/CLAUDE.md` § Testing chain, an existing Playwright suite at `e2e/`, a pre-existing Vitest/Jest config), the oracle must invoke it OR `evidence-not-run` must justify the omission with a runner-capability claim. Silent omission of mandated test chains is FAIL.
@@ -77,7 +87,7 @@ blocking-objection: null | "<highest-priority objection>"
 <one paragraph, citing oracle-outcome and evidence-run entries that prove or disprove>
 
 ## Check 2 - Evidence sufficiency: PASS | FAIL
-<one paragraph; explicitly include the soundness probe — for each structural AC, name a broken implementation that passes ("AC<n> grep `<pattern>` is defeated by <broken impl>; oracle would PASS")>
+<one paragraph; explicitly include the soundness probe — for each structural AC, name a broken implementation that passes ("AC<n> grep `<pattern>` is defeated by <broken impl>; oracle would PASS"). Then include the behavior-vs-design pass — walk `oracle/assertions.txt` and call out any over-pinned assertions ("`tabs.spec.ts:194 expect(second).toBeFocused()` after ArrowRight — spec at brief.md:19 explicitly says 'focuses + activates'; correctly pinned" / "`auth.test.ts:42 expect(res.status).toBe(403)` — spec said 'deny' without naming a status code; FAIL — loosen to `toBeOneOf([401, 403])`").>
 
 ## Check 3 - Honesty/risk discipline: PASS | FAIL
 <one paragraph, citing evidence-not-run / residual-risk / human-review-needed entries>

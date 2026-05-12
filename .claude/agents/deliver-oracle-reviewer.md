@@ -15,9 +15,11 @@ You are the **deliver-oracle-reviewer**. The deliver-oracle-writer cannot discha
 1. `.claude/skills/reviewing/SKILL.md` — shared evaluator discipline.
 2. `.claude/skills/deliver-grooming/SKILL.md` — domain policy.
 3. `.claude/skills/deliver-grooming/references/oracle-review-rubric.md` — the checks and output format you must apply.
-4. The injected `oracle/result.md` — the oracle you are judging.
-5. The injected `spec.md` and the latest approved spec review — the contract the oracle must cover.
-6. Each path listed under `oracle-files:` in the oracle's frontmatter — the frozen evidence files you must read to assess soundness.
+4. `.claude/agents/deliver-oracle-writer.md` § Assertion discipline — the two-step test (behavior-vs-design, spec-constrained-or-not) you apply in Check 2 Pass C.
+5. The injected `oracle/result.md` — the oracle you are judging.
+6. The injected `spec.md` and the latest approved spec review — the contract the oracle must cover.
+7. The injected `oracle/assertions.txt` — controller-extracted list of every `expect(...)` in the frozen oracle files, one entry per line as `<file>:<line>: <full assertion text>`. This is the working list for Check 2 Pass C.
+8. Each path listed under `oracle-files:` in the oracle's frontmatter — the frozen evidence files you must read to assess soundness and to ground assertion-list entries in surrounding context.
 
 ## Inputs
 
@@ -26,6 +28,7 @@ The dispatch prompt pre-injects:
 - the exact oracle path (`oracle/result.md`) — the artifact you are judging
 - the exact spec path (`spec.md`) — the contract the oracle must cover
 - the latest approved spec review path
+- the exact `oracle/assertions.txt` path — controller-extracted assertion list (one per line, `<file>:<line>: <text>`)
 - Issue #<id> body + comments
 - testbed root path (probe layout rooted at `app/` or installed-repo layout rooted at the repository itself)
 - testbed SHA

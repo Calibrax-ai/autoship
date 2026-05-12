@@ -250,6 +250,78 @@ Per-track comment and state-transition policy (deliver defaults, audit approval 
 
 Repo or org standards are a different layer. Preferred hosting, CI, observability, migrations, and secrets policy belong in `.autoship/standards.yaml`, not in worker prompts. For audit specifically, treat `.autoship/standards.yaml` as the policy source, repo artifacts such as `.env.example` and CI config as evidence, and freeform inference as the last resort. If no standard exists, return `decision-required` rather than inventing one.
 
+## Enum validation
+
+You parse frontmatter at every worker return — see § The load-bearing discipline, point 7. At each parse, before deciding the next dispatch, walk every enum field present in the parsed frontmatter against the canonical table below. A field whose value is not in its allowed list is an **enum violation**.
+
+Three occurrences across probes 0.1 / 0.3 / 0.5 have shown reviewers' Check 1 silently accepting invented status values (`design-status: ready`, `design-status: drafted` when the enum was `drafted-with-gaps | need-info | ready`, etc.). This check moves the work to a mechanical channel where the failure mode can't recur.
+
+### Enum table (canonical)
+
+| Field | Allowed values |
+|---|---|
+| `artifact` | `spec` \| `decomposition` \| `review` \| `oracle` \| `verification` |
+| `type` | `Bug` \| `Feature` \| `Refactor` \| `decomposition` |
+| `trigger` | `first-groom` \| `regroom` |
+| `controller-status` | `ready` \| `need-info` |
+| `reproduction-status` | `confirmed` \| `cannot-reproduce` \| `need-info` |
+| `design-status` | `drafted` \| `need-info` |
+| `preservation-status` | `ready` \| `needs-coverage-first` \| `need-info` |
+| `verdict` | `APPROVED` \| `REJECTED` |
+| `oracle-outcome` | `oracle-red-expected` \| `oracle-green` \| `oracle-failed` \| `oracle-insufficient-evidence` |
+| `coverage` | `behavioral` \| `structural` \| `visual` \| `integration` \| `supporting` |
+| `verification-outcome` | `verification-passed` \| `verification-failed` \| `oracle-mutation-detected` |
+| `human-review-needed` | `true` \| `false` |
+
+This table is canonical. `.claude/skills/deliver-grooming/SKILL.md` § Status enums and `.claude/agents/deliver-oracle-writer.md` list the worker-facing subsets they emit; if any of them disagree with this table, **this table wins** until the discrepancy is reconciled.
+
+### Procedure
+
+After parsing an artifact's frontmatter at any worker return (pre-groomer, any reviewer, oracle-writer, implementation, controller-owned verification, audit-auditor, audit-reviewer):
+
+1. Walk every key in the parsed frontmatter. If a key appears in the enum table, check whether its value — after YAML-trim, case-sensitive, exact-match — is in the allowed list.
+2. If every key/value passes, proceed with normal routing as today.
+3. If any key fails, do not dispatch the next worker. Apply § Enum violation handling below.
+4. Keys absent from the enum table are not validated — they may be domain-specific metadata (e.g., `worktree`, `branch`, `oracle-files`). Log unknown keys as a one-line advisory in `decisions.log`; do not block on them.
+
+### Enum violation handling
+
+An enum violation is a structural defect in the worker's output, not a judgment failure. Skip the reviewer; re-dispatch the worker that emitted the artifact:
+
+| Emitting worker | Re-dispatch action |
+|---|---|
+| `deliver-pre-groomer` | regroom |
+| `deliver-oracle-writer` | rewrite |
+| `deliver-spec-reviewer` / `deliver-decomposition-reviewer` / `deliver-oracle-reviewer` | re-judge |
+| `deliver-implementation` | re-implement |
+| audit-auditor / audit-reviewer | re-audit / re-review |
+
+Inject the violation as the corrective feedback for the next attempt. Name the field, the invalid value, the allowed list, and the source path. Example for a pre-groomer emitting `design-status: drafted-with-gaps`:
+
+> Re-grooming FRD-162. Prior output had a frontmatter enum violation; not dispatching reviewer.
+>
+> **Violation:**
+> - field: `design-status`
+> - value: `drafted-with-gaps`
+> - allowed: `[drafted, need-info]`
+> - source: `.autoship/issues/FRD-162/spec.md` (latest)
+>
+> Required: emit a value from the allowed list, or emit `need-info` if the spec genuinely cannot be classified. Do not invent labels.
+
+### Counter and parse-failure rules
+
+- **Enum violations count against `max_regroom_cycles`** (default 3 — same counter as REJECTED-review regrooms). Three consecutive enum violations from the same worker on the same artifact → park at `Needs Attention` with a `blocker-escalation` report; the worker cannot honor the schema and the failure is structural, not transient.
+- **Frontmatter parse failure** (malformed YAML, no frontmatter block at all) is the same class as an enum violation. Re-dispatch the emitting worker with the parse error injected as feedback; count one regroom cycle; do not dispatch the reviewer.
+
+### Scope discipline
+
+The enum check is mechanical and bounded. It does NOT:
+
+- Replace Check 1 (well-formedness) of any reviewer rubric. Required-field presence, section completeness, type-specific section conformance — those remain reviewer judgment.
+- Validate semantic correctness (is `design-status: drafted` actually right for this issue's content? — reviewer judgment).
+- Validate cross-field consistency (`type: Bug` with a `design-status` field set — reviewer judgment).
+- Enforce field presence — the check applies only to fields that ARE present in the frontmatter.
+
 ## Anti-patterns (explicit rejections)
 
 - **Agents writing to Linear or GitHub** — breaks workflow-surface ownership.
@@ -545,10 +617,10 @@ Per-issue terminals (`Spec Ready` in supervised mode, `Breakdown Proposed`, `Nee
 Dispatch workers via fresh subprocess sessions from the autoship root. Each dispatch pre-injects the inputs declared in the worker's agent definition.
 
 - **deliver-pre-groomer** — when neither `spec.md` nor `decomposition.md` exists, or after a REJECTED review (spec-review or decomposition-review). The pre-groomer's output type depends on scope classification: bounded issues produce `spec.md`; umbrella issues produce `decomposition.md` (see `.claude/skills/deliver-grooming/SKILL.md` § Scope classification — the pre-groomer defaults toward bounded and only outputs `decomposition.md` when work genuinely cannot fit in one AI-agent session).
-- **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`
+- **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`. **Before dispatch**, the controller extracts every runnable command the spec cites and runs it at the testbed SHA, capturing baseline pass/fail. Sources of runnable commands: `Acceptance Criteria` lines with `Verification: \`<cmd>\`` patterns, Refactor `Preservation Proof → Executable behavior evidence` blocks, and the spec's top-level `Verification:` line if present. The controller writes results to `.autoship/issues/<id>/baseline-runnability.txt` (one entry per line, `<command> | <exit-code> | <status> | <stdout/stderr tail>`), uses a 120-second per-command timeout, skips commands matching destructive patterns (`rm -rf`, `drop`, `git reset`, migration rollbacks) and labels them `NOT_RUN: destructive pattern`. This is mechanical — the controller runs commands; the reviewer judges what the results mean for Groundedness. Pre-injects spec path, `baseline-runnability.txt` path, testbed root, testbed SHA, and the exact review output path. The reviewer applies the rubric's baseline-runnability pass (Check 2 Pass B) against the extracted results — for Refactor specs especially, a cited "covering" test that FAILS at baseline is the documented Groundedness blind spot from REF-001 (`docs/deliver-learnings.md:179-191`).
 - **deliver-decomposition-reviewer** — after every pre-groom/regroom pass that produced `decomposition.md`
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Breakdown outcomes do not progress to oracle; the parent issue's terminal is `Breakdown Proposed` until the operator approves child-issue creation.)
-- **deliver-oracle-reviewer** — after every oracle-write/rewrite that produced `oracle/result.md` with `oracle-green` or `oracle-red-expected`, and no `reviews/oracle-review-NN.md` covers the latest oracle. Pre-injects oracle path, spec path, latest spec-review path, every `oracle-files:` path, testbed root, and the exact review output path (`reviews/oracle-review-NN.md`). (`oracle-failed` / `oracle-insufficient-evidence` short-circuit to `Needs Attention` without review — the writer already declared the oracle untrustworthy.)
+- **deliver-oracle-reviewer** — after every oracle-write/rewrite that produced `oracle/result.md` with `oracle-green` or `oracle-red-expected`, and no `reviews/oracle-review-NN.md` covers the latest oracle. **Before dispatch**, the controller extracts every `expect(...)` assertion from every path listed under `oracle-files:` and writes them to `.autoship/issues/<id>/oracle/assertions.txt` (one entry per line, `<file>:<line>: <full assertion text>`). This is a mechanical grep (`grep -nE '^\s*(await\s+)?expect\(' <oracle-file>` across each frozen file), not judgment — the controller does the extraction so the reviewer judges with the full list in hand rather than scanning files. Pre-injects oracle path, spec path, latest spec-review path, every `oracle-files:` path, `oracle/assertions.txt` path, testbed root, and the exact review output path (`reviews/oracle-review-NN.md`). The reviewer applies the rubric's behavior-vs-design Pass C against the extracted list. (`oracle-failed` / `oracle-insufficient-evidence` short-circuit to `Needs Attention` without review — the writer already declared the oracle untrustworthy.)
 - **deliver-implementation** — `oracle/result.md` exists with `oracle-green` or `oracle-red-expected`, latest `reviews/oracle-review-NN.md` is APPROVED, and no `implementation/result.md`. If `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence`, park the issue at `Needs Attention` with the oracle blocker; do not dispatch implementation.
 
 Reviewer routing is mechanical: presence of `spec.md` → `deliver-spec-reviewer`; presence of `decomposition.md` → `deliver-decomposition-reviewer`. The two artifacts are mutually exclusive — never both for the same issue in the same run.

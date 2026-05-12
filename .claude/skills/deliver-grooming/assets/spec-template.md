@@ -55,6 +55,13 @@ OR
 # Intended Layout                  [Frontend/UI only]
 <concise ASCII sketch of the main screen, panel, or component arrangement; expose hierarchy, navigation, tab/sidebar placement, empty states, and primary actions>
 
+# External Library Claims          [optional — include when spec relies on third-party behavior]
+<every claim about how an external library, framework, runtime, browser, OS, or third-party service behaves — anything not in the testbed's own source tree. Each entry must cite a primary source the reviewer can verify cheaply.>
+- "<exact claim about external behavior the spec relies on>"
+  Source: <one of: docs URL with anchor | `file:line` in node_modules / vendored source | executable probe command + expected output>
+- "<next claim>"
+  Source: <...>
+
 # Failure Modes                    [optional — include when runtime risk exists]
 <bulleted list of failure scenarios the change must handle or explicitly defer>
 
