@@ -85,7 +85,7 @@ You are decomposing for an AI agent, not a human team. The executor ships full v
 
 Weight these signals together. No single one is decisive:
 
-- **Total estimated change size.** Bounded typically lands <1500 LOC of additions across all layers. Above ~3000 LOC the umbrella case strengthens, but only when the work also cannot be sequenced inside one session.
+- **Total estimated change size.** Calibrated for AI-agent-led delivery: typical bounded slices land in the **2000–5000 LOC** band (additions across all layers, including tests + UI + infra + docs). Modern context windows easily hold a whole feature plus tests; the constraint is verifier trust and one integration test, not implementer memory. Above ~5000 LOC the coherence ceiling strengthens the umbrella case, but only when the work also cannot be sequenced inside one session. Below ~500 LOC, planning overhead dominates (autoship spec + review + oracle artifacts can be longer than the code itself) — look for a coupled sibling to merge into a bigger bounded slice rather than auto-decomposing. For human-led delivery the ceiling shifts down to ~1500 LOC; this skill is calibrated for agents.
 - **Shared acceptance boundary.** One user-visible outcome that confirms the whole change end-to-end ("operator toggles X and sees behavior change") = bounded, even across DB+API+UI. Independent outcomes that confirm separately ("eight feature-dense pages each become a section with sub-tabs") = umbrella.
 - **Inter-slice observability dependency.** Slice 2 cannot be safely designed until slice 1 ships and is observed (DB migration bake time, telemetry-gated rollout, schema change that needs production validation before next layer) → real umbrella. "Logically separable but could ship together" → not umbrella.
 - **Validation reach.** One validation gate confirms the whole change → bounded. Different gates per slice that don't run together → umbrella.
@@ -113,6 +113,36 @@ When umbrella shape is chosen, switch artifact type immediately. Do not draft a 
 For umbrella issues, the deliver-pre-groomer writes `decomposition.md` instead of `spec.md`. The artifact uses `artifact: decomposition`, `controller-status: ready`, and `type: decomposition` in frontmatter — see `assets/decomposition-template.md`.
 
 After writing `decomposition.md`, the controller dispatches `deliver-decomposition-reviewer` (not `deliver-spec-reviewer`). The reviewer applies five checks (Groundedness, Slice sizing, Dependency correctness, Surfaced concerns load-bearing, Question discipline) — see `references/decomposition-review-rubric.md`.
+
+### Slice quality — the four checks
+
+When decomposition IS the right shape, each slice must pass these four checks in order. The first failure means re-cut. The pre-groomer applies them while authoring; the reviewer re-applies them to catch slips.
+
+1. **Name the function.** Describe what the slice does in one sentence, using a verb a non-engineer would understand. If the sentence mentions a file, a function name, or a layer (backend/frontend/infra), the slice is mis-cut — restart from the capability. A slice is *what is delivered*, not *what code is written*.
+
+   | Slice IS (capability) | Slice is NOT (implementation step) |
+   |---|---|
+   | "Members can be invited and accept invitations" | "Implement `createInvitation` with duplicate checks" |
+   | "Webhook ingestion drops to DLQ after 3 retries" | "Add retry counter column to webhook_events" |
+   | "Add a search bar to the chat list" | "Build the SearchInput component" |
+
+2. **End-to-end completeness.** Does the slice deliver the function from the entry point a user/operator touches all the way to the underlying state change? If the slice produces output that no other shipped code consumes, OR consumes input that no other shipped code produces, it is coupled to its missing half — merge them.
+
+3. **One contract, one owner.** If any two slices in the breakdown reference each other's contracts (envelope shape, error code, response field, sequencing requirement, schema column), they are the same slice. Distributed contracts produce integration failures the reviewer guards against — envelope drift, sequencing skew, half-done feature, schema-code skew, test orphaning, doc-code skew. The fix is always the same: merge coupled slices until the contract has one owner.
+
+4. **One integration test exists at the boundary.** Each slice has one test file that exercises its contract end-to-end — a test that would fail if the function stopped working from the user's perspective, not a unit test of an internal function. If you can't name that test file today, the slice is mis-cut.
+
+Stop at the first failure and re-cut.
+
+### When fine slicing IS correct
+
+Fine slicing into many small pieces is right when:
+
+- Slices have genuinely independent contracts (different services, different consumers, different release cadences)
+- Each slice produces an observable change someone could verify alone
+- Slices ship on different cadences (a dependency upgrade is its own slice, not coupled to the feature using it)
+
+Rule of thumb: fine slicing is for parallel work with clear boundaries; coarse slicing is for one user-visible feature.
 
 Once the breakdown is approved, the controller updates the already-created issue branch, opens or updates the `[Breakdown]` draft PR, and parks the parent issue at `Breakdown Proposed`. The operator reviews the PR and either moves the parent to `Breakdown Approved` or runs `autoship create-issues <id>` to create child issues in Linear and start dependency-free slices. The full lifecycle lives in `docs/architecture/decomposition.md`.
 

@@ -100,6 +100,7 @@ Flags always win. `--report-only` and `--tracker=none` are respected even if `de
 - **Speak plainly to humans.** This document uses internal architecture terms (`RunRequest`, generator-evaluator, structural handoff, eligibility filter) for precision. They belong in your reasoning, not in your user-facing speech. When narrating progress, halts, or errors to the operator, translate. Say "I'll figure out what to run by reading your prompt, `.autoship/defaults.yaml`, and the framework defaults" — not "resolving the RunRequest." Say "I'll send this spec to a reviewer" — not "structural handoff to deliver-spec-reviewer." The terms are tools for thinking, not labels to read aloud.
 - **Interpret natural language with the operator's config in hand.** When a prompt says "my Todo issues", read `.autoship/defaults.yaml`, resolve the configured Linear scope (`team_key`, optional `project`, `owner: me`, `states.groom`), list the matching issues, and preview the exact set before acting. If the prompt asks to build, use explicit issue IDs or `states.build`; never infer a broad build batch from "Todo".
 - **Deprecated defaults warning.** If `.autoship/defaults.yaml` contains v0.2 deliver keys (`deliver.tracker`, `deliver.linear.claim`, `state_types`, `deliver.pr`, `approval_mode`, `max_regroom_cycles`) or the pre-0.5 handoff key `decomposition_proposed`, warn once at run start and explain the current shape: choose exactly one of `deliver.linear` or `deliver.folder`; Linear uses `owner: me`, `states.groom`, optional supervised `states.build`, and `breakdown_proposed`; PR defaults are draft, `origin`, and the detected repo default branch.
+- **Goal-state discipline overrides status checkpoints.** See § Goal-state discipline for the top-of-turn diff, oracle-gating decision, and re-probe rule. When this section and an older rule disagree on *when to park* (e.g. "if an in-progress step has a completed artifact, do not redo work"), the goal-state discipline wins. The older rules still govern what is *allowed* (generator-evaluator separation, frozen oracle by hash when invoked, fresh context, no merge/deploy/release).
 
 ## Autoship in one paragraph
 
@@ -166,7 +167,7 @@ For remote runs:
 - After every worker returns, validate the expected artifact, parse only the structured/frontmatter fields needed for routing, then commit and push the artifact plus `manifest.json` with `step_status: completed` or `blocked`.
 - Before every external mutation beyond the checkpoint push itself (PR open/update, PR comment, Linear state/comment, Linear child creation), write the intended action and idempotency key into `manifest.json`, commit, and push.
 - After every external mutation, write the resulting external id or URL into `manifest.json`, commit, and push.
-- On rerun, reconstruct from the issue branch, `manifest.json`, committed artifacts, existing PR by branch, and Linear issue/slice identifiers. If an `in_progress` step has no completed artifact, rerun that step idempotently.
+- On rerun, reconstruct from the issue branch, `manifest.json`, committed artifacts, existing PR by branch, and Linear issue/slice identifiers. If an `in_progress` step has no completed artifact, rerun that step idempotently. If a step has a completed artifact but the goal-state diff (§ Goal-state discipline) shows the goal isn't achieved AND a concrete path forward exists, take that path — completed artifacts are evidence, not stopping conditions.
 
 `session_id` is optional resume acceleration. It is never the source of truth for correctness.
 
@@ -214,6 +215,54 @@ Work advances past specific cost/risk boundaries only at approval gates:
 In human mode: operator confirmation or an explicit command confirms each boundary. In unattended mode: only configured strict eligibility can advance work; typed blockers halt at `needs-human-input`.
 
 Never promote work silently past a boundary. Every promotion is either an operator action or an explicit reviewer APPROVED.
+
+## Goal-state discipline
+
+This is a top-of-every-turn invariant that overrides any rule treating artifact completion as a stopping condition. Hold this discipline alongside the load-bearing rules above; when those rules and this one disagree on *when to park*, this one wins. The load-bearing rules still govern *what is allowed* (generator-evaluator separation, frozen oracle by hash when an oracle was invoked, fresh context, no merge/deploy/release).
+
+### The principle
+
+The issue is the goal. The artifacts are evidence of progress toward the goal, not approval to stop.
+
+- Status-driven: "an in-progress step has a completed artifact → do not redo work."
+- Goal-driven: "the goal has been achieved → stop. Otherwise, what concrete path forward exists, and have I tried it?"
+
+Letting status win over goal is a recurring failure mode. Status is a fact about the past; the goal is what the controller serves.
+
+### Top-of-turn goal-state diff
+
+Before reading `manifest.json` or selecting the next pipeline step, observe:
+
+1. **What is the goal?** Read the issue's `Outcome` line in the spec (or the Linear issue body when no spec exists yet). If you cannot articulate the goal in one sentence, stop and write a `kind: halt-on-ambiguity` record — the rest of the loop depends on this.
+2. **Where is the work?** Observe state on disk and on the remote: does a PR exist? Has implementation landed? Build green? Tests pass? Does Linear state match the achieved outcome?
+3. **Has the goal been achieved?** If yes, the run-terminal is reached; persist state and stop.
+4. **If not, what concrete path forward exists, and have I tried it this run?** Check the manifest's `resume_attempts`. If the same path was tried this issue and produced the same outcome, the next attempt must be a different path or must include new context that changed the failure mode — do not loop. If the only path is blocked on something only a human can provide (product decision, credential, infra resource you cannot acquire), park at `Needs Attention`. Otherwise take the path.
+
+A `completed-artifact` state with `goal-not-achieved` is **resume territory**, not a terminal.
+
+### Oracle as tool, not phase
+
+The spec → oracle → oracle-review → implementation → verification pipeline is a powerful but expensive tool. It exists to defend against the implementer agent's tendency to silently rewrite the judge. Invoke it when that failure mode is plausible; skip it when CI + types + PR review already cover the risk.
+
+**Decision test, asked during the goal-state diff:**
+
+> Does invoking the oracle prevent a failure that nothing else catches?
+>
+> - CI + types + PR review already cover this slice's failure modes? → skip the oracle, ship via standard channels.
+> - Failure mode is invisible to types/CI (cross-cutting refactor, multi-step AC, behavior change without a clear repro)? → oracle is load-bearing, write and freeze it.
+> - The cost of writing it exceeds the cost of getting it wrong? → skip.
+
+Default skip for: config tweaks, single-line changes, type-enforced shape changes, pattern-extensions of mechanisms already covered by existing tests. Default invoke for: cross-cutting refactors, multi-AC features spanning modules, behavior changes without an observable repro, anything where the failure mode would be invisible to types and CI. When uncertain whether the slice falls on the skip side, invoke the oracle — over-investment is recoverable; silent drift is not.
+
+This is **not** a relaxation of anti-cheating discipline. When you choose to invoke the oracle, every rule in § The load-bearing discipline still applies for the duration of that slice — generator-evaluator separation, frozen-by-hash, fresh-context reviewers. The change is only that "invoke the oracle" is now your decision, not a pipeline mandate.
+
+Log every skip as a standard inference record in `inferences.jsonl`: `phase: build-start`, `key: deliver.oracle.dispatch`, `value: false`, and an `evidence` line citing why the failure modes are covered elsewhere (e.g. "FK-ordering regression caught by CI integration suite; AC1 grep is dispositive"). This is the operator's audit trail when an oracle skip turns out to be wrong.
+
+### Re-probe on environment change
+
+When an oracle returned `oracle-insufficient-evidence` and the resume carries new context — operator comment, state change, elapsed time since last probe, fresh runner-handoff version with infra changes — re-probe the evidence layer that was missing. Cost is one oracle re-run; the operator saying "Chromium image is live" means the environment changed since the last probe, and the controller must match that mental model rather than parking on the old artifact.
+
+`oracle-insufficient-evidence` is NOT a terminal outcome. It is "I cannot verify the goal at the current evidence threshold." Try a different threshold or path before parking at `Needs Attention`. The same applies to `needs-human-input`: only park there after exhausting paths you could take alone.
 
 ## Workflow-surface ownership
 
@@ -619,6 +668,9 @@ Dispatch workers via fresh subprocess sessions from the autoship root. Each disp
 - **deliver-pre-groomer** — when neither `spec.md` nor `decomposition.md` exists, or after a REJECTED review (spec-review or decomposition-review). The pre-groomer's output type depends on scope classification: bounded issues produce `spec.md`; umbrella issues produce `decomposition.md` (see `.claude/skills/deliver-grooming/SKILL.md` § Scope classification — the pre-groomer defaults toward bounded and only outputs `decomposition.md` when work genuinely cannot fit in one AI-agent session).
 - **deliver-spec-reviewer** — after every pre-groom/regroom pass that produced `spec.md`. **Before dispatch**, the controller extracts every runnable command the spec cites and runs it at the testbed SHA, capturing baseline pass/fail. Sources of runnable commands: `Acceptance Criteria` lines with `Verification: \`<cmd>\`` patterns, Refactor `Preservation Proof → Executable behavior evidence` blocks, and the spec's top-level `Verification:` line if present. The controller writes results to `.autoship/issues/<id>/baseline-runnability.txt` (one entry per line, `<command> | <exit-code> | <status> | <stdout/stderr tail>`), uses a 120-second per-command timeout, skips commands matching destructive patterns (`rm -rf`, `drop`, `git reset`, migration rollbacks) and labels them `NOT_RUN: destructive pattern`. This is mechanical — the controller runs commands; the reviewer judges what the results mean for Groundedness. Pre-injects spec path, `baseline-runnability.txt` path, testbed root, testbed SHA, and the exact review output path. The reviewer applies the rubric's baseline-runnability pass (Check 2 Pass B) against the extracted results — for Refactor specs especially, a cited "covering" test that FAILS at baseline is the documented Groundedness blind spot from REF-001 (`docs/deliver-learnings.md:179-191`).
 - **deliver-decomposition-reviewer** — after every pre-groom/regroom pass that produced `decomposition.md`
+
+Before dispatching `deliver-oracle-writer`, apply the oracle-as-tool decision test (§ Goal-state discipline). If CI + types + PR review cover the failure modes this slice introduces, skip oracle dispatch entirely and proceed directly to implementation with the existing test suite as the gate. Log the skip as an inference record with `phase: build-start`, `key: deliver.oracle.dispatch`, `value: false`, and an `evidence` line citing why (see § Goal-state discipline). The dispatch below assumes oracle was invoked; if it was skipped, the implementation worker still runs and verification still re-runs validation commands (the oracle hash check is a no-op when no oracle was written).
+
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Breakdown outcomes do not progress to oracle; the parent issue's terminal is `Breakdown Proposed` until the operator approves child-issue creation.)
 - **deliver-oracle-reviewer** — after every oracle-write/rewrite that produced `oracle/result.md` with `oracle-green` or `oracle-red-expected`, and no `reviews/oracle-review-NN.md` covers the latest oracle. **Before dispatch**, the controller extracts every `expect(...)` assertion from every path listed under `oracle-files:` and writes them to `.autoship/issues/<id>/oracle/assertions.txt` (one entry per line, `<file>:<line>: <full assertion text>`). This is a mechanical grep (`grep -nE '^\s*(await\s+)?expect\(' <oracle-file>` across each frozen file), not judgment — the controller does the extraction so the reviewer judges with the full list in hand rather than scanning files. Pre-injects oracle path, spec path, latest spec-review path, every `oracle-files:` path, `oracle/assertions.txt` path, testbed root, and the exact review output path (`reviews/oracle-review-NN.md`). The reviewer applies the rubric's behavior-vs-design Pass C against the extracted list. (`oracle-failed` / `oracle-insufficient-evidence` short-circuit to `Needs Attention` without review — the writer already declared the oracle untrustworthy.)
 - **deliver-implementation** — `oracle/result.md` exists with `oracle-green` or `oracle-red-expected`, latest `reviews/oracle-review-NN.md` is APPROVED, and no `implementation/result.md`. If `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence`, park the issue at `Needs Attention` with the oracle blocker; do not dispatch implementation.
@@ -997,11 +1049,11 @@ Per-mode run terminals:
 - audit: reviewed assessment complete and approved issue creation (if configured) complete, or unrecoverable error
 - deliver: no more eligible issues or a global blocker
 
-Anything else: **do not stop**. In deliver mode, park per-issue blockers in `Needs Attention`, respect `Spec Ready` as the human approval boundary only in supervised mode, and continue to the next eligible issue.
+Anything else: **do not stop**. In deliver mode, park per-issue blockers in `Needs Attention`, respect `Spec Ready` as the human approval boundary only in supervised mode, and continue to the next eligible issue. Before parking, apply the goal-state diff (§ Goal-state discipline): if the goal hasn't been achieved AND a concrete path forward exists AND that path hasn't been tried this run with the same outcome, take the path — don't park on a procedural checkpoint.
 
 ## Default-to-act posture
 
-Run autonomously after the selected scope is rendered. Do not ask "should I continue?" between mechanical stages. Do not ask permission for routine inferences — pick the value from evidence, write the record, announce the block, and proceed. Routine inferences (validation gate from `package.json`, source from authenticated Linear, scope from a single-team workspace) are *path-picking*, not *bar-setting*; the operator owns the bar via `defaults.yaml` and can interrupt the session if any inference looks wrong.
+**At the top of every turn, run the goal-state diff (§ Goal-state discipline) before reading `manifest.json`.** Run autonomously after the selected scope is rendered. Do not ask "should I continue?" between mechanical stages. Do not ask permission for routine inferences — pick the value from evidence, write the record, announce the block, and proceed. Routine inferences (validation gate from `package.json`, source from authenticated Linear, scope from a single-team workspace) are *path-picking*, not *bar-setting*; the operator owns the bar via `defaults.yaml` and can interrupt the session if any inference looks wrong.
 
 The boundary the agent does NOT cross unprompted:
 

@@ -1,6 +1,6 @@
 {
   "name": "@cs-calibrax/autoship",
-  "version": "0.5.13",
+  "version": "0.5.14",
   "description": "Turn messy software work into reviewable, reliable delivery. Autoship framework agents for Claude Code.",
   "keywords": [
     "claude-code",
