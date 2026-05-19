@@ -46,6 +46,9 @@ Important boundaries:
 - `.claude/skills/reviewing/` — shared reviewer discipline.
 - `.claude/skills/blocker-escalation/` — blocker report template, category enum, and lint script.
 - `.claude/skills/ui-walking/` — oracle-anchored UI journey execution: posture, journey lifecycle, evidence rubric, failure taxonomy. Consumed by `ui-walker`.
+- `.claude/skills/test-driven-development/` — vendored from [obra/superpowers](https://github.com/obra/superpowers) (MIT). RED-GREEN-REFACTOR discipline; autoship-anchored to the frozen oracle. Consumed by `deliver-implementation`.
+- `.claude/skills/systematic-debugging/` — vendored from obra/superpowers (MIT). 4-phase root-cause discipline; autoship-anchored to `deliver-pre-groomer`'s Bug reproduction phase and `reproduction-status` output enum.
+- `.claude/skills/receiving-code-review/` — vendored from obra/superpowers (MIT). Discipline for worker re-dispatch with REJECTED-verdict objections; push-back routes through `blocker-escalation`, not direct rebuttal.
 - `docs/architecture/audit-architecture.md` — audit lifecycle and handoff boundary.
 - `docs/architecture/audit-tracker-sync.md` — opt-in Linear audit issue sync, dedup, and regression detection.
 - `docs/architecture/deliver-architecture.md` — deliver phase machine, state transitions, and approval boundaries.
@@ -99,7 +102,7 @@ test -f .autoship/defaults.yaml
 test ! -e .autoship/program.md
 ```
 
-Expected default install: 10 agents, 5 skills, standards/defaults present, no `program.md`.
+Expected default install: 10 agents, 8 skills, standards/defaults present, no `program.md`.
 
 Controller smoke:
 

@@ -20,6 +20,16 @@ Your job is to establish the strongest practical evidence contract for the appro
 - **Scope-tight.** Test files, fixtures, harness files, and test-only config are in scope. Production source is not.
 - **Mechanical honesty.** Your artifact must record whether the evidence is sufficient, red-expected, failed, or insufficient.
 
+## Two evidence surfaces
+
+The oracle you author has up to two evidence surfaces, both frozen and hash-checked, both required for `verification-passed`:
+
+1. **Code-level assertions** — unit, integration, contract, and behavioral tests authored against the spec's claims. Run by the testbed's test runner during verification. This is the long-established surface; everything in §Required procedure below applies.
+
+2. **`ui_journeys`** — runtime UI assertions executed by `ui-walker` against the running application. Each journey is a named sequence of UI steps plus an `expected` observable state (visible text, URL, console-error policy, network-error policy, selector presence/absence). See `.claude/skills/ui-walking/SKILL.md` for the canonical schema. Author `ui_journeys` whenever the spec has user-facing UI behavior whose correctness cannot be proven by code-level tests alone (a backend route returning the right JSON is code-test territory; "the error banner appears next to the right field after a failed submit" is `ui_journeys` territory).
+
+When both surfaces apply, list **both** under `oracle-files:` and `evidence-run:` in the artifact. The implementation executor satisfies surface 1; `ui-walker` exercises surface 2; the controller's verification gate requires *both* clean for `verification-passed`. A frozen `ui_journeys` block is mutated only by re-dispatching `deliver-oracle-writer`, not by `deliver-implementation` or `ui-walker` — the freeze-and-hash discipline is identical to the code-test surface.
+
 ## Inputs
 
 The dispatch prompt pre-injects:

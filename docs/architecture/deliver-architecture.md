@@ -104,12 +104,14 @@ When review rejects, work loops back: Spec-reviewer REJECT sends the pre-groomer
 
 - **Evidence-first artifacts** — truth comes from code, data, and observed behavior, not from issue text
 - **Oracle quality as the ceiling** — the *oracle* is the test suite that judges whether a change is done. The executor optimizes for whatever the oracle measures, so weak tests produce "code that passes tests but doesn't work."
+- **Two evidence surfaces under one oracle** — the oracle has up to two frozen surfaces: code-level assertions (run by the testbed's test runner during verification) and `ui_journeys` (runtime UI assertions executed by `ui-walker`). Both are hash-checked. Both must pass for `verification-passed`. `deliver-implementation` satisfies surface 1; `ui-walker` exercises surface 2; the controller's verification gate aggregates. The freeze-and-hash discipline is identical across surfaces — only `deliver-oracle-writer` may author or mutate either.
 - **Generator-evaluator separation at every handoff** — the author never discharges the gates judging its own work
 - **Fresh session per unit** — context accumulation silently degrades output quality
 - **Disk-backed execution state** — state lives on disk, not in a long-running session
 - **Strict unit sizing** — every unit must fit in one context window
 - **Mechanical verification gates** — no judgment-only transitions in the outer loop
 - **Isolation and recovery discipline** — autonomous work runs in branches or worktrees, with explicit stuck detection
+- **Vendored disciplines from `obra/superpowers` (MIT)** — three superpowers skills are vendored into `.claude/skills/` with attribution and autoship-specific anchoring: `test-driven-development` (RED-GREEN-REFACTOR against the frozen oracle, consumed by `deliver-implementation`), `systematic-debugging` (4-phase root-cause discipline, consumed by `deliver-pre-groomer`'s Bug reproduction), and `receiving-code-review` (worker re-dispatch with REJECTED-verdict objections, consumed by any worker on re-dispatch). Autoship-specific disciplines (`reviewing`, `blocker-escalation`, `deliver-grooming`, `ui-walking`, `autoship-audit`) remain autoship-owned — superpowers covers neither the reviewer-side stance nor the audit/oracle product surface. The vendor boundary is a deliberate fork: vendored skills keep superpowers' anti-rationalization voice while autoship-native skills keep autoship's role-anchoring voice.
 
 ## Lifecycle and State Machine
 

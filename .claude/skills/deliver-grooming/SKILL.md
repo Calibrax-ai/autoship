@@ -72,6 +72,33 @@ Type-specific sections:
 - **Feature** — Design Rationale (with Alternatives, Picked + Reason; conditional subsections based on blast-radius characteristics)
 - **Refactor** — Behavior Preservation (What must be preserved, Preservation Proof, Structure Improvement); Design Rationale is optional
 
+## Spec granularity discipline
+
+The spec is the implementation plan. Two disciplines apply to every spec, regardless of type. (Inspiration acknowledged: [obra/superpowers](https://github.com/obra/superpowers) `writing-plans` skill — adapted to autoship's spec artifact.)
+
+### Bite-sized acceptance criteria
+
+Each Acceptance Criterion is one observable outcome a fresh-context executor can attempt in one short step. Not "the user can manage their account" — that is a feature description, not a criterion. Concrete shape:
+
+- **One state change or visible effect per criterion.** A criterion that requires three unrelated state changes is three criteria.
+- **Stated in observable terms.** "Submitting an empty form shows `Required` next to Name" — not "validation works." If you cannot describe the criterion as something a reviewer (human or `ui-walker`) can check, it is not yet a criterion.
+- **Sized so the executor can verify it independently.** If satisfying one criterion requires implementing two unrelated subsystems first, split the criterion (or escalate the spec to umbrella).
+
+### Per-criterion verification command
+
+Every Acceptance Criterion includes a `Verification: \`<cmd>\`` line citing the smallest command (or `ui-walker` journey name) that proves it. This is the controller's mechanical hook — pre-spec-review baseline runnability extracts these commands and runs them at the testbed SHA before the reviewer ever sees the spec.
+
+- For backend behavior: a unit/integration test invocation, a `curl` against the test server, or a query against test data.
+- For frontend behavior: a `ui-walker` journey name from the oracle's `ui_journeys` block, or an E2E test invocation.
+- For Refactor preservation: the executable behavior test cited in `Preservation Proof`.
+- If no command can prove the criterion, the criterion is not yet ready — add an Assumption naming the gap or escalate as a blocker.
+
+### Files-touched explicitness
+
+The Blast-Radius Manifest already enumerates files into the four buckets (Expected to create / Expected to change / May change / Must not change). The discipline strengthens to: **every Acceptance Criterion should map to at least one file under "Expected to create" or "Expected to change."** A criterion that does not trace to a file in the manifest either belongs to a different slice or signals an incomplete manifest. Reviewer flag.
+
+These disciplines tighten the spec's contract enough that `deliver-implementation` can apply `test-driven-development` (see `.claude/skills/test-driven-development/`) without ambiguity about what "passing" means.
+
 ## Scope classification (before any drafting)
 
 Before deciding whether to write a spec, classify the issue. The question is **not** "does any signal trigger umbrella?" — it is **"can one AI agent ship this in one session?"** Default toward bounded. Decomposition is the rare path, not the standard one.

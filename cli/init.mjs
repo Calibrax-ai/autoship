@@ -43,6 +43,9 @@ const CORE_SKILLS = [
 	'reviewing',
 	'blocker-escalation',
 	'ui-walking',
+	'test-driven-development',
+	'systematic-debugging',
+	'receiving-code-review',
 ];
 
 export async function init(args = []) {

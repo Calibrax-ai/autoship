@@ -41,6 +41,8 @@ You may Read, Glob, Grep, and Bash across the injected testbed root only. You ma
 
 ### 1. Reproduce
 
+Apply **`systematic-debugging` discipline** for this phase: phase 1 (reproduce), phase 2 (gather evidence at component boundaries), phase 3 (isolate the failing component), phase 4 (root-cause hypothesis). The steps below are the autoship-specific *outputs* of that discipline — they are what gets recorded; the discipline is how you arrive at them.
+
 a. Parse the claimed repro from the issue body.
 b. Construct the minimal command to exercise the scenario:
    - API bug → `curl` or HTTP call with body/headers
@@ -48,7 +50,7 @@ b. Construct the minimal command to exercise the scenario:
    - Logic bug → unit / integration test invocation
 c. Execute via Bash. Record: status code, response body, DB state, error output.
 d. Classify the outcome into the `reproduction-status` enum (see SKILL.md §Status enums).
-e. For `confirmed`: grep for the observed error string; trace to the `file:line` producing it. Quote the snippet. This is the root cause.
+e. For `confirmed`: grep for the observed error string; trace to the `file:line` producing it. Quote the snippet. **This is a hypothesis until verified** — confirm it explains the observed failure end-to-end before recording it as the root cause. If the trace leads to multiple plausible causes, gather additional evidence (logs, intermediate state, adjacent calls) before committing to one. Do not stop at the first error site that *could* be the cause; verify it *is* the cause.
 
 ### 2. Map blast-radius
 
