@@ -34,6 +34,7 @@ const CORE_AGENTS = [
 	'deliver-oracle-writer.md',
 	'deliver-oracle-reviewer.md',
 	'deliver-implementation.md',
+	'ui-walker.md',
 ];
 
 const CORE_SKILLS = [
@@ -41,6 +42,7 @@ const CORE_SKILLS = [
 	'deliver-grooming',
 	'reviewing',
 	'blocker-escalation',
+	'ui-walking',
 ];
 
 export async function init(args = []) {

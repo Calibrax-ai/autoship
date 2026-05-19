@@ -40,10 +40,12 @@ Important boundaries:
 - `.claude/agents/deliver-decomposition-reviewer.md` — fresh-context judge of `decomposition.md` for umbrella issues (auto-routed from grooming when umbrella shape is detected).
 - `.claude/agents/deliver-oracle-writer.md`, `.claude/agents/deliver-oracle-reviewer.md` — generator-evaluator pair for the frozen oracle artifact.
 - `.claude/agents/deliver-implementation.md` — implementation worker for deliver.
+- `.claude/agents/ui-walker.md` — runtime UI journey executor for deliver verification; dispatched after `deliver-implementation` when the oracle declares `ui_journeys`. Observes; does not judge. Outputs evidence pack to `.autoship/issues/<id>/ui-walker/`.
 - `.claude/skills/autoship-audit/` — audit protocol, assessment template, review rubric, and safe external exposure reference.
 - `.claude/skills/deliver-grooming/` — deliver spec schema and review rubric.
 - `.claude/skills/reviewing/` — shared reviewer discipline.
 - `.claude/skills/blocker-escalation/` — blocker report template, category enum, and lint script.
+- `.claude/skills/ui-walking/` — oracle-anchored UI journey execution: posture, journey lifecycle, evidence rubric, failure taxonomy. Consumed by `ui-walker`.
 - `docs/architecture/audit-architecture.md` — audit lifecycle and handoff boundary.
 - `docs/architecture/audit-tracker-sync.md` — opt-in Linear audit issue sync, dedup, and regression detection.
 - `docs/architecture/deliver-architecture.md` — deliver phase machine, state transitions, and approval boundaries.
@@ -97,7 +99,7 @@ test -f .autoship/defaults.yaml
 test ! -e .autoship/program.md
 ```
 
-Expected default install: 9 agents, 4 skills, standards/defaults present, no `program.md`.
+Expected default install: 10 agents, 5 skills, standards/defaults present, no `program.md`.
 
 Controller smoke:
 

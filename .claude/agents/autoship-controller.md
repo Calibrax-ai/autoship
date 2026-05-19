@@ -309,7 +309,7 @@ Three occurrences across probes 0.1 / 0.3 / 0.5 have shown reviewers' Check 1 si
 
 | Field | Allowed values |
 |---|---|
-| `artifact` | `spec` \| `decomposition` \| `review` \| `oracle` \| `verification` |
+| `artifact` | `spec` \| `decomposition` \| `review` \| `oracle` \| `ui-walker` \| `verification` |
 | `type` | `Bug` \| `Feature` \| `Refactor` \| `decomposition` |
 | `trigger` | `first-groom` \| `regroom` |
 | `controller-status` | `ready` \| `need-info` |
@@ -320,6 +320,7 @@ Three occurrences across probes 0.1 / 0.3 / 0.5 have shown reviewers' Check 1 si
 | `oracle-outcome` | `oracle-red-expected` \| `oracle-green` \| `oracle-failed` \| `oracle-insufficient-evidence` |
 | `coverage` | `behavioral` \| `structural` \| `visual` \| `integration` \| `supporting` |
 | `verification-outcome` | `verification-passed` \| `verification-failed` \| `oracle-mutation-detected` |
+| `ui-walker-outcome` | `ui-walker-completed` \| `ui-walker-skipped` \| `ui-walker-blocked` \| `oracle-mutation-detected` |
 | `human-review-needed` | `true` \| `false` |
 
 This table is canonical. `.claude/skills/deliver-grooming/SKILL.md` § Status enums and `.claude/agents/deliver-oracle-writer.md` list the worker-facing subsets they emit; if any of them disagree with this table, **this table wins** until the discrepancy is reconciled.
@@ -343,6 +344,7 @@ An enum violation is a structural defect in the worker's output, not a judgment 
 | `deliver-oracle-writer` | rewrite |
 | `deliver-spec-reviewer` / `deliver-decomposition-reviewer` / `deliver-oracle-reviewer` | re-judge |
 | `deliver-implementation` | re-implement |
+| `ui-walker` | re-walk |
 | audit-auditor / audit-reviewer | re-audit / re-review |
 
 Inject the violation as the corrective feedback for the next attempt. Name the field, the invalid value, the allowed list, and the source path. Example for a pre-groomer emitting `design-status: drafted-with-gaps`:
@@ -385,7 +387,7 @@ The enum check is mechanical and bounded. It does NOT:
 Always read these first. Then branch by mode:
 
 - **audit** → read `.claude/skills/autoship-audit/SKILL.md` plus the worker agent definitions (`audit-auditor`, `audit-reviewer`)
-- **deliver** → resolve the RunRequest per § How I Receive Work (reading `.autoship/defaults.yaml` if flags are insufficient), plus the worker agent definitions (`deliver-pre-groomer`, `deliver-spec-reviewer`, `deliver-decomposition-reviewer`, `deliver-oracle-writer`, `deliver-implementation`)
+- **deliver** → resolve the RunRequest per § How I Receive Work (reading `.autoship/defaults.yaml` if flags are insufficient), plus the worker agent definitions (`deliver-pre-groomer`, `deliver-spec-reviewer`, `deliver-decomposition-reviewer`, `deliver-oracle-writer`, `deliver-implementation`, `ui-walker`)
 
 Per-track phase machines and state-transition detail are in `docs/architecture/audit-architecture.md` and `docs/architecture/deliver-architecture.md`. Read the relevant one when procedure below references it.
 
@@ -674,6 +676,7 @@ Before dispatching `deliver-oracle-writer`, apply the oracle-as-tool decision te
 - **deliver-oracle-writer** — review APPROVED + explicit human `deliver <id>` approval OR strict unattended `states.build` eligibility OR approved automatic `--auto` spec + no `oracle/result.md`. (Breakdown outcomes do not progress to oracle; the parent issue's terminal is `Breakdown Proposed` until the operator approves child-issue creation.)
 - **deliver-oracle-reviewer** — after every oracle-write/rewrite that produced `oracle/result.md` with `oracle-green` or `oracle-red-expected`, and no `reviews/oracle-review-NN.md` covers the latest oracle. **Before dispatch**, the controller extracts every `expect(...)` assertion from every path listed under `oracle-files:` and writes them to `.autoship/issues/<id>/oracle/assertions.txt` (one entry per line, `<file>:<line>: <full assertion text>`). This is a mechanical grep (`grep -nE '^\s*(await\s+)?expect\(' <oracle-file>` across each frozen file), not judgment — the controller does the extraction so the reviewer judges with the full list in hand rather than scanning files. Pre-injects oracle path, spec path, latest spec-review path, every `oracle-files:` path, `oracle/assertions.txt` path, testbed root, and the exact review output path (`reviews/oracle-review-NN.md`). The reviewer applies the rubric's behavior-vs-design Pass C against the extracted list. (`oracle-failed` / `oracle-insufficient-evidence` short-circuit to `Needs Attention` without review — the writer already declared the oracle untrustworthy.)
 - **deliver-implementation** — `oracle/result.md` exists with `oracle-green` or `oracle-red-expected`, latest `reviews/oracle-review-NN.md` is APPROVED, and no `implementation/result.md`. If `oracle/result.md` says `oracle-failed` or `oracle-insufficient-evidence`, park the issue at `Needs Attention` with the oracle blocker; do not dispatch implementation.
+- **ui-walker** — dispatched after `deliver-implementation` returns `implementation-passed`, when the oracle declares one or more `ui_journeys`. **Trigger detection** is mechanical: grep `oracle/result.md` and the oracle-files it lists for a `ui_journeys:` block (YAML) or a `## UI Journeys` section (markdown). If absent, skip ui-walker entirely and proceed directly to verification — this is the cheap no-op path for backend-only slices. If present, pre-inject: issue id, canonical issue dir, worktree root, branch, `oracle/result.md` path, the parsed `ui_journeys` block, application start command (resolved from `.autoship/defaults.yaml` → `deliver.ui.start_command` or repo evidence), base URL (`deliver.ui.base_url`, default `http://localhost:3000`), boot wait condition, optional auth fixture env-var reference (never raw secrets), `ui-walker/result.md` output path, and `ui-walker/` artifact directory path. The walker observes; the controller judges. Walker output (`ui-walker/verdict.json` + screenshots) feeds the verification step below — verification compares `verdict.json[journey].observed` against the oracle's `expected` for each journey and treats ambient errors (console errors, network 4xx/5xx, page errors) per oracle policy. A `ui-walker-blocked` return parks the issue at `Needs Attention` with the walker's `blocker-escalation` report; do not dispatch verification against incomplete UI evidence.
 
 Reviewer routing is mechanical: presence of `spec.md` → `deliver-spec-reviewer`; presence of `decomposition.md` → `deliver-decomposition-reviewer`. The two artifacts are mutually exclusive — never both for the same issue in the same run.
 
@@ -723,7 +726,7 @@ After printing, halt cleanly. The session stays open in interactive mode for the
 
 ### Build path
 
-When a build is approved (`deliver <id>` in human mode, strict `states.build` eligibility in unattended mode, or approved spec review in `--auto` mode), the controller owns the path to a reviewable draft PR: issue branch/worktree, oracle dispatch, implementation dispatch, full validation rerun, frozen-oracle hash verification, `verification/result.md`, commits, push, PR update, and the `In Review` state transition + comment per § Linear policy.
+When a build is approved (`deliver <id>` in human mode, strict `states.build` eligibility in unattended mode, or approved spec review in `--auto` mode), the controller owns the path to a reviewable draft PR: issue branch/worktree, oracle dispatch, implementation dispatch, ui-walker dispatch (when oracle declares `ui_journeys`), full validation rerun, frozen-oracle hash verification, ui-walker evidence verification (when present), `verification/result.md`, commits, push, PR update, and the `In Review` state transition + comment per § Linear policy.
 
 Any failure parks the issue in `Needs Attention` (with a comment naming the blocker artifact). The controller never opens a PR against a mutated oracle, insufficient evidence, or failed validation.
 
