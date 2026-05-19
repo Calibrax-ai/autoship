@@ -113,6 +113,7 @@ Live autoship has no `.autoship/program.md`.
 - **RunRequest** — normalized run intent, resolved from: prompt flags → optional `.autoship/defaults.yaml` overrides → runtime inference from repo evidence → framework defaults. Snapshotted as `run.json` under each run directory.
 - **`.autoship/standards.yaml`** — repo policy contract. Commit this file. The operator-owned source of truth for what good looks like in this repo (hosting, CI, observability, secrets, release expectations).
 - **`.autoship/defaults.yaml`** — optional per-repo overrides. Empty/absent is fine — autoship infers source, scope, and validation from repo evidence at runtime. Use this file only when you want to lock down explicit choices that override the inference. Flags always win.
+- **`.autoship/runners.yaml`** — harness dispatch contract (0.6.0+). Declares which harness the controller dispatches workers to (subprocess invocation, SDK, or HTTP). Default is `claude-code`; the file is forward-compat scaffolding so additional adapters (flue, pi extension, OpenHands) can land without controller refactors. See § Harness interface below.
 - **`.autoship/audits/<run-id>/`** — audit artifacts.
 - **`.autoship/runs/<run-id>/`** — deliver run logs and snapshots: `run.json` (resolved RunRequest), `invocation.txt` (raw trigger), `decisions.log` (prose state-transition log), `inferences.jsonl` (structured inference trail; see [decision-log.md](docs/architecture/decision-log.md)).
 - **`.autoship/issues/<id>/`** — deliver issue mirror, spec, reviews, oracle, implementation, verification, and PR artifact.
@@ -133,6 +134,30 @@ When autoship integrates with Linear:
 ### State-as-baton handoff
 
 In deliver, the Linear workflow-state column carries the human ↔ agent baton. Cards in `In Progress` mean autoship is working; cards anywhere else mean it's the operator's turn. The recommended remote states are action-based: `Run Agent` means "agent may analyze and, if clear, build"; `Breakdown Proposed` means "review the breakdown PR"; `Breakdown Approved` means "create child issues and start dependency-free slices"; `Needs Attention` means "autoship halted on a typed blocker." `Spec Ready` remains optional supervised compatibility. Each milestone fires a state change + @mention comment when posting is enabled — kanban for the glance, Inbox for the notification. State transitions are best-effort: if a target state is missing in the workspace, the comment still posts. See [deliver-architecture.md](docs/architecture/deliver-architecture.md) for the full transition table.
+
+## Harness interface
+
+Autoship's workflow logic, state machine, and agent prompts are intentionally **harness-agnostic and model-agnostic**. The product ships today on Claude Code, but the underlying contract is small enough that other agent runtimes can host the same workflow with a thin adapter.
+
+A harness must implement two operations:
+
+1. **Spawn a fresh-context agent session** with a pre-injected prompt and tool allowlist. Return a session handle / log stream.
+2. **Await completion and surface the worker's `result.md` frontmatter** (or equivalent structured output) so the controller can parse outcomes and decide next dispatch.
+
+Everything else — issue state under `.autoship/issues/<id>/`, RunRequest resolution, tracker mutations, inference logging, enum validation, generator-evaluator pairing — lives above the harness. Workers do not depend on which runtime is below.
+
+Per-harness packaging takes the shape most native to that runtime. Today's targets:
+
+| Harness | Invocation model | Packaging | Status |
+|---|---|---|---|
+| **Claude Code** | Subprocess: `claude --agent <id> -p <prompt>` | npm package + `.claude/agents/*.md` scaffolded into target repo | Production (current) |
+| **flue** | Subprocess: `flue run <agent_id> --id <run_id>` | Future — flue's `task` tool maps to fresh-context dispatch; same subprocess shape as Claude Code | Feasible, adapter cost low |
+| **pi-coding-agent** | In-process: pi extension registering tools backed by `pi-agent-core` | Future — autoship would ship as a pi extension package | Feasible via extension; ~bounded adapter work |
+| **OpenHands** | Python SDK or REST API; Docker volume mount for filesystem state | Future — higher-cost adapter (no subprocess idiom; containerized state sync) | Feasible but more invasive |
+
+The active harness is declared in `.autoship/runners.yaml`. Today the controller treats `claude-code` as an implicit default; the runners.yaml file is forward-compat scaffolding (the controller does not yet branch on its contents). Skills carry a portable `skill.yaml` manifest alongside each `SKILL.md` so harness-specific format translation (Claude Code's directory-bundle shape vs flue/OpenHands' single-file-with-triggers shape) can be done mechanically by adapters without rewriting skill content.
+
+The multi-harness commitment is **conditional on real demand**. No adapter is built before a real second-harness operator asks. The hedges above (`runners.yaml`, `skill.yaml`, this section's documented contract) cost nothing today and turn the future adapter from "controller refactor" into "additive adapter package."
 
 ## Current Implementation Status
 

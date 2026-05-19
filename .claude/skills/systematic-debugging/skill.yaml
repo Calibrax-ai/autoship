@@ -1,0 +1,16 @@
+# Vendored from obra/superpowers (MIT). See SKILL.md attribution header.
+name: systematic-debugging
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes. Autoship-anchored to deliver-pre-groomer's Bug reproduction phase.
+entry: SKILL.md
+references:
+  - root-cause-tracing.md
+  - condition-based-waiting.md
+  - defense-in-depth.md
+triggers:
+  - debug
+  - reproduce
+  - root-cause
+upstream:
+  repo: https://github.com/obra/superpowers
+  path: skills/systematic-debugging/
+  license: MIT

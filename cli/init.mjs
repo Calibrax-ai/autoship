@@ -116,6 +116,14 @@ export async function init(args = []) {
 	writeFileSync(join(autoshipDir, 'defaults.yaml'), renderDefaultsTemplate());
 	console.log('  ✓ defaults.yaml → .autoship/  (commented template)');
 
+	// Write runners.yaml — the harness dispatch contract. Today the controller
+	// uses the implicit Claude Code default; this file is a forward-compat hedge
+	// so future multi-harness work (flue, pi extension, OpenHands) can land as
+	// adapter packages without controller refactors. See
+	// docs/architecture/system-overview.md § Harness interface for the contract.
+	writeFileSync(join(autoshipDir, 'runners.yaml'), renderRunnersTemplate());
+	console.log('  ✓ runners.yaml → .autoship/  (claude-code default; multi-harness hedge)');
+
 	// Update .gitignore
 	updateGitignore(cwd);
 	console.log('  ✓ .gitignore updated');
@@ -426,5 +434,82 @@ release:
 
 audit:
   if_no_standard: decision-required
+`;
+}
+
+function renderRunnersTemplate() {
+	return `# autoship runners.yaml — harness dispatch contract.
+#
+# Autoship today runs on Claude Code. This file declares which harnesses the
+# controller may dispatch workers to. Each harness entry encodes the minimum
+# information the dispatcher needs:
+#
+#   invocation: how a worker session is started (subprocess | sdk | http)
+#   spawn:      the command/import/endpoint that launches the worker, with
+#               placeholders {agent_id}, {prompt_file}, {run_id}, {payload_file}
+#   state:      how worker artifacts reach the operator filesystem
+#               (filesystem-direct | docker-volume-mount)
+#   skills_format: how skills are packaged for this harness
+#               (directory-bundle | single-file-with-triggers)
+#
+# Only the active harness needs to be uncommented. Today the controller does
+# not yet read this file at runtime — it uses claude-code as the implicit
+# default. This file is forward-compat scaffolding so a future multi-harness
+# adapter can be added by populating an entry, not by editing the controller.
+#
+# When you add a real second harness:
+#   1. Build the adapter (subprocess command, SDK shim, or HTTP client).
+#   2. Uncomment the matching entry here; flip 'active:' to true.
+#   3. The controller will route worker dispatch through the active harness.
+#
+# See docs/architecture/system-overview.md § Harness interface for the
+# abstract contract every adapter must satisfy.
+
+active: claude-code
+
+harnesses:
+  claude-code:
+    invocation: subprocess
+    spawn: "claude --agent {agent_id} --verbose -p {prompt_file}"
+    state: filesystem-direct
+    skills_format: directory-bundle
+    notes: |
+      The default and current production target. Workers run as
+      \`claude --agent <id>\` subprocesses; result.md frontmatter is
+      parsed by the controller after each dispatch.
+
+  # flue:
+  #   invocation: subprocess
+  #   spawn: "flue run {agent_id} --id {run_id} --payload {payload_file}"
+  #   state: filesystem-direct
+  #   skills_format: single-file-with-triggers
+  #   notes: |
+  #     Headless-by-design TypeScript runtime built on pi-agent-core.
+  #     Native sub-agent dispatch via the \`task\` tool; per-call tool
+  #     allowlist. flue's \`flue run\` CLI is subprocess-friendly, so the
+  #     dispatch model maps cleanly from claude-code.
+
+  # pi-extension:
+  #   invocation: in-process
+  #   spawn: "pi.spawnSubagent({agent_id}, {prompt_file})"
+  #   state: filesystem-direct
+  #   skills_format: single-file-with-triggers
+  #   notes: |
+  #     pi-coding-agent extension. Autoship registers itself as a pi
+  #     extension and uses pi-agent-core's Agent class to spawn fresh
+  #     sub-sessions. No subprocess; the extension lives inside the pi
+  #     session.
+
+  # openhands-sdk:
+  #   invocation: python-sdk
+  #   spawn: "openhands.sdk.agent.Agent(name={agent_id}).run({prompt_file})"
+  #   state: docker-volume-mount
+  #   state_mount: ".autoship/issues -> /workspace/issues"
+  #   skills_format: single-file-with-triggers
+  #   notes: |
+  #     OpenHands Python SDK. Requires async Python in the controller
+  #     dispatch path and Docker volume mounting for filesystem state.
+  #     Higher-cost adapter than subprocess-shaped harnesses; defer
+  #     until a real OpenHands user requires it.
 `;
 }

@@ -1,0 +1,11 @@
+# Manifest for harness-portable skill discovery. See
+# docs/architecture/system-overview.md § Harness interface.
+name: autoship-audit
+description: Use when autoship audit mode assesses a known repo for production readiness, launch go/no-go, or client handoff risk.
+entry: SKILL.md
+references:
+  - assets/
+  - references/
+triggers:
+  - autoship-audit
+  - audit

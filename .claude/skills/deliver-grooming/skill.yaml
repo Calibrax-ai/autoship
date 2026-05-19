@@ -1,0 +1,10 @@
+name: deliver-grooming
+description: Use during autoship's deliver track when a Linear/GitHub issue must become a reviewed executable spec for a Bug, Feature, or Refactor.
+entry: SKILL.md
+references:
+  - assets/
+  - references/
+triggers:
+  - groom
+  - grooming
+  - spec

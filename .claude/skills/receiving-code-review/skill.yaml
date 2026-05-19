@@ -1,0 +1,13 @@
+# Vendored from obra/superpowers (MIT). See SKILL.md attribution header.
+name: receiving-code-review
+description: Use when receiving code review feedback, before implementing suggestions. Autoship-anchored to worker re-dispatch with REJECTED-verdict objections.
+entry: SKILL.md
+references: []
+triggers:
+  - re-dispatch
+  - REJECTED
+  - review-feedback
+upstream:
+  repo: https://github.com/obra/superpowers
+  path: skills/receiving-code-review/
+  license: MIT

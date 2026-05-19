@@ -1,0 +1,11 @@
+name: blocker-escalation
+description: Use when an autoship agent cannot safely continue and must stop guessing. Converts unresolved ambiguity, protected-surface conflicts, repeated-without-narrowing failures, or environment/setup failures into a structured blocker report.
+entry: SKILL.md
+references:
+  - assets/
+  - references/
+  - scripts/
+triggers:
+  - blocker
+  - escalate
+  - cannot-proceed

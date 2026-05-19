@@ -1,0 +1,11 @@
+name: ui-walking
+description: Use when an autoship worker must drive a running application's UI to produce verification evidence against an oracle's UI journeys.
+entry: SKILL.md
+references:
+  - journey-execution.md
+  - evidence-rubric.md
+  - failure-taxonomy.md
+triggers:
+  - ui-walker
+  - ui-journey
+  - ui_journeys
