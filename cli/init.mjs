@@ -9,17 +9,8 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stdin, stdout } from 'node:process';
-
-import { select, input } from '@inquirer/prompts';
 
 import { inferStandards, applyInferences } from './infer-standards.mjs';
-import {
-	checkLinearCli,
-	checkLinearAuth,
-	listTeams,
-	listProjects,
-} from './linear-cli.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -57,7 +48,9 @@ export async function init(args = []) {
 		);
 	}
 
-	const noInteractive = args.includes('--no-interactive');
+	// `--no-interactive` is accepted as a no-op for backwards compatibility with
+	// scripts and CI that used to pass it; init is unconditionally non-interactive
+	// since the interactive wizard was removed (0.6.0+).
 	const upgradeFramework = args.includes('--upgrade-framework');
 	const allowed = new Set(['--no-interactive', '--upgrade-framework']);
 	const unknown = args.filter((a) => !allowed.has(a));
@@ -91,19 +84,6 @@ export async function init(args = []) {
 		);
 	}
 
-	// Run the setup wizard if we're in a TTY and the user didn't opt out.
-	// Non-TTY (CI, piped invocations) writes the all-commented template.
-	const interactive = !noInteractive && stdin.isTTY && stdout.isTTY;
-	let answers = null;
-	if (interactive) {
-		try {
-			answers = await runWizard(cwd);
-		} catch (err) {
-			console.warn(`\nWizard skipped (${err.message}). Falling back to commented template.\n`);
-			answers = null;
-		}
-	}
-
 	console.log('Installing autoship...');
 
 	// Copy core agents + skills.
@@ -130,20 +110,17 @@ export async function init(args = []) {
 		`  ✓ standards.yaml → .autoship/  (filled ${filled.length} from evidence; ${setMeCount} still SET_ME)`
 	);
 
-	// Write defaults.yaml. With wizard answers, write a populated config;
-	// without (CI / non-TTY / wizard skipped), write the all-commented template.
-	writeFileSync(join(autoshipDir, 'defaults.yaml'), renderDefaults(answers));
-	console.log(
-		answers
-			? `  ✓ defaults.yaml → .autoship/  (${describeAnswers(answers)})`
-			: '  ✓ defaults.yaml → .autoship/  (commented template)'
-	);
+	// Write defaults.yaml as the all-commented template. Operators edit it to
+	// lock down explicit overrides; otherwise autoship infers source, scope, and
+	// validation at runtime from repo evidence.
+	writeFileSync(join(autoshipDir, 'defaults.yaml'), renderDefaultsTemplate());
+	console.log('  ✓ defaults.yaml → .autoship/  (commented template)');
 
 	// Update .gitignore
 	updateGitignore(cwd);
 	console.log('  ✓ .gitignore updated');
 
-	printNextSteps(answers);
+	printNextSteps();
 }
 
 // `autoship init --upgrade-framework` refreshes only the package-owned files
@@ -226,259 +203,26 @@ function formatYAMLValue(value) {
 	return String(value);
 }
 
-// ---- Wizard ----
-//
-// Interactive setup that runs at install time when stdin is a TTY. Collects
-// optional overrides for the values autoship would otherwise infer at runtime
-// (source, Linear scope, validation command). Every answer is optional — the
-// runtime controller infers source from `linear auth list` + filesystem state,
-// scope from `linear team list`, and validation from package.json scripts /
-// Makefile / pyproject.toml. The wizard exists to let operators lock down
-// explicit choices when they don't want inference.
-//
-// Skips entirely in CI / non-TTY contexts (init.mjs entry point checks isTTY);
-// falls back to manual entry when Linear CLI is missing or not authed.
-async function runWizard(cwd) {
-	// Show what we detected as context for the operator.
-	const inferences = inferStandards(cwd);
-	const detected = describeDetectedStack(inferences);
-	console.log(`Detecting repo evidence... ${detected || '(no specific framework markers)'}\n`);
-	console.log('autoship infers source, scope, and validation at runtime. This wizard');
-	console.log('is for explicit overrides — skip any answer to let autoship infer.\n');
 
-	// Tracker choice.
-	const tracker = await select({
-		message: 'Issue tracker (lock down a source override, or skip to let autoship infer)?',
-		choices: [
-			{ name: 'Linear  (lock to Linear; drives the `linear` CLI to discover teams + projects)', value: 'linear' },
-			{ name: 'Local folder  (.autoship/issues/<id>/issue.md)', value: 'folder' },
-			{ name: 'Skip — autoship infers at runtime', value: 'skip' },
-		],
-		default: 'skip',
-	});
-
-	let linear = null;
-	if (tracker === 'linear') {
-		linear = await collectLinearAnswers();
-	}
-
-	// Validation command override — autoship infers from package.json/Makefile/etc.
-	// at runtime. This wizard step exists to lock down a specific gate when the
-	// operator wants something other than the inferred default.
-	let validation = null;
-	if (tracker !== 'skip') {
-		console.log('');
-		const scripts = readPackageScripts(cwd);
-		const suggestion = pickValidationSuggestion(cwd, scripts);
-		if (scripts.length) {
-			console.log(`Detected scripts in package.json: ${scripts.join(', ')}`);
-		}
-		if (suggestion) {
-			console.log(`At runtime autoship would infer: ${suggestion}`);
-		}
-		validation = await input({
-			message: 'Validation command override (leave blank to let autoship infer):',
-			default: '',
-		});
-		validation = validation.trim() || null;
-	}
-
-	console.log('');
-	return { tracker, linear, validation };
-}
-
-// Collects the Linear-specific answers, driving the CLI live where possible.
-// Falls back to manual entry when CLI is missing, not authed, or returns
-// empty/null.
-async function collectLinearAnswers() {
-	const cliPath = checkLinearCli();
-	if (!cliPath) {
-		console.log('  ⚠ `linear` CLI not found on PATH.');
-		console.log('    Install: brew install linear-cli');
-		console.log('    Or use Linear MCP: https://docs.anthropic.com/en/docs/mcp');
-		console.log('    Falling back to manual entry — autoship will halt at runtime if Linear isn\'t reachable.\n');
-		return await collectLinearAnswersManual();
-	}
-
-	console.log(`  ✓ \`linear\` CLI found at ${cliPath}`);
-	if (!checkLinearAuth()) {
-		console.log('  ⚠ Not logged in to Linear. Run `linear auth login` and re-run autoship init.');
-		console.log('    Falling back to manual entry.\n');
-		return await collectLinearAnswersManual();
-	}
-	console.log('  ✓ authenticated\n');
-
-	// Team — discover from CLI.
-	const teams = listTeams();
-	let teamKey, teamName;
-	if (!teams || teams.length === 0) {
-		console.log('  ⚠ Could not list Linear teams. Falling back to manual entry.\n');
-		return await collectLinearAnswersManual();
-	}
-	if (teams.length === 1) {
-		teamKey = teams[0].key;
-		teamName = teams[0].name;
-		console.log(`  Team: ${teamName} (${teamKey}) — only team in workspace, auto-selected.\n`);
-	} else {
-		const picked = await select({
-			message: 'Linear team?',
-			choices: teams.map((t) => ({ name: `${t.name} (${t.key})`, value: t.key })),
-		});
-		teamKey = picked;
-		teamName = teams.find((t) => t.key === picked).name;
-	}
-
-	// Project — discover from CLI.
-	const projects = listProjects(teamKey);
-	let projectName = null;
-	if (projects && projects.length > 0) {
-		const choices = projects.map((p) => ({ name: p.name, value: p.name }));
-		choices.push({ name: '(skip — no project filter)', value: '' });
-		projectName = await select({ message: 'Linear project?', choices });
-		if (!projectName) projectName = null;
-	} else {
-		console.log('  (no projects discovered for this team — skipping)\n');
-	}
-
-	console.log('\nLinear work selection defaults:');
-	console.log('  owner: me');
-	console.log('  groom states: Todo');
-	console.log('  remote trigger state: Run Agent  (create this state in Linear — see Done section)');
-	console.log('  optional supervised build handoff: Spec Ready\n');
-
-	return {
-		team: teamName,
-		teamKey,
-		project: projectName,
-		owner: 'me',
-		states: {
-			groom: ['Todo'],
-		},
-	};
-}
-
-async function collectLinearAnswersManual() {
-	const team = (await input({ message: 'Linear team name (e.g. Engineering, Delivery):' })).trim();
-	const teamKey = (await input({ message: 'Linear team key (e.g. ENG, DEL — used by linear CLI):' })).trim();
-	const project = (await input({ message: 'Linear project name (e.g. MyProject):' })).trim();
-
-	console.log('\nUsing default Linear work selection: owner=me, groom=Todo, remote trigger=Run Agent.\n');
-
-	return {
-		team,
-		teamKey,
-		project: project || null,
-		owner: 'me',
-		states: {
-			groom: ['Todo'],
-		},
-	};
-}
-
-function readPackageScripts(cwd) {
-	try {
-		const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8'));
-		return pkg.scripts && typeof pkg.scripts === 'object' ? Object.keys(pkg.scripts) : [];
-	} catch {
-		return [];
-	}
-}
-
-function pickValidationSuggestion(cwd, scripts) {
-	const runner = detectPkgRunner(cwd);
-	const preferred = ['test', 'check', 'validate'];
-	for (const name of preferred) {
-		if (scripts.includes(name)) {
-			return name === 'test' ? `${runner} test` : `${runner} run ${name}`;
-		}
-	}
-	return null;
-}
-
-function detectPkgRunner(cwd) {
-	if (existsSync(join(cwd, 'bun.lockb')) || existsSync(join(cwd, 'bun.lock'))) return 'bun';
-	if (existsSync(join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
-	if (existsSync(join(cwd, 'yarn.lock'))) return 'yarn';
-	return 'npm';
-}
-
-function describeDetectedStack({ values }) {
-	const items = [];
-	if (values['platform.hosting'] === 'vercel') items.push('Next.js/Vercel');
-	if (values['platform.hosting'] === 'fly.io') items.push('Fly');
-	if (values['platform.hosting'] === 'cloudflare-workers') items.push('Cloudflare Workers');
-	if (values['platform.hosting'] === 'container') items.push('Container');
-	if (values['database.migrations'] === 'prisma migrate') items.push('Prisma');
-	if (values['database.migrations'] === 'drizzle-kit') items.push('Drizzle');
-	if (values['database.migrations'] === 'alembic') items.push('Alembic');
-	if (values['ci.provider']) items.push(values['ci.provider']);
-	if (values['observability.errors'] === 'sentry') items.push('Sentry');
-	if (values['observability.errors'] === 'datadog') items.push('Datadog');
-	if (values['async.provider'] === 'bullmq') items.push('BullMQ');
-	if (values['async.provider'] === 'celery') items.push('Celery');
-	return items.length ? items.join(' + ') : null;
-}
-
-function describeAnswers(answers) {
-	const parts = [`source=${answers.tracker}`];
-	if (answers.linear) {
-		parts.push(`team=${answers.linear.teamKey || answers.linear.team}`);
-		parts.push(`owner=${answers.linear.owner || 'me'}`);
-		parts.push(`groom=${(answers.linear.states?.groom || ['Todo']).join('+')}`);
-		if (answers.linear.states?.build) {
-			parts.push(`build=${answers.linear.states.build.join('+')}`);
-		}
-	}
-	if (answers.validation) parts.push(`validation=${answers.validation}`);
-	return parts.join(', ');
-}
-
-function printNextSteps(answers) {
-	const lines = ['', 'Done.', ''];
-
-	// Always-relevant next steps.
-	lines.push('  1. Review .autoship/standards.yaml. Inferred fields carry `# inferred from <evidence>` comments; SET_ME fields are your call. Edit directly — autoship does not modify it once it exists. Re-run `autoship init` later for an advisory if repo evidence has changed.');
-
-	if (!answers || answers.tracker === 'skip') {
-		lines.push('  2. defaults.yaml is empty — autoship will infer source, scope, and validation at runtime from repo evidence. Each inference is announced at run start and logged to .autoship/runs/<run-id>/inferences.jsonl. Edit defaults.yaml only if you want to lock down explicit overrides.');
-	}
-
-	if (answers && answers.tracker === 'linear') {
-		const groomStates = (answers.linear?.states?.groom || ['Todo']).join(' / ');
-		lines.push(`  2. In Linear, create four workflow states for the recommended remote flow (Settings → Workflow → Add status):`);
-		lines.push(`       • "Run Agent"          (type: unstarted; remote runner wake-up state)`);
-		lines.push(`       • "Breakdown Proposed"      (type: unstarted; review the breakdown PR)`);
-		lines.push(`       • "Breakdown Approved"      (type: unstarted; create child issues and start dependency-free slices)`);
-		lines.push(`       • "Needs Attention"         (type: unstarted, parallel column)`);
-		lines.push(`     These carry the handoff baton:`);
-		lines.push(`       Run Agent      → "agent may analyze and, if clear, build"`);
-		lines.push(`       Breakdown Proposed  → "review the breakdown PR"`);
-		lines.push(`       Breakdown Approved  → "create child issues and start dependency-free slices"`);
-		lines.push(`       Needs Attention     → "autoship halted on a blocker, your turn to unblock"`);
-		lines.push(`     PR labels are an orthogonal axis: \`autoship\` + \`autoship:<outcome>\` (spec, breakdown, need-info, blocked, cannot-reproduce) tag artifact kind. State answers "what next?"; label answers "what kind?".`);
-		lines.push(`     Optional supervised mode may also use a "Spec Ready" handoff, but it is not part of the default remote happy path.`);
-		lines.push(`  3. For local/human grooming, assign issues to yourself and put them in ${groomStates}. For remote automation, move one issue to Run Agent.`);
-	}
-
-	lines.push('');
-	lines.push('  Run autoship:');
-	lines.push('');
-	lines.push('       autoship audit --report-only      # zero-config, no tracker writes');
-	if (answers && answers.tracker === 'linear') {
-		lines.push('       autoship "get all Todo issues assigned to me and start grooming"');
-		lines.push('       autoship deliver FRD-162          # approve the spec and build one issue');
-	} else if (answers && answers.tracker === 'folder') {
-		lines.push('       autoship groom FRD-162            # writes .autoship/issues/<id>/spec.md');
-		lines.push('       autoship deliver FRD-162          # approve the spec and build one issue');
-	}
-	lines.push('       autoship interactive              # open a chat session with the controller');
-	lines.push('');
-	lines.push('  If you ran via `npx`, install globally to drop the prefix:');
-	lines.push('       npm install -g @cs-calibrax/autoship');
-	lines.push('');
-	lines.push('  Docs: https://github.com/Calibrax-ai/autoship');
-	lines.push('');
-
+function printNextSteps() {
+	const lines = [
+		'',
+		'Done.',
+		'',
+		'  1. Review .autoship/standards.yaml. Inferred fields carry `# inferred from <evidence>` comments; SET_ME fields are your call. Edit directly — autoship does not modify it once it exists. Re-run `autoship init` later for an advisory if repo evidence has changed.',
+		'  2. defaults.yaml is the all-commented template. Autoship infers source, scope, and validation at runtime from repo evidence — each inference is announced at run start and logged to .autoship/runs/<run-id>/inferences.jsonl. Uncomment and fill any block in defaults.yaml only when you want to lock down an explicit override.',
+		'',
+		'  Run autoship:',
+		'',
+		'       autoship audit --report-only      # zero-config, no tracker writes',
+		'       autoship interactive              # open a chat session with the controller',
+		'',
+		'  If you ran via `npx`, install globally to drop the prefix:',
+		'       npm install -g @cs-calibrax/autoship',
+		'',
+		'  Docs: https://github.com/Calibrax-ai/autoship',
+		'',
+	];
 	console.log(lines.join('\n'));
 }
 
@@ -552,11 +296,6 @@ function updateGitignore(cwd) {
 	}
 }
 
-function renderDefaults(answers = null) {
-	if (!answers) return renderDefaultsTemplate();
-	return renderDefaultsConfigured(answers);
-}
-
 function renderDefaultsTemplate() {
 	return `# autoship defaults.yaml — optional per-repo overrides.
 #
@@ -627,85 +366,6 @@ function renderDefaultsTemplate() {
 `;
 }
 
-function renderDefaultsConfigured(answers) {
-	const lines = [];
-	lines.push('# autoship defaults.yaml — per-repo overrides.');
-	lines.push("# Generated by `autoship init`. Edit freely — autoship does not modify");
-	lines.push('# this file once it exists. Flags on the invocation always win;');
-	lines.push('# --report-only and --tracker=none override audit stickies.');
-	lines.push('#');
-	lines.push('# autoship infers source, scope, and validation at runtime when not');
-	lines.push('# overridden here. Each inference is announced at run start and logged to');
-	lines.push('# .autoship/runs/<run-id>/inferences.jsonl.');
-	lines.push('#');
-	lines.push('# Safety note: keep audit.create_issues: false unless you actually want');
-	lines.push('# every audit run to write into the tracker. Use --approve per-run instead.');
-	lines.push('');
-
-	// Audit block — always include with conservative defaults.
-	const auditTracker = answers.tracker === 'linear' ? 'linear' : 'none';
-	lines.push('audit:');
-	lines.push(`  tracker: ${auditTracker}            # linear | none`);
-	lines.push('  create_issues: false       # override per-run with --approve');
-	lines.push('  external_exposure: false   # override per-run with --external-url=<url>');
-	lines.push('');
-
-	const deliverSource = answers.tracker === 'skip' ? null : answers.tracker;
-	if (deliverSource) {
-		lines.push('deliver:');
-		lines.push('  # Uncomment to make query/batch runs pause at the preview for [y/N].');
-		lines.push('  # Default behavior is to proceed immediately after the preview.');
-		lines.push('  # confirm: true');
-		lines.push('');
-		if (deliverSource === 'linear' && answers.linear) {
-			lines.push('  linear:');
-			lines.push(`    team: ${quote(answers.linear.team)}`);
-			if (answers.linear.teamKey) {
-				lines.push(`    team_key: ${quote(answers.linear.teamKey)}    # Linear short key, used by the linear CLI`);
-			}
-			if (answers.linear.project) {
-				lines.push(`    project: ${quote(answers.linear.project)}`);
-			}
-			lines.push(`    owner: ${answers.linear.owner || 'me'}`);
-			lines.push('    states:');
-			lines.push('      # Eligibility (which Linear states autoship picks up from)');
-			lines.push('      # Local/human grooming often uses ["Todo"]. Remote runners wake');
-			lines.push('      # from the explicit "Run Agent" state instead.');
-			lines.push(`      groom: [${(answers.linear.states?.groom || ['Todo']).map(quote).join(', ')}]`);
-			lines.push('      # Optional supervised-mode compatibility only. Default remote flow');
-			lines.push('      # uses --auto from Run Agent and does not require Spec Ready.');
-			lines.push('      # build: ["Spec Ready"]');
-			lines.push('      # Transitions (which states autoship sets at handoffs).');
-			lines.push('      # Best-effort — if a target state does not exist in the workspace,');
-			lines.push('      # autoship falls back to comment-only at that handoff.');
-			lines.push('      working: "In Progress"      # autoship has the baton (grooming or building)');
-			lines.push('      # Optional supervised-mode handoff:');
-			lines.push('      # spec_ready: "Spec Ready"  # bounded spec complete, awaiting human approval');
-			lines.push('      breakdown_proposed: "Breakdown Proposed"  # umbrella breakdown ready for review');
-			lines.push('      blocked: "Needs Attention"  # autoship halted, awaiting human unblock');
-			lines.push('      pr_open: "In Review"        # draft PR opened, awaiting code review');
-		} else {
-			lines.push('  folder:');
-			lines.push('    path: .autoship/issues');
-		}
-		// Validation block: only write when operator explicitly chose an override
-		// during the wizard. Empty means "let autoship infer at runtime".
-		if (answers.validation) {
-			lines.push('  validation:');
-			lines.push('    commands:');
-			lines.push(`      - ${quote(answers.validation)}`);
-		} else {
-			lines.push('  # Validation gate left to runtime inference (package.json scripts,');
-			lines.push('  # Makefile, pyproject.toml, Cargo.toml). Uncomment to override:');
-			lines.push('  # validation:');
-			lines.push('  #   commands:');
-			lines.push('  #     - "bun test"');
-		}
-	}
-	lines.push('');
-
-	return lines.join('\n');
-}
 
 function quote(value) {
 	return JSON.stringify(value);
