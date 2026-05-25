@@ -1,0 +1,84 @@
+# Deploys both halves of the autoship-runner together on every push to main:
+#   1. The Vercel webhook receiver (api/webhooks/linear.ts), and
+#   2. The trigger.dev worker (src/trigger/).
+#
+# They must stay in lockstep — a tag/key schema change on one half silently
+# breaks the other if only one redeploys. This workflow guarantees both
+# deploy from the same commit, or neither does.
+#
+# History: the previous setup leaned on Vercel's GitHub App for the webhook
+# half (a separate trigger-deploy.yml deployed the worker half). The Vercel
+# App wasn't authorized on this repo, so webhook-side changes silently
+# failed to land in prod. The mismatch surfaced when a stable-key idempotency
+# bug was fixed on the worker side but the webhook still searched by the
+# old key — comments hit the new tokens, found nothing, returned 202 ignored.
+# See run_cmp22c1jn40nh0iofe9r16kp0 for the postmortem trace.
+#
+# Required GitHub secret:
+#   TRIGGER_ACCESS_TOKEN — trigger.dev Personal Access Token (Account →
+#                          Personal Access Tokens). Distinct from the
+#                          runtime tr_prod_* secret key the receiver uses.
+#   VERCEL_TOKEN         — Vercel Account → Tokens.
+#
+# The Vercel org/project IDs are non-secret identifiers (like the
+# trigger.dev project ref), so they're hardcoded here for reproducibility
+# rather than passed through Secrets.
+#
+# Deploy order: Vercel webhook first, then trigger.dev worker. The webhook
+# is the entry point — shipping a backward-compatible webhook first lets
+# in-flight events keep flowing while the worker catches up. For
+# backward-INCOMPATIBLE run-payload changes, this order is still safer
+# than the reverse: the worker only sees the new payload shape after the
+# webhook is updated to emit it.
+#
+# Cloud Run standby (deploy.yml) is intentionally a separate workflow —
+# it's a failover target, not a tied deploy.
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: team_tBZE0Fwf7oYg2cn1Ws60jLAG
+  VERCEL_PROJECT_ID: prj_riFKRtmIFQzOHUZVSAN8c6Oabu6D
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Deploy Vercel webhook (production)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy trigger.dev worker (production)
+        env:
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+        run: npx trigger.dev@latest deploy --env prod --skip-update-check

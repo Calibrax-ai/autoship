@@ -1,0 +1,74 @@
+# Cloud Run is a standby receiver. Vercel is the active webhook target today
+# (see api/webhooks/linear.ts + vercel.json). This workflow stays so we can
+# fail back to Cloud Run quickly if Vercel goes sideways or if we migrate
+# back. If you remove this, also tear down the Cloud Run service, the
+# autoship-deployer / autoship-runner-sa service accounts, and the
+# trigger-secret-key / trigger-project-ref / linear-* Secret Manager entries.
+#
+# Note: Cloud Run only hosts the receiver. The trigger.dev *worker* is
+# deployed separately by .github/workflows/trigger-deploy.yml — workers run
+# on trigger.dev's managed cloud, not on Cloud Run or Vercel.
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/64024580617/locations/global/workloadIdentityPools/github/providers/github-provider
+          service_account: autoship-deployer@test-project-459213.iam.gserviceaccount.com
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy autoship-runner \
+            --source=. \
+            --region=asia-southeast1 \
+            --project=test-project-459213 \
+            --service-account=autoship-runner-sa@test-project-459213.iam.gserviceaccount.com \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=3 \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=60 \
+            --concurrency=80 \
+            --set-env-vars="AUTOSHIP_LINEAR_AUTO_STATE=Run Agent" \
+            --set-secrets="LINEAR_WEBHOOK_SECRET=linear-webhook-secret:latest,LINEAR_API_KEY=linear-api-key:latest,TRIGGER_SECRET_KEY=trigger-secret-key:latest"
+
+      - name: Show service URL
+        run: |
+          gcloud run services describe autoship-runner \
+            --region=asia-southeast1 \
+            --project=test-project-459213 \
+            --format='value(status.url)'

@@ -1,7 +1,28 @@
-.playwright-mcp/
-.autoship/
+# macOS
 .DS_Store
 
-# npm package build artifacts
-*.tgz
+# npm
 node_modules/
+*.tgz
+npm-debug.log*
+
+# editor / OS
+.idea/
+.vscode/
+*.swp
+
+# autoship per-package runtime state
+.autoship/
+.playwright-mcp/
+
+# trigger.dev local cache (in packages/runner/)
+.trigger/
+
+# build outputs
+dist/
+build/
+
+# env files
+.env
+.env.local
+.env.*.local
