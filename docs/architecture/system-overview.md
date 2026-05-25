@@ -17,6 +17,69 @@ Both modes read repo policy from `.autoship/standards.yaml`, scaffolded by `auto
 
 Validate remains future work. Extract is retired from the live product; its implementation and research notes are archived under `docs/archive/extract/`.
 
+## The layer model
+
+Autoship is a 6-layer stack. Each layer has a clear owner, a stable upward contract, and can be swapped without rewriting the layers above it. **Layer 3 (agents + skills) is autoship's actual IP; the other five layers are plumbing.**
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  L5  External tracker     Linear / GitHub / future UI      │  ← operator workspace
+├────────────────────────────────────────────────────────────┤
+│  L4  State                .autoship/                       │  ← operator + autoship
+│      standards.yaml, defaults.yaml, runners.yaml,          │
+│      issues/<id>/{spec,oracle,implementation,verification},│
+│      runs/<run-id>/{inferences.jsonl, decisions.log}       │
+├────────────────────────────────────────────────────────────┤
+│  L3  Agents + Skills      .claude/                         │  ← autoship IP
+│      11 agents (controller + workers)                      │
+│      8 skills (autoship-owned + vendored disciplines)      │
+├────────────────────────────────────────────────────────────┤
+│  L2  Adapter              .autoship/runners.yaml + glue    │  ← autoship per harness
+│      dispatch contract, model_tier → model map,            │
+│      skills-format translation                             │
+├────────────────────────────────────────────────────────────┤
+│  L1  Harness runtime      Claude Code / pi / flue /        │  ← harness vendor
+│                            OpenHands                       │
+│      agent invocation, model access, tool execution        │
+├────────────────────────────────────────────────────────────┤
+│  L0  Distribution         curl install / plugin install /  │  ← package channel
+│                            git clone / npm                 │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Per-layer ownership
+
+| Layer | What lives there | Owner | Swap consequence |
+|---|---|---|---|
+| **L5 Tracker** | Linear/GitHub state, comments, PR threads | Operator | Switch tracker = change `.autoship/standards.yaml` source block + small controller adapter. Operator-visible UX changes; agents untouched. |
+| **L4 State** | Per-repo policy + per-issue evidence + per-run artifacts | Operator (filled) + autoship (templates scaffolded) | Moving off filesystem = significant rewrite. The filesystem-as-source-of-truth invariant is load-bearing across the design. |
+| **L3 Agents + Skills** | Workflow logic, worker behavior, disciplines | **Autoship — this is the product** | Editing here = changing autoship's behavior. Most autoship PRs touch this layer. |
+| **L2 Adapter** | runners.yaml + per-harness invocation translation | Autoship (one per harness) | Adding a harness = new adapter package; L3 untouched. This is the multi-harness commitment surface. |
+| **L1 Harness** | Spawn fresh-context agent, give it tools + model, return structured output | **Not autoship** (Anthropic / earendil-works / OpenHands maintainers) | Operator's choice. Autoship is a guest; harness vendor owns runtime quality. |
+| **L0 Distribution** | How L3 files reach the operator | Package channel | Switching channels = packaging change, zero code impact. |
+
+### Contracts between layers
+
+Each layer promises the layer above a bounded interface:
+
+- **L1 → L2**: "spawn an agent with prompt + tool allowlist; return structured output"
+- **L2 → L3**: "your `model_tier: high` resolves to an appropriate model; your prompt is dispatched; result.md frontmatter is parsed"
+- **L3 → L4**: "I write only to `.autoship/issues/<id>/<my-artifact>/` and follow the documented schema"
+- **L4 → L5**: "the controller mirrors handoffs to the tracker per runners.yaml's posting policy"
+
+When a layer's contract is clear, the layer above doesn't care how it's implemented. This is what makes harness-portability and tracker-portability feasible without rewriting the workflow.
+
+### Why this taxonomy matters
+
+The layer model is the canonical mental map for autoship contributors. When deciding where new behavior belongs, ask: *what's the smallest layer that owns this concern?*
+
+- "We need to talk to a new tracker" → L4/L5, not L3
+- "We need to support a new harness" → L2 (adapter), not L3
+- "We need a different install path" → L0, not L1+
+- "We need a new workflow phase" → L3, almost always
+
+If a change spans multiple layers, that's a signal one of the layer contracts is wrong. Fix the contract first.
+
 ## Current Module Map
 
 ```mermaid
