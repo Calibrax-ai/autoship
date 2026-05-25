@@ -1,0 +1,28 @@
+{
+  "name": "autoship-runner",
+  "private": true,
+  "description": "Remote runner for Linear-triggered Autoship jobs.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "dev:trigger": "mkdir -p .trigger/tmp/store && trigger dev",
+    "deploy:trigger": "trigger deploy",
+    "test": "tsx src/runner/autoship.test.ts && tsx src/runner/git.test.ts && tsx src/linear/webhook.test.ts && tsx src/server-options.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "4.4.5",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@trigger.dev/build": "4.4.5",
+    "@types/node": "^22.10.7",
+    "trigger.dev": "^4.4.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2"
+  }
+}

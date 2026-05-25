@@ -1,0 +1,16 @@
+node_modules
+.git
+.github
+.env
+.env.local
+.env.example
+.trigger
+runs
+.DS_Store
+*.log
+.agents
+.claude
+README.md
+AGENTS.md
+Makefile
+skills-lock.json
