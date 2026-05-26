@@ -1,6 +1,6 @@
 # Deploys both halves of the autoship-runner together on every push to main:
-#   1. The Vercel webhook receiver (api/webhooks/linear.ts), and
-#   2. The trigger.dev worker (src/trigger/).
+#   1. The Vercel webhook receiver (packages/runner/api/webhooks/linear.ts), and
+#   2. The trigger.dev worker (packages/runner/src/trigger/).
 #
 # They must stay in lockstep — a tag/key schema change on one half silently
 # breaks the other if only one redeploys. This workflow guarantees both
@@ -31,13 +31,16 @@
 # than the reverse: the worker only sees the new payload shape after the
 # webhook is updated to emit it.
 #
-# Cloud Run standby (deploy.yml) is intentionally a separate workflow —
-# it's a failover target, not a tied deploy.
-name: Deploy to production
+# Cloud Run standby (deploy-runner-cloud-run.yml) is intentionally a
+# separate workflow — it's a failover target, not a tied deploy.
+name: Deploy runner to production
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/deploy-runner-production.yml'
   workflow_dispatch:
 
 concurrency:
@@ -61,16 +64,17 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies (monorepo root)
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Typecheck runner workspace
+        run: npm run typecheck --workspace=packages/runner
 
-      - name: Test
-        run: npm test
+      - name: Test runner workspace
+        run: npm test --workspace=packages/runner
 
       - name: Deploy Vercel webhook (production)
+        working-directory: packages/runner
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -79,6 +83,7 @@ jobs:
           npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
       - name: Deploy trigger.dev worker (production)
+        working-directory: packages/runner
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
         run: npx trigger.dev@latest deploy --env prod --skip-update-check
