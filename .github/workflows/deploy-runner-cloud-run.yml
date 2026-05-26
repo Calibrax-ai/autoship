@@ -1,18 +1,22 @@
 # Cloud Run is a standby receiver. Vercel is the active webhook target today
-# (see api/webhooks/linear.ts + vercel.json). This workflow stays so we can
-# fail back to Cloud Run quickly if Vercel goes sideways or if we migrate
-# back. If you remove this, also tear down the Cloud Run service, the
-# autoship-deployer / autoship-runner-sa service accounts, and the
-# trigger-secret-key / trigger-project-ref / linear-* Secret Manager entries.
+# (see packages/runner/api/webhooks/linear.ts + packages/runner/vercel.json).
+# This workflow stays so we can fail back to Cloud Run quickly if Vercel goes
+# sideways or if we migrate back. If you remove this, also tear down the Cloud
+# Run service, the autoship-deployer / autoship-runner-sa service accounts,
+# and the trigger-secret-key / trigger-project-ref / linear-* Secret Manager
+# entries.
 #
 # Note: Cloud Run only hosts the receiver. The trigger.dev *worker* is
-# deployed separately by .github/workflows/trigger-deploy.yml — workers run
-# on trigger.dev's managed cloud, not on Cloud Run or Vercel.
-name: Deploy to Cloud Run
+# deployed separately by deploy-runner-production.yml — workers run on
+# trigger.dev's managed cloud, not on Cloud Run or Vercel.
+name: Deploy runner to Cloud Run
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/deploy-runner-cloud-run.yml'
   workflow_dispatch:
 
 concurrency:
@@ -34,11 +38,11 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies (monorepo root)
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Typecheck runner workspace
+        run: npm run typecheck --workspace=packages/runner
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -52,7 +56,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy autoship-runner \
-            --source=. \
+            --source=packages/runner \
             --region=asia-southeast1 \
             --project=test-project-459213 \
             --service-account=autoship-runner-sa@test-project-459213.iam.gserviceaccount.com \
