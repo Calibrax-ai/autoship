@@ -38,11 +38,18 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies (monorepo root)
-        run: npm ci
+      # Install + typecheck from inside packages/runner/. See sibling
+      # deploy-runner-production.yml for the rationale (CI install path
+      # mirrors Docker's, no workspace-hoist surprises).
+      - name: Install runner dependencies (package-local)
+        working-directory: packages/runner
+        # --no-workspaces: see sibling deploy-runner-production.yml for the
+        # rationale (npm hoists to monorepo root otherwise).
+        run: npm ci --no-workspaces
 
-      - name: Typecheck runner workspace
-        run: npm run typecheck --workspace=packages/runner
+      - name: Typecheck
+        working-directory: packages/runner
+        run: npm run typecheck
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2

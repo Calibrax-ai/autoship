@@ -64,20 +64,32 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies (monorepo root)
-        run: npm ci
+      # Install runner deps inside packages/runner/ (not from monorepo root)
+      # so packages/runner/node_modules is populated. Workspace hoisting at
+      # the root puts deps in ../../node_modules, which Vercel's per-package
+      # bundler can't find — `vercel build` then tries to install on its own
+      # and fails with `spawn npm ENOENT`. This is also the install path
+      # Docker uses (Dockerfile COPY package-lock.json + npm ci), so CI and
+      # production install identically and can't drift.
+      #
+      # The monorepo root npm workspaces setup is for human dev; deploy CI
+      # treats each package as standalone.
+      - name: Install runner dependencies (package-local)
+        working-directory: packages/runner
+        # --no-workspaces is required: npm always hoists to monorepo root
+        # otherwise (it ignores nested .npmrc workspaces=false and the env
+        # var conflicts with --workspace). This flag explicitly says
+        # "treat this as standalone." Uses packages/runner/package-lock.json.
+        run: npm ci --no-workspaces
 
-      - name: Typecheck runner workspace
-        run: npm run typecheck --workspace=packages/runner
+      - name: Typecheck
+        working-directory: packages/runner
+        run: npm run typecheck
 
-      - name: Test runner workspace
-        run: npm test --workspace=packages/runner
+      - name: Test
+        working-directory: packages/runner
+        run: npm test
 
-      # Install both deploy CLIs globally so their build subprocesses can find
-      # `npm` on PATH. The previous `npx <cli>@latest` pattern caused
-      # `spawn npm ENOENT` from inside `vercel build` — its child process
-      # didn't inherit PATH from the wrapping npx shim consistently across
-      # Node 20 runners. Follows Vercel's recommended GitHub Actions pattern.
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
