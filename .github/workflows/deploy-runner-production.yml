@@ -96,14 +96,29 @@ jobs:
       - name: Install Trigger.dev CLI
         run: npm install --global trigger.dev@latest
 
+      # Server-side build (no --prebuilt). Vercel's local `vercel build`
+      # had an unfixable `spawn npm ENOENT` from inside its install
+      # subprocess (see runs #26449168750, #26449398708, #26450563874,
+      # #26450973760). Letting Vercel's cloud handle the build sidesteps
+      # the CLI bug.
+      #
+      # Depends on Vercel dashboard state:
+      #   - "Ignored Build Step" = Automatic (NOT `exit 0` — that skips
+      #     server-side builds too)
+      #   - Git integration disconnected (otherwise git push auto-deploy
+      #     races with this CI workflow)
+      # Run from monorepo root, NOT packages/runner. The Vercel project's
+      # rootDirectory setting is already "packages/runner" (per
+      # .vercel/project.json), so Vercel will descend into packages/runner
+      # on its own. Combining working-directory: packages/runner with
+      # rootDirectory: packages/runner produces a doubled path
+      # `packages/runner/packages/runner` that doesn't exist.
       - name: Deploy Vercel webhook (production)
-        working-directory: packages/runner
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          vercel build --prod --token="$VERCEL_TOKEN"
-          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prod --token="$VERCEL_TOKEN"
 
       - name: Deploy trigger.dev worker (production)
         working-directory: packages/runner
