@@ -8,7 +8,7 @@ Two packages, one workspace.
 ## Install (end users)
 
 ```bash
-# Recommended (v0.6.0+):
+# Recommended (v0.6.1+):
 curl -fsSL https://raw.githubusercontent.com/Calibrax-ai/autoship/main/install.sh | bash
 
 # Legacy npm path (still supported):
