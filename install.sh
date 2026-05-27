@@ -42,22 +42,25 @@ trap cleanup EXIT
 TARBALL_URL="https://github.com/${REPO}/archive/refs/heads/${REF}.tar.gz"
 AUTH_HEADER=()
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  # GitHub accepts the same PAT for repo content access via the public
-  # archive URL. Use it if present (required while the repo is private).
+  # GitHub accepts a PAT for repo content access via the archive URL.
+  # Optional now that the repo is public; kept for repo-becomes-private
+  # safety and for users behind enterprise proxies that require auth.
   AUTH_HEADER=(-H "Authorization: token ${GITHUB_TOKEN}")
 fi
 
 echo "→ Downloading autoship (${REF}) from ${REPO}..."
-if ! curl -fsSL "${AUTH_HEADER[@]}" "$TARBALL_URL" | tar -xz -C "$TMP_DIR" 2>/dev/null; then
-  # Re-run without piping to tar so we get the real HTTP status.
-  http_status="$(curl -sI -o /dev/null -w '%{http_code}' "${AUTH_HEADER[@]}" "$TARBALL_URL")"
+# ${arr[@]+"${arr[@]}"} guards against unbound-variable error from set -u
+# when AUTH_HEADER is empty (no GITHUB_TOKEN set, which is the common case
+# for the public repo).
+if ! curl -fsSL ${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"} "$TARBALL_URL" | tar -xz -C "$TMP_DIR" 2>/dev/null; then
+  http_status="$(curl -sI -o /dev/null -w '%{http_code}' ${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"} "$TARBALL_URL")"
   echo "" >&2
   echo "Error: failed to download tarball (HTTP $http_status)" >&2
   echo "  URL: $TARBALL_URL" >&2
-  if [[ "$http_status" == "404" && -z "${GITHUB_TOKEN:-}" ]]; then
+  if [[ "$http_status" == "404" ]]; then
     echo "" >&2
-    echo "  The autoship repository is currently private. Set GITHUB_TOKEN" >&2
-    echo "  to a Personal Access Token with repo:read scope and re-run:" >&2
+    echo "  If ${REPO} is private in your context, set GITHUB_TOKEN to a" >&2
+    echo "  Personal Access Token with repo:read scope and re-run:" >&2
     echo "" >&2
     echo "    GITHUB_TOKEN=ghp_xxx curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >&2
     echo "" >&2

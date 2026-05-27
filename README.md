@@ -8,11 +8,8 @@ Two packages, one workspace.
 ## Install (end users)
 
 ```bash
-# Recommended (v0.7.0+, no npm/Node required at install time):
+# Recommended (v0.7.0+):
 curl -fsSL https://raw.githubusercontent.com/Calibrax-ai/autoship/main/install.sh | bash
-
-# While the repo is private, pass a GitHub token with repo:read scope:
-GITHUB_TOKEN=ghp_xxx curl -fsSL https://raw.githubusercontent.com/Calibrax-ai/autoship/main/install.sh | bash
 
 # Legacy npm path (still supported through v0.7.x):
 npx @cs-calibrax/autoship init
