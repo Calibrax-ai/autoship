@@ -45,29 +45,23 @@ build_prompt() {
   fi
 }
 
-# Strips --print from args; emits remaining args one per line on stdout.
-# Sets the global PRINT_FLAG=1 if --print was present, 0 otherwise.
+# Strips --print from args, populating globals DISPATCH_ARGS (array) and
+# PRINT_FLAG (0/1). Direct iteration — no subprocess, so PRINT_FLAG
+# changes are visible to the caller. (Earlier version used process
+# substitution; subshell ate the PRINT_FLAG update.)
 PRINT_FLAG=0
-strip_print_flag() {
-  local arg
+DISPATCH_ARGS=()
+collect_args() {
+  DISPATCH_ARGS=()
   PRINT_FLAG=0
+  local arg
   for arg in "$@"; do
     if [[ "$arg" == "--print" ]]; then
       PRINT_FLAG=1
     else
-      printf '%s\n' "$arg"
+      DISPATCH_ARGS+=("$arg")
     fi
   done
-}
-
-# Reads strip_print_flag output back into an array. Sets DISPATCH_ARGS.
-# Usage: collect_args "$@"; then DISPATCH_ARGS is the cleaned list.
-collect_args() {
-  DISPATCH_ARGS=()
-  local line
-  while IFS= read -r line; do
-    DISPATCH_ARGS+=("$line")
-  done < <(strip_print_flag "$@")
 }
 
 # Dispatches a prompt to `claude --agent autoship-controller`. Mode is
@@ -84,11 +78,19 @@ dispatch_controller() {
 
   if [[ "${AUTOSHIP_PRINT:-}" == "1" ]]; then
     local display_path="${claude_path:-claude}"
+    # Match .mjs's argv.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')
+    # behavior: only quote args containing spaces.
+    local quoted_prompt
+    if [[ "$prompt" == *" "* ]]; then
+      quoted_prompt="\"$prompt\""
+    else
+      quoted_prompt="$prompt"
+    fi
     if [[ "$mode" == "headless" ]]; then
-      printf '%s --agent autoship-controller -p "%s"\n' "$display_path" "$prompt"
+      printf '%s --agent autoship-controller -p %s\n' "$display_path" "$quoted_prompt"
     else
       if [[ -n "$prompt" ]]; then
-        printf '%s --agent autoship-controller "%s"\n' "$display_path" "$prompt"
+        printf '%s --agent autoship-controller %s\n' "$display_path" "$quoted_prompt"
       else
         printf '%s --agent autoship-controller\n' "$display_path"
       fi
@@ -126,7 +128,9 @@ verb_dispatch() {
   local verb="$1"; shift
   collect_args "$@"
   local prompt
-  prompt="$(build_prompt "$verb" "${DISPATCH_ARGS[@]}")"
+  # ${arr[@]+"${arr[@]}"} guards against unbound-variable error from set -u
+  # when the array is empty (bash 3.2/4.x edge case).
+  prompt="$(build_prompt "$verb" ${DISPATCH_ARGS[@]+"${DISPATCH_ARGS[@]}"})"
   if [[ "$PRINT_FLAG" == "1" ]]; then
     dispatch_controller "$prompt" headless
   else
@@ -137,7 +141,10 @@ verb_dispatch() {
 # Bare-prompt forwarding (anything that isn't a known verb is a natural-language prompt).
 bare_prompt_dispatch() {
   collect_args "$@"
-  local prompt="${DISPATCH_ARGS[*]}"
+  local prompt=""
+  if [[ ${#DISPATCH_ARGS[@]} -gt 0 ]]; then
+    prompt="${DISPATCH_ARGS[*]}"
+  fi
   if [[ "$PRINT_FLAG" == "1" ]]; then
     dispatch_controller "$prompt" headless
   else
@@ -150,8 +157,13 @@ case "$VERB" in
     # Transitional: Phase 3 replaces this delegation with lib/init.sh.
     exec node "$SCRIPT_DIR/autoship.mjs" init "$@"
     ;;
-  audit|groom|deliver|create-issues|materialize)
+  audit|groom|deliver|create-issues)
     verb_dispatch "$VERB" "$@"
+    ;;
+  materialize)
+    # Compatibility alias: materialize → create-issues. The .mjs implementation
+    # has runMaterialize that builds a "create-issues ..." prompt; mirror that.
+    verb_dispatch "create-issues" "$@"
     ;;
   interactive)
     dispatch_controller "" interactive
