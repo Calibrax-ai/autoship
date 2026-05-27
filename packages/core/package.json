@@ -20,7 +20,7 @@
   "author": "Calibrax",
   "type": "module",
   "bin": {
-    "autoship": "bin/autoship.mjs"
+    "autoship": "bin/autoship"
   },
   "files": [
     "bin/",

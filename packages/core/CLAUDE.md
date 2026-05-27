@@ -31,7 +31,8 @@ Important boundaries:
 
 ## Key Files
 
-- `bin/autoship.mjs` — native CLI: `init`, `audit`, `groom`, `deliver`, `create-issues`, `materialize`, bare-prompt forwarding, and `interactive`. All non-init commands spawn `claude --agent autoship-controller` with the right prompt.
+- `bin/autoship` — bash CLI entry point (Phase 1 of v0.7.0 migration). Handles `audit`, `groom`, `deliver`, `create-issues`, `materialize`, `interactive`, and bare-prompt forwarding via a 3-line `claude --agent autoship-controller` dispatch. Pure bash — no Node.js needed for these verbs. Delegates `init` to `bin/autoship.mjs` (transitional; Phase 3 replaces init with bash too).
+- `bin/autoship.mjs` — transitional: still owns the `init` verb. Will be replaced in Phase 3 of the bash CLI migration. Non-init dispatch was moved to `bin/autoship` in v0.7.0 Phase 1.
 - `cli/init.mjs` — scaffolds live core agents/skills, `.autoship/standards.yaml`, and commented `.autoship/defaults.yaml`.
 - `cli/infer-standards.mjs` — heuristic inference of standards.yaml fields from repo evidence (used by both `init` and `standards`).
 - `.claude/agents/autoship-controller.md` — controller for audit, groom, and deliver.
@@ -84,17 +85,19 @@ Framework checks:
 ```bash
 node --check cli/init.mjs
 node --check bin/autoship.mjs
+shellcheck bin/autoship
+test/bash-dispatch.sh                    # bash vs .mjs dispatch parity
 npm pack --dry-run --json
 ```
 
-Installer smoke:
+Installer smoke (from monorepo root):
 
 ```bash
 rm -rf /tmp/autoship-smoke
 mkdir /tmp/autoship-smoke
 cd /tmp/autoship-smoke
 git init
-node /Users/shyangcalibrax/Documents/Projects/autoship/bin/autoship.mjs init
+/path/to/autoship/packages/core/bin/autoship init
 find .claude/agents -maxdepth 1 -name '*.md' | wc -l
 find .claude/skills -mindepth 1 -maxdepth 1 -type d | wc -l
 test -f .autoship/standards.yaml
@@ -108,12 +111,15 @@ Controller smoke:
 
 ```bash
 claude --agent autoship-controller -p "audit --report-only"
+# Or, via the bash CLI:
+AUTOSHIP_PRINT=1 bin/autoship audit --report-only    # echo the resolved command
+bin/autoship audit --report-only                      # run it
 ```
 
 Init advisory smoke (re-run on existing .autoship/):
 
 ```bash
-node /Users/shyangcalibrax/Documents/Projects/autoship/bin/autoship.mjs init
+/path/to/autoship/packages/core/bin/autoship init
 ```
 
 ## Editing Conventions

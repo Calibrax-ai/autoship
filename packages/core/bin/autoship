@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# autoship — turn messy software work into reviewable, reliable delivery
+# Phase 1 bash dispatch. Non-init verbs run through claude directly; init
+# transitionally delegates to bin/autoship.mjs (replaced in Phase 3 of v0.7.0).
+
+set -euo pipefail
+
+VERB="${1:-help}"
+shift || true
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+print_help() {
+  cat <<'USAGE'
+autoship — turn messy software work into reviewable, reliable delivery
+
+Usage:
+  autoship init                        Install + configure autoship in this repo
+  autoship init --no-interactive       (kept for backwards compat — already non-interactive)
+  autoship "<prompt>"                  Run a natural-language request through the controller
+  autoship audit [args...]             Run audit via the controller (interactive — output streams)
+  autoship groom [scope...]            Groom issues and write local specs
+  autoship deliver [args...]           Run deliver via the controller (interactive — output streams)
+  autoship create-issues <issue-id>    Create Linear child issues from an approved breakdown
+  autoship materialize <issue-id>      Compatibility alias for create-issues
+  autoship interactive                 Open an interactive controller chat with no starting prompt
+
+Prompt/audit/groom/deliver default to INTERACTIVE mode — output streams as the
+controller runs, session stays open for follow-ups. Add --print for headless
+mode (final response only; useful for CI / pipes).
+
+Set AUTOSHIP_PRINT=1 to see the resolved `claude` invocation without running it.
+
+Docs: https://github.com/Calibrax-ai/autoship
+USAGE
+}
+
+# Builds "<verb> [args...]" with single-space joining, matching the .mjs's buildPrompt.
+build_prompt() {
+  local verb="$1"; shift
+  if [[ $# -eq 0 ]]; then
+    printf '%s' "$verb"
+  else
+    printf '%s %s' "$verb" "$*"
+  fi
+}
+
+# Strips --print from args, populating globals DISPATCH_ARGS (array) and
+# PRINT_FLAG (0/1). Direct iteration — no subprocess, so PRINT_FLAG
+# changes are visible to the caller. (Earlier version used process
+# substitution; subshell ate the PRINT_FLAG update.)
+PRINT_FLAG=0
+DISPATCH_ARGS=()
+collect_args() {
+  DISPATCH_ARGS=()
+  PRINT_FLAG=0
+  local arg
+  for arg in "$@"; do
+    if [[ "$arg" == "--print" ]]; then
+      PRINT_FLAG=1
+    else
+      DISPATCH_ARGS+=("$arg")
+    fi
+  done
+}
+
+# Dispatches a prompt to `claude --agent autoship-controller`. Mode is
+# "interactive" (default; passes prompt as positional arg) or "headless"
+# (uses -p flag, prints only the final response).
+#
+# Honors AUTOSHIP_PRINT=1 by echoing the resolved command instead of running.
+# Prints fallback guidance + exits non-zero if `claude` is not on PATH.
+dispatch_controller() {
+  local prompt="$1"
+  local mode="${2:-interactive}"
+  local claude_path
+  claude_path="$(command -v claude || true)"
+
+  if [[ "${AUTOSHIP_PRINT:-}" == "1" ]]; then
+    local display_path="${claude_path:-claude}"
+    # Match .mjs's argv.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')
+    # behavior: only quote args containing spaces.
+    local quoted_prompt
+    if [[ "$prompt" == *" "* ]]; then
+      quoted_prompt="\"$prompt\""
+    else
+      quoted_prompt="$prompt"
+    fi
+    if [[ "$mode" == "headless" ]]; then
+      printf '%s --agent autoship-controller -p %s\n' "$display_path" "$quoted_prompt"
+    else
+      if [[ -n "$prompt" ]]; then
+        printf '%s --agent autoship-controller %s\n' "$display_path" "$quoted_prompt"
+      else
+        printf '%s --agent autoship-controller\n' "$display_path"
+      fi
+    fi
+    return 0
+  fi
+
+  if [[ -z "$claude_path" ]]; then
+    cat >&2 <<EOF
+
+\`claude\` is not on your PATH, so autoship can't run the controller for you.
+
+Install Claude Code (https://claude.com/claude-code), then run:
+
+  claude --agent autoship-controller -p "$prompt"
+
+(Set AUTOSHIP_PRINT=1 to print this command without trying to run it.)
+EOF
+    exit 1
+  fi
+
+  if [[ "$mode" == "headless" ]]; then
+    exec "$claude_path" --agent autoship-controller -p "$prompt"
+  else
+    if [[ -n "$prompt" ]]; then
+      exec "$claude_path" --agent autoship-controller "$prompt"
+    else
+      exec "$claude_path" --agent autoship-controller
+    fi
+  fi
+}
+
+# For verbs that build "<verb> [args...]" prompts (audit/groom/deliver/...).
+verb_dispatch() {
+  local verb="$1"; shift
+  collect_args "$@"
+  local prompt
+  # ${arr[@]+"${arr[@]}"} guards against unbound-variable error from set -u
+  # when the array is empty (bash 3.2/4.x edge case).
+  prompt="$(build_prompt "$verb" ${DISPATCH_ARGS[@]+"${DISPATCH_ARGS[@]}"})"
+  if [[ "$PRINT_FLAG" == "1" ]]; then
+    dispatch_controller "$prompt" headless
+  else
+    dispatch_controller "$prompt" interactive
+  fi
+}
+
+# Bare-prompt forwarding (anything that isn't a known verb is a natural-language prompt).
+bare_prompt_dispatch() {
+  collect_args "$@"
+  local prompt=""
+  if [[ ${#DISPATCH_ARGS[@]} -gt 0 ]]; then
+    prompt="${DISPATCH_ARGS[*]}"
+  fi
+  if [[ "$PRINT_FLAG" == "1" ]]; then
+    dispatch_controller "$prompt" headless
+  else
+    dispatch_controller "$prompt" interactive
+  fi
+}
+
+case "$VERB" in
+  init)
+    # Transitional: Phase 3 replaces this delegation with lib/init.sh.
+    exec node "$SCRIPT_DIR/autoship.mjs" init "$@"
+    ;;
+  audit|groom|deliver|create-issues)
+    verb_dispatch "$VERB" "$@"
+    ;;
+  materialize)
+    # Compatibility alias: materialize → create-issues. The .mjs implementation
+    # has runMaterialize that builds a "create-issues ..." prompt; mirror that.
+    verb_dispatch "create-issues" "$@"
+    ;;
+  interactive)
+    dispatch_controller "" interactive
+    ;;
+  help|--help|-h)
+    print_help
+    ;;
+  --version)
+    node -e "console.log(require('$SCRIPT_DIR/../package.json').version)"
+    ;;
+  *)
+    if [[ -n "$VERB" ]]; then
+      bare_prompt_dispatch "$VERB" "$@"
+    else
+      print_help
+    fi
+    ;;
+esac
