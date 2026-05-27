@@ -7,12 +7,13 @@ Autoship is a set of Claude Code agents and skills for the path from repo readin
 ## Install
 
 ```bash
-# Recommended (v0.7.0+, no npm required to install):
+# Recommended (v0.6.0+, no npm required to install):
 curl -fsSL https://raw.githubusercontent.com/Calibrax-ai/autoship/main/install.sh | bash
 # Then, in your target repo:
 autoship init
 
-# Legacy npm path (still supported, scheduled for deprecation in v0.8.0):
+# Legacy npm path (still supported; eventual deprecation planned once
+# the bash CLI rewrite — Phases 2, 3, 5 of the v0.7.0 design — completes):
 npx @cs-calibrax/autoship init
 ```
 

@@ -39,7 +39,9 @@ TMP_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-TARBALL_URL="https://github.com/${REPO}/archive/refs/heads/${REF}.tar.gz"
+# GitHub's /archive/<ref>.tar.gz form auto-resolves to either branch or tag.
+# Works for AUTOSHIP_REF=main, AUTOSHIP_REF=v0.7.0, AUTOSHIP_REF=<sha>, etc.
+TARBALL_URL="https://github.com/${REPO}/archive/${REF}.tar.gz"
 AUTH_HEADER=()
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   # GitHub accepts a PAT for repo content access via the archive URL.
