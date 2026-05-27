@@ -8,10 +8,17 @@ Two packages, one workspace.
 ## Install (end users)
 
 ```bash
+# Recommended (v0.7.0+, no npm/Node required at install time):
+curl -fsSL https://raw.githubusercontent.com/Calibrax-ai/autoship/main/install.sh | bash
+
+# While the repo is private, pass a GitHub token with repo:read scope:
+GITHUB_TOKEN=ghp_xxx curl -fsSL https://raw.githubusercontent.com/Calibrax-ai/autoship/main/install.sh | bash
+
+# Legacy npm path (still supported through v0.7.x):
 npx @cs-calibrax/autoship init
 ```
 
-This installs the autoship agents and skills into the current git repo. No knowledge of the monorepo is needed to use autoship — only contributors need the monorepo shape.
+After install, `cd` into a git repo and run `autoship init`. This installs the autoship agents and skills into that repo. No knowledge of the monorepo is needed to use autoship — only contributors need the monorepo shape.
 
 ## Develop (contributors)
 
